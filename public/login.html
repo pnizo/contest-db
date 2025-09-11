@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ログイン - スプレッドシートDB</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="login-page">
+    <div class="login-container">
+        <div class="login-card">
+            <header class="login-header">
+                <h1>ログイン</h1>
+                <p>スプレッドシートDB ユーザー管理システム</p>
+            </header>
+
+            <form id="loginForm" class="login-form">
+                <div class="form-group">
+                    <label for="email">メールアドレス</label>
+                    <input type="email" id="email" name="email" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="password">パスワード</label>
+                    <input type="password" id="password" name="password" required>
+                </div>
+
+                <button type="submit" class="login-btn">ログイン</button>
+            </form>
+        </div>
+
+        <div id="notification" class="notification hidden"></div>
+    </div>
+
+    <script>
+        class LoginManager {
+            constructor() {
+                this.init();
+            }
+
+            init() {
+                this.checkAuthStatus();
+                this.bindEvents();
+            }
+
+            async checkAuthStatus() {
+                try {
+                    const response = await fetch('/api/auth/status', {
+                        credentials: 'include'
+                    });
+                    const result = await response.json();
+                    
+                    if (result.isAuthenticated) {
+                        window.location.href = '/';
+                    }
+                } catch (error) {
+                    console.error('Auth check error:', error);
+                }
+            }
+
+            bindEvents() {
+                document.getElementById('loginForm').addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    this.handleLogin(e);
+                });
+            }
+
+            async handleLogin(e) {
+                const formData = new FormData(e.target);
+                const loginData = Object.fromEntries(formData.entries());
+
+                try {
+                    const response = await fetch('/api/auth/login', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(loginData),
+                        credentials: 'include'
+                    });
+
+                    const result = await response.json();
+
+                    if (result.success) {
+                        this.showNotification('ログインしました', 'success');
+                        setTimeout(() => {
+                            window.location.href = '/';
+                        }, 1000);
+                    } else {
+                        this.showNotification(result.error, 'error');
+                    }
+                } catch (error) {
+                    this.showNotification('ログインエラーが発生しました: ' + error.message, 'error');
+                }
+            }
+
+            showNotification(message, type) {
+                const notification = document.getElementById('notification');
+                notification.textContent = message;
+                notification.className = `notification ${type}`;
+                notification.classList.remove('hidden');
+                
+                setTimeout(() => {
+                    notification.classList.add('show');
+                }, 100);
+
+                setTimeout(() => {
+                    notification.classList.remove('show');
+                    setTimeout(() => {
+                        notification.classList.add('hidden');
+                    }, 300);
+                }, 3000);
+            }
+        }
+
+        const loginManager = new LoginManager();
+    </script>
+</body>
+</html>

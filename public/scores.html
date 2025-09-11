@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>大会成績管理 - スプレッドシートDB</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <div id="authHeader" class="auth-header" style="display: none;">
+            <div class="user-info-display">
+                <div class="user-avatar" id="userAvatar"></div>
+                <div class="user-details-display">
+                    <div class="name" id="userName"></div>
+                    <div class="role" id="userRole"></div>
+                </div>
+            </div>
+            <div class="auth-actions">
+                <nav class="page-nav">
+                    <a href="/" class="nav-link">ユーザー管理</a>
+                    <a href="/scores" class="nav-link active">成績管理</a>
+                </nav>
+                <button id="logoutBtn" class="logout-btn">ログアウト</button>
+            </div>
+        </div>
+
+        <main class="scores-main">
+            <section class="collapsible-section import-section">
+                <div class="section-header" onclick="toggleSection('import-section')">
+                    <h2>CSVインポート</h2>
+                    <span class="toggle-icon">▼</span>
+                </div>
+                <div class="section-content collapsed" id="import-section-content">
+                <div class="import-form">
+                    <div class="form-group">
+                        <label for="csvFile">CSVファイルを選択:</label>
+                        <input type="file" id="csvFile" name="csvFile" accept=".csv" required>
+                        <small>※CSV形式のファイルを選択してください</small>
+                    </div>
+                    <!-- <div class="form-group">
+                        <label>マッピング情報:</label>
+                        <div class="mapping-info">
+                            <p><strong>CSV → スプレッドシート</strong></p>
+                            <ul>
+                                <li>npcj_no → npcj_no</li>
+                                <li>contest_date → contest_date</li>
+                                <li>contest_name → contest_name</li>
+                                <li>category_name → category_name</li>
+                                <li>contest_place → contest_place</li>
+                                <li>placing → placing</li>
+                                <li>player_no → player_no</li>
+                                <li>player_name → player_name</li>
+                            </ul>
+                        </div>
+                    </div> -->
+                    <button type="button" id="importBtn" disabled>CSVをインポート</button>
+                    <div id="importStatus" class="import-status hidden"></div>
+                </div>
+                </div>
+            </section>
+
+            <section class="collapsible-section scores-section">
+                <div class="section-header" onclick="toggleSection('scores-section')">
+                    <h2>成績一覧</h2>
+                    <span class="toggle-icon">▼</span>
+                </div>
+                <div class="section-content" id="scores-section-content">
+                <div class="section-controls">
+                    <div class="controls">
+                        <div class="search-container">
+                            <input type="text" id="searchInput" placeholder="大会名・カテゴリー名で検索..." class="search-input">
+                            <button type="button" id="clearSearchBtn" class="clear-btn" title="検索をクリア">×</button>
+                        </div>
+                        <div class="control-buttons">
+                            <button id="refreshBtn">データ再読込</button>
+                            <button id="toggleDeletedBtn" class="toggle-btn">削除済みを表示</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="filters">
+                    <div class="filter-row">
+                        <input type="text" id="npcjFilter" placeholder="NPCJ番号" class="filter-input">
+                        <select id="contestFilter" class="filter-select">
+                            <option value="">大会名を選択</option>
+                        </select>
+                        <select id="categoryFilter" class="filter-select">
+                            <option value="">カテゴリー名を選択</option>
+                        </select>
+                    </div>
+                    <div class="filter-row">
+                        <div class="date-range">
+                            <input type="date" id="startDate" class="filter-input">
+                            <span class="date-separator">〜</span>
+                            <input type="date" id="endDate" class="filter-input">
+                        </div>
+                        <div class="filter-actions">
+                            <button id="applyFiltersBtn" class="filter-btn">絞り込み</button>
+                            <button id="clearFiltersBtn" class="filter-btn">クリア</button>
+                        </div>
+                    </div>
+                </div>
+                
+                <div id="scoresTableContainer">
+                    <div class="loading">読み込み中...</div>
+                </div>
+                
+                <div id="pagination" class="pagination hidden">
+                    <button id="prevPageBtn" class="pagination-btn">前へ</button>
+                    <span id="pageInfo" class="page-info">ページ 1 / 1 (全 0 件)</span>
+                    <button id="nextPageBtn" class="pagination-btn">次へ</button>
+                </div>
+                </div>
+            </section>
+        </main>
+
+        <div id="notification" class="notification hidden"></div>
+    </div>
+
+    <!-- Edit Score Modal -->
+    <div id="editModal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>成績を編集</h2>
+                <button class="modal-close" onclick="scoresManager.closeEditModal()">&times;</button>
+            </div>
+            <form id="editScoreForm" class="modal-form">
+                <div class="form-group">
+                    <label for="editNpcjNo">NPCJ番号:</label>
+                    <input type="text" id="editNpcjNo" name="npcj_no" required>
+                </div>
+                <div class="form-group">
+                    <label for="editContestDate">開催日:</label>
+                    <input type="date" id="editContestDate" name="contest_date" required>
+                </div>
+                <div class="form-group">
+                    <label for="editContestName">大会名:</label>
+                    <input type="text" id="editContestName" name="contest_name" required>
+                </div>
+                <div class="form-group">
+                    <label for="editCategoryName">カテゴリー名:</label>
+                    <input type="text" id="editCategoryName" name="category_name" required>
+                </div>
+                <div class="form-group">
+                    <label for="editPlacing">順位:</label>
+                    <input type="number" id="editPlacing" name="placing" min="1" required>
+                </div>
+                <div class="form-group">
+                    <label for="editPlayerName">選手名:</label>
+                    <input type="text" id="editPlayerName" name="player_name" required>
+                </div>
+                <div class="form-group">
+                    <label for="editContestPlace">開催地:</label>
+                    <input type="text" id="editContestPlace" name="contest_place" required>
+                </div>
+                <div class="form-actions">
+                    <button type="button" onclick="scoresManager.closeEditModal()" class="btn btn-secondary">キャンセル</button>
+                    <button type="submit" class="btn btn-primary">更新</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="scores-script.js"></script>
+</body>
+</html>
