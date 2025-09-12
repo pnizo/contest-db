@@ -68,6 +68,7 @@ class ScoresManager {
             const response = await fetch(`${this.apiUrl}/filter-options`, {
                 credentials: 'include'
             });
+            
             const result = await response.json();
             console.log('Filter options response:', result);
 
@@ -353,6 +354,7 @@ class ScoresManager {
             }
 
             const response = await fetch(url, { credentials: 'include' });
+            
             const result = await response.json();
 
             if (result.success) {
@@ -708,6 +710,7 @@ class ScoresManager {
             const response = await fetch(`${this.apiUrl}/${id}`, {
                 credentials: 'include'
             });
+            
             const result = await response.json();
             
             if (result.success) {

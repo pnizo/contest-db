@@ -248,4 +248,74 @@ router.post('/import', requireAuth, async (req, res) => {
   }
 });
 
+// テキスト形式で成績データを取得
+router.get('/text/:npcjNo', async (req, res) => {
+  try {
+    const { npcjNo } = req.params;
+    const sortBy = req.query.sort || 'contest_date';
+    const sortOrder = req.query.order || 'desc';
+    
+    if (!npcjNo) {
+      return res.status(400).json({ success: false, error: 'NPCJ番号が必要です' });
+    }
+    
+    // 指定されたNPCJ番号の成績を取得
+    const allScores = await scoreModel.findAll();
+    const userScores = allScores.filter(score => 
+      score.npcj_no && score.npcj_no.toString() === npcjNo.toString()
+    );
+    
+    if (userScores.length === 0) {
+      return res.status(404).json({ 
+        success: false, 
+        error: `NPCJ番号 ${npcjNo} の成績が見つかりません` 
+      });
+    }
+    
+    // ソート処理
+    const sortedScores = userScores.sort((a, b) => {
+      let aValue = a[sortBy] || '';
+      let bValue = b[sortBy] || '';
+      
+      // 数値の場合は数値として比較
+      if (sortBy === 'placing' || sortBy === 'npcj_no') {
+        aValue = parseInt(aValue) || 0;
+        bValue = parseInt(bValue) || 0;
+      }
+      
+      // 日付の場合は日付として比較
+      if (sortBy === 'contest_date') {
+        aValue = new Date(aValue) || new Date(0);
+        bValue = new Date(bValue) || new Date(0);
+      }
+      
+      let comparison = 0;
+      if (aValue < bValue) comparison = -1;
+      if (aValue > bValue) comparison = 1;
+      
+      return sortOrder === 'desc' ? -comparison : comparison;
+    });
+    
+    // テキスト形式で出力
+    const textLines = sortedScores.map(score => {
+      const date = score.contest_date || '不明';
+      const contest = score.contest_name || '不明';
+      const category = score.category_name || '不明';
+      const placing = score.placing || '不明';
+      
+      return `${date} | ${contest} | ${category} | ${placing}位`;
+    });
+    
+    const resultText = textLines.join('\n');
+    
+    // テキスト形式で返す
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    res.send(resultText);
+    
+  } catch (error) {
+    console.error('Text API error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 module.exports = router;

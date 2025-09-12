@@ -7,7 +7,7 @@ require('dotenv').config();
 const userRoutes = require('./routes/users');
 const authRoutes = require('./routes/auth');
 const scoreRoutes = require('./routes/scores');
-const { checkAuth } = require('./middleware/auth');
+const { checkAuth, requireIpRestriction } = require('./middleware/auth');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -31,17 +31,13 @@ app.use(session({
   }
 }));
 
-// 静的ファイルを先に設定
-app.use(express.static('public'));
+// セキュリティミドルウェア（IP制限のみ）
+app.use('/api', requireIpRestriction);
 
 // 認証チェックミドルウェア
 app.use(checkAuth);
 
-// ページルート（HTMLファイル）
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
-
+// ページルート
 app.get('/login', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'login.html'));
 });
@@ -49,6 +45,9 @@ app.get('/login', (req, res) => {
 app.get('/scores', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'scores.html'));
 });
+
+// 静的ファイルを設定
+app.use(express.static('public'));
 
 // APIルート
 app.use('/api/auth', authRoutes);
@@ -61,13 +60,5 @@ app.use((err, req, res, next) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`サーバーがポート ${PORT} で起動しました`);
-  console.log(`アプリケーション: http://localhost:${PORT}`);
-  console.log('');
-  console.log('セットアップ手順:');
-  console.log('1. .env.example を .env にコピー');
-  console.log('2. Google Cloud Console でプロジェクトとサービスアカウントを作成');
-  console.log('3. .env ファイルに認証情報を設定');
-  console.log('4. スプレッドシートにサービスアカウントの編集権限を付与');
-  console.log('5. スプレッドシートの最初の行にヘッダー (id, name, email, role, createdAt) を設定');
+  console.log(`🚀 Server running at http://localhost:${PORT}`);
 });

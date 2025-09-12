@@ -3,16 +3,29 @@ require('dotenv').config();
 
 class SheetsService {
   constructor() {
-    this.auth = new google.auth.GoogleAuth({
-      credentials: {
-        client_email: process.env.GOOGLE_SHEETS_CLIENT_EMAIL,
-        private_key: process.env.GOOGLE_SHEETS_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-      },
-      scopes: ['https://www.googleapis.com/auth/spreadsheets'],
-    });
-    
-    this.sheets = google.sheets({ version: 'v4', auth: this.auth });
     this.spreadsheetId = process.env.GOOGLE_SHEETS_SPREADSHEET_ID;
+    this._auth = null;
+    this._sheets = null;
+  }
+
+  get auth() {
+    if (!this._auth) {
+      this._auth = new google.auth.GoogleAuth({
+        credentials: {
+          client_email: process.env.GOOGLE_SHEETS_CLIENT_EMAIL,
+          private_key: process.env.GOOGLE_SHEETS_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+        },
+        scopes: ['https://www.googleapis.com/auth/spreadsheets'],
+      });
+    }
+    return this._auth;
+  }
+
+  get sheets() {
+    if (!this._sheets) {
+      this._sheets = google.sheets({ version: 'v4', auth: this.auth });
+    }
+    return this._sheets;
   }
 
   async getValues(range) {

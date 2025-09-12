@@ -186,7 +186,10 @@ class UserManager {
 
     async editUser(id) {
         try {
-            const response = await fetch(`${this.apiUrl}/${id}`);
+            const response = await fetch(`${this.apiUrl}/${id}`, {
+                credentials: 'include'
+            });
+            
             const result = await response.json();
 
             if (result.success) {
@@ -221,6 +224,7 @@ class UserManager {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify(userData),
+                credentials: 'include'
             });
 
             const result = await response.json();
@@ -245,6 +249,7 @@ class UserManager {
         try {
             const response = await fetch(`${this.apiUrl}/${id}`, {
                 method: 'DELETE',
+                credentials: 'include'
             });
 
             const result = await response.json();
@@ -268,6 +273,7 @@ class UserManager {
         try {
             const response = await fetch(`${this.apiUrl}/${id}/restore`, {
                 method: 'PUT',
+                credentials: 'include'
             });
 
             const result = await response.json();
@@ -291,6 +297,7 @@ class UserManager {
         try {
             const response = await fetch(`${this.apiUrl}/${id}/permanent`, {
                 method: 'DELETE',
+                credentials: 'include'
             });
 
             const result = await response.json();

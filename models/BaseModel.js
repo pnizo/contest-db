@@ -3,20 +3,35 @@ const SheetsService = require('../config/sheets');
 class BaseModel {
   constructor(sheetName) {
     this.sheetName = sheetName;
-    this.sheetsService = new SheetsService();
+    this.sheetsService = null;
     this.headers = [];
+    this._initialized = false;
+  }
+
+  getSheetsService() {
+    if (!this.sheetsService) {
+      this.sheetsService = new SheetsService();
+    }
+    return this.sheetsService;
+  }
+
+  async ensureInitialized() {
+    if (!this._initialized) {
+      const headerRow = await this.getSheetsService().getValues(`${this.sheetName}!1:1`);
+      this.headers = headerRow[0] || [];
+      this._initialized = true;
+    }
   }
 
   async initialize() {
-    const headerRow = await this.sheetsService.getValues(`${this.sheetName}!1:1`);
-    this.headers = headerRow[0] || [];
-    console.log(`Headers for ${this.sheetName}:`, this.headers);
+    await this.ensureInitialized();
     return this;
   }
 
   async findAll() {
     try {
-      const values = await this.sheetsService.getValues(`${this.sheetName}!A:Z`);
+      await this.ensureInitialized();
+      const values = await this.getSheetsService().getValues(`${this.sheetName}!A:Z`);
       if (values.length === 0) return [];
       
       const headers = values[0];
@@ -39,7 +54,7 @@ class BaseModel {
 
   async findWithPaging(page = 1, limit = 50, filters = {}, sortBy = 'contest_date', sortOrder = 'desc') {
     try {
-      const values = await this.sheetsService.getValues(`${this.sheetName}!A:Z`);
+      const values = await this.getSheetsService().getValues(`${this.sheetName}!A:Z`);
       if (values.length === 0) {
         return { data: [], total: 0, page, limit, totalPages: 0 };
       }
@@ -131,7 +146,7 @@ class BaseModel {
 
   async findAllIncludingDeleted() {
     try {
-      const values = await this.sheetsService.getValues(`${this.sheetName}!A:Z`);
+      const values = await this.getSheetsService().getValues(`${this.sheetName}!A:Z`);
       if (values.length === 0) return [];
       
       const headers = values[0];
@@ -157,12 +172,13 @@ class BaseModel {
 
   async create(data) {
     try {
+      await this.ensureInitialized();
       if (this.headers.length === 0) {
         await this.initialize();
       }
 
       const row = this.headers.map(header => data[header] || '');
-      await this.sheetsService.appendValues(`${this.sheetName}!A:Z`, [row]);
+      await this.getSheetsService().appendValues(`${this.sheetName}!A:Z`, [row]);
       
       return { success: true, data };
     } catch (error) {
@@ -173,6 +189,7 @@ class BaseModel {
 
   async update(id, data) {
     try {
+      await this.ensureInitialized();
       if (this.headers.length === 0) {
         await this.initialize();
       }
@@ -189,7 +206,7 @@ class BaseModel {
         data.hasOwnProperty(header) ? data[header] : item[header]
       );
 
-      await this.sheetsService.updateValues(
+      await this.getSheetsService().updateValues(
         `${this.sheetName}!A${rowIndex}:Z${rowIndex}`,
         [updatedRow]
       );
@@ -203,6 +220,7 @@ class BaseModel {
 
   async delete(id) {
     try {
+      await this.ensureInitialized();
       const all = await this.findAll();
       const item = all.find(item => item.id === id);
       
@@ -211,7 +229,7 @@ class BaseModel {
       }
 
       const rowIndex = item._rowIndex - 2;
-      await this.sheetsService.deleteRow(this.sheetName, rowIndex);
+      await this.getSheetsService().deleteRow(this.sheetName, rowIndex);
       
       return { success: true };
     } catch (error) {
