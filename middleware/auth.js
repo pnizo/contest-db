@@ -36,6 +36,7 @@ const ipToInt = (ip) => {
 };
 
 const requireAuth = (req, res, next) => {
+  // sessionCompatibilityミドルウェアによってreq.sessionにユーザー情報が設定されているはず
   if (!req.session || !req.session.user) {
     return res.status(401).json({ 
       success: false, 

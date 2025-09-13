@@ -73,6 +73,13 @@ router.get('/me', requireAuth, (req, res) => {
 
 router.get('/status', (req, res) => {
   const isAuthenticated = !!(req.session && req.session.user);
+  console.log('Auth status check:', {
+    hasSession: !!req.session,
+    hasUser: !!(req.session && req.session.user),
+    isAuthenticated,
+    userEmail: req.session?.user?.email
+  });
+  
   res.json({ 
     success: true, 
     isAuthenticated,

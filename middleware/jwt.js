@@ -33,16 +33,23 @@ function sessionCompatibility(req, res, next) {
   }
 
   // JWTトークンからユーザー情報を取得
-  const token = req.headers.authorization?.replace('Bearer ', '') || 
-                req.cookies?.token || 
-                req.body?.token ||
-                req.query?.token;
+  const authHeader = req.headers.authorization;
+  const token = authHeader && authHeader.startsWith('Bearer ') 
+    ? authHeader.slice(7) 
+    : req.cookies?.token || 
+      req.body?.token ||
+      req.query?.token;
 
   if (token) {
     const decoded = verifyToken(token);
     if (decoded) {
       req.session.user = decoded;
+      console.log('JWT verified for user:', decoded.email); // デバッグログ
+    } else {
+      console.log('JWT verification failed for token:', token.substring(0, 20) + '...'); // デバッグログ
     }
+  } else {
+    console.log('No JWT token found in request'); // デバッグログ
   }
 
   next();
