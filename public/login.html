@@ -33,6 +33,23 @@
     </div>
 
     <script>
+        // JWT管理ユーティリティ
+        const AuthToken = {
+            get() {
+                return localStorage.getItem('authToken');
+            },
+            set(token) {
+                localStorage.setItem('authToken', token);
+            },
+            remove() {
+                localStorage.removeItem('authToken');
+            },
+            getHeaders() {
+                const token = this.get();
+                return token ? { 'Authorization': `Bearer ${token}` } : {};
+            }
+        };
+
         class LoginManager {
             constructor() {
                 this.init();
@@ -46,6 +63,10 @@
             async checkAuthStatus() {
                 try {
                     const response = await fetch('/api/auth/status', {
+                        headers: {
+                            ...AuthToken.getHeaders(),
+                            'Content-Type': 'application/json'
+                        },
                         credentials: 'include'
                     });
                     const result = await response.json();
@@ -82,6 +103,10 @@
                     const result = await response.json();
 
                     if (result.success) {
+                        // JWTトークンを保存
+                        if (result.token) {
+                            AuthToken.set(result.token);
+                        }
                         this.showNotification('ログインしました', 'success');
                         setTimeout(() => {
                             window.location.href = '/';
