@@ -5,15 +5,26 @@ const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '24h';
 
 // JWTトークンを生成
 function generateToken(user) {
-  return jwt.sign(
-    { 
-      id: user.id, 
-      email: user.email, 
-      role: user.role 
-    },
-    JWT_SECRET,
-    { expiresIn: JWT_EXPIRES_IN }
-  );
+  try {
+    console.log('Generating JWT for user:', { id: user.id, email: user.email, role: user.role });
+    console.log('JWT_SECRET exists:', !!JWT_SECRET);
+    
+    const token = jwt.sign(
+      { 
+        id: user.id, 
+        email: user.email, 
+        role: user.role 
+      },
+      JWT_SECRET,
+      { expiresIn: JWT_EXPIRES_IN }
+    );
+    
+    console.log('JWT generation successful, token length:', token.length);
+    return token;
+  } catch (error) {
+    console.error('JWT generation failed:', error);
+    return null;
+  }
 }
 
 // JWTトークンを検証

@@ -27,14 +27,23 @@ router.post('/login', async (req, res) => {
       
       // JWTトークンを生成
       const token = generateToken(result.user);
+      console.log('Generated JWT token for login:', token ? token.substring(0, 20) + '...' : 'null');
       
-      res.json({ 
+      const loginResponse = { 
         success: true, 
         message: 'ログインしました',
         user: result.user,
         role: result.user.role,
         token: token
+      };
+      
+      console.log('Login response sent:', { 
+        success: loginResponse.success, 
+        hasToken: !!loginResponse.token,
+        userEmail: loginResponse.user.email 
       });
+      
+      res.json(loginResponse);
     } else {
       res.status(401).json(result);
     }

@@ -110,6 +110,7 @@
                     });
 
                     const result = await response.json();
+                    console.log('Login response:', result);
 
                     if (result.success) {
                         // JWTトークンを保存
@@ -118,6 +119,7 @@
                             console.log('JWT token saved:', result.token.substring(0, 20) + '...');
                         } else {
                             console.log('No token received in login response');
+                            console.log('Full response object:', result);
                         }
                         this.showNotification('ログインしました', 'success');
                         setTimeout(() => {
