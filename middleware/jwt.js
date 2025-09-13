@@ -27,29 +27,41 @@ function verifyToken(token) {
 
 // セッション互換性のためのミドルウェア
 function sessionCompatibility(req, res, next) {
-  // セッションオブジェクトを初期化
+  // セッションオブジェクトを初期化（Vercel対応）
   if (!req.session) {
     req.session = {};
   }
 
   // JWTトークンからユーザー情報を取得
   const authHeader = req.headers.authorization;
-  const token = authHeader && authHeader.startsWith('Bearer ') 
-    ? authHeader.slice(7) 
-    : req.cookies?.token || 
-      req.body?.token ||
-      req.query?.token;
+  let token = null;
+  
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    token = authHeader.slice(7);
+    console.log('JWT token found in Authorization header');
+  } else if (req.cookies?.token) {
+    token = req.cookies.token;
+    console.log('JWT token found in cookies');
+  } else if (req.body?.token) {
+    token = req.body.token;
+    console.log('JWT token found in body');
+  } else if (req.query?.token) {
+    token = req.query.token;
+    console.log('JWT token found in query');
+  } else {
+    console.log('No JWT token found in request headers, cookies, body, or query');
+  }
 
   if (token) {
     const decoded = verifyToken(token);
     if (decoded) {
       req.session.user = decoded;
-      console.log('JWT verified for user:', decoded.email); // デバッグログ
+      console.log('JWT verified successfully for user:', decoded.email);
     } else {
-      console.log('JWT verification failed for token:', token.substring(0, 20) + '...'); // デバッグログ
+      console.log('JWT verification failed for token:', token.substring(0, 20) + '...');
+      // トークンが無効な場合、セッションからユーザー情報を削除
+      req.session.user = null;
     }
-  } else {
-    console.log('No JWT token found in request'); // デバッグログ
   }
 
   next();

@@ -62,6 +62,10 @@
 
             async checkAuthStatus() {
                 try {
+                    console.log('Checking auth status on login page...');
+                    const token = AuthToken.get();
+                    console.log('Token exists in localStorage:', !!token);
+                    
                     const response = await fetch('/api/auth/status', {
                         headers: {
                             ...AuthToken.getHeaders(),
@@ -71,8 +75,13 @@
                     });
                     const result = await response.json();
                     
+                    console.log('Auth status result:', result);
+                    
                     if (result.isAuthenticated) {
+                        console.log('User is authenticated, redirecting to /users');
                         window.location.href = '/users';
+                    } else {
+                        console.log('User is not authenticated, staying on login page');
                     }
                 } catch (error) {
                     console.error('Auth check error:', error);
@@ -106,6 +115,9 @@
                         // JWTトークンを保存
                         if (result.token) {
                             AuthToken.set(result.token);
+                            console.log('JWT token saved:', result.token.substring(0, 20) + '...');
+                        } else {
+                            console.log('No token received in login response');
                         }
                         this.showNotification('ログインしました', 'success');
                         setTimeout(() => {
