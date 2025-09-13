@@ -19,6 +19,27 @@ const AuthToken = {
     }
 };
 
+// 認証付きfetch関数
+async function authFetch(url, options = {}) {
+    const authHeaders = AuthToken.getHeaders();
+    console.log('authFetch called for:', url);
+    console.log('Auth headers:', authHeaders);
+    
+    const defaultOptions = {
+        headers: {
+            'Content-Type': 'application/json',
+            ...authHeaders,
+            ...(options.headers || {})
+        },
+        credentials: 'include'
+    };
+    
+    const mergedOptions = { ...defaultOptions, ...options };
+    console.log('Final request headers:', mergedOptions.headers);
+    
+    return fetch(url, mergedOptions);
+}
+
 class ScoresManager {
     constructor() {
         this.apiUrl = '/api/scores';
@@ -51,36 +72,67 @@ class ScoresManager {
 
     async checkAuthStatus() {
         try {
+            console.log('=== Scores page checkAuthStatus START ===');
+            const token = AuthToken.get();
+            console.log('Token exists in localStorage on scores page:', !!token);
+            if (token) {
+                console.log('Token preview on scores page:', token.substring(0, 20) + '...');
+            }
+            
+            const headers = AuthToken.getHeaders();
+            console.log('Auth headers for /api/auth/status on scores page:', headers);
+            
             const response = await fetch('/api/auth/status', {
                 headers: {
-                    ...AuthToken.getHeaders(),
+                    ...headers,
                     'Content-Type': 'application/json'
                 },
                 credentials: 'include'
             });
+            
+            console.log('Auth status response status on scores page:', response.status);
             const result = await response.json();
+            console.log('Auth status result on scores page:', result);
             
             if (!result.isAuthenticated) {
+                console.log('User NOT authenticated on scores page, redirecting to /');
                 AuthToken.remove();
-                window.location.href = '/';
+                setTimeout(() => {
+                    window.location.href = '/';
+                }, 2000); // 2秒待機してログを確認
                 return;
             }
 
+            console.log('User authenticated on scores page, proceeding...');
             this.currentUser = result.user;
             this.isAdmin = result.user.role === 'admin';
-            this.updateUI();
+            
+            try {
+                this.updateUI();
+                console.log('scores updateUI completed successfully');
+            } catch (uiError) {
+                console.error('scores updateUI error (but keeping authentication):', uiError);
+                // UIエラーでもトークンは保持
+            }
         } catch (error) {
-            console.error('Auth check error:', error);
+            console.error('Auth check error on scores page:', error);
             AuthToken.remove();
-            window.location.href = '/';
+            setTimeout(() => {
+                window.location.href = '/';
+            }, 2000); // 2秒待機してログを確認
         }
     }
 
     updateUI() {
         if (this.currentUser) {
+            console.log('scores updateUI - currentUser:', this.currentUser);
             document.getElementById('authHeader').style.display = 'flex';
-            document.getElementById('userAvatar').textContent = this.currentUser.name.charAt(0).toUpperCase();
-            document.getElementById('userName').textContent = this.currentUser.name;
+            
+            const userName = this.currentUser.name || this.currentUser.email || 'User';
+            console.log('scores updateUI - userName:', userName);
+            
+            document.getElementById('userAvatar').textContent = userName.charAt(0).toUpperCase();
+            document.getElementById('userName').textContent = userName;
             document.getElementById('userRole').innerHTML = `<span class="role-badge ${this.currentUser.role}">${this.currentUser.role}</span>`;
 
             if (!this.isAdmin) {
@@ -92,9 +144,7 @@ class ScoresManager {
     async loadFilterOptions() {
         try {
             console.log('Loading filter options...');
-            const response = await fetch(`${this.apiUrl}/filter-options`, {
-                credentials: 'include'
-            });
+            const response = await authFetch(`${this.apiUrl}/filter-options`);
             
             const result = await response.json();
             console.log('Filter options response:', result);
