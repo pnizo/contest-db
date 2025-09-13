@@ -13,6 +13,9 @@ const { sessionCompatibility } = require('./middleware/jwt');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// プロキシ信頼設定（Vercel、Cloudflare等で必要）
+app.set('trust proxy', true);
+
 app.use(cors({
   origin: process.env.NODE_ENV === 'production' ? process.env.VERCEL_URL : 'http://localhost:3000',
   credentials: true

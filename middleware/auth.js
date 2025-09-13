@@ -1,25 +1,57 @@
 const requireIpRestriction = (req, res, next) => {
-  const clientIp = req.ip || req.connection.remoteAddress || req.socket.remoteAddress;
+  // Vercel/プロキシ環境での実際のクライアントIP取得
+  const clientIp = 
+    req.headers['cf-connecting-ip'] ||      // Cloudflare
+    req.headers['x-real-ip'] ||             // Nginx
+    req.headers['x-forwarded-for']?.split(',')[0]?.trim() ||  // プロキシチェーン
+    req.ip ||                               // Express trust proxy
+    req.connection.remoteAddress ||         // 直接接続
+    req.socket.remoteAddress ||             // ソケット
+    'unknown';
+    
   const allowedIps = process.env.ALLOWED_IPS ? process.env.ALLOWED_IPS.split(',') : [];
 
+  console.log('=== IP RESTRICTION CHECK ===');
+  console.log('Client IP:', clientIp);
+  console.log('ALLOWED_IPS env var:', process.env.ALLOWED_IPS);
+  console.log('Parsed allowed IPs:', allowedIps);
+  console.log('Request headers:', {
+    'x-forwarded-for': req.headers['x-forwarded-for'],
+    'x-real-ip': req.headers['x-real-ip'],
+    'cf-connecting-ip': req.headers['cf-connecting-ip']
+  });
+
   if (allowedIps.length === 0) {
+    console.log('No IP restrictions configured, allowing access');
     return next();
   }
 
   const isAllowed = allowedIps.some(allowedIp => {
-    if (allowedIp.includes('/')) {
-      return isIpInCidr(clientIp, allowedIp.trim());
+    const trimmedIp = allowedIp.trim();
+    console.log(`Checking against allowed IP: ${trimmedIp}`);
+    
+    if (trimmedIp.includes('/')) {
+      const result = isIpInCidr(clientIp, trimmedIp);
+      console.log(`CIDR check result for ${clientIp} in ${trimmedIp}: ${result}`);
+      return result;
     }
-    return clientIp === allowedIp.trim();
+    
+    const exactMatch = clientIp === trimmedIp;
+    console.log(`Exact match check for ${clientIp} === ${trimmedIp}: ${exactMatch}`);
+    return exactMatch;
   });
 
+  console.log('Final IP check result:', isAllowed);
+
   if (!isAllowed) {
+    console.log('IP access denied');
     return res.status(403).json({
       success: false,
       error: 'アクセスが許可されていないIPアドレスです'
     });
   }
 
+  console.log('IP access granted');
   next();
 };
 
