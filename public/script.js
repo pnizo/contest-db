@@ -60,7 +60,7 @@ class UserManager {
             
             if (!result.isAuthenticated) {
                 AuthToken.remove();
-                window.location.href = '/login';
+                window.location.href = '/';
                 return;
             }
 
@@ -70,7 +70,7 @@ class UserManager {
         } catch (error) {
             console.error('Auth check error:', error);
             AuthToken.remove();
-            window.location.href = '/login';
+            window.location.href = '/';
         }
     }
 
@@ -377,7 +377,7 @@ class UserManager {
             const result = await response.json();
             if (result.success) {
                 AuthToken.remove();
-                window.location.href = '/login';
+                window.location.href = '/';
             }
         } catch (error) {
             console.error('Logout error:', error);

@@ -43,14 +43,14 @@ app.use(sessionCompatibility);
 // 認証チェックミドルウェア
 app.use(checkAuth);
 
-// ルートページ
+// ルートページ（ログイン）
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 // ページルート
-app.get('/login', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'login.html'));
+app.get('/users', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'users.html'));
 });
 
 app.get('/scores', (req, res) => {

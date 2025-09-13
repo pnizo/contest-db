@@ -41,7 +41,7 @@ const requireAuth = (req, res, next) => {
     return res.status(401).json({ 
       success: false, 
       error: 'ログインが必要です',
-      redirect: '/login'
+      redirect: '/'
     });
   }
   next();
@@ -52,7 +52,7 @@ const requireAdmin = (req, res, next) => {
     return res.status(401).json({ 
       success: false, 
       error: 'ログインが必要です',
-      redirect: '/login'
+      redirect: '/'
     });
   }
 

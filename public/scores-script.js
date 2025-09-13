@@ -58,7 +58,7 @@ class ScoresManager {
             
             if (!result.isAuthenticated) {
                 AuthToken.remove();
-                window.location.href = '/login';
+                window.location.href = '/';
                 return;
             }
 
@@ -68,7 +68,7 @@ class ScoresManager {
         } catch (error) {
             console.error('Auth check error:', error);
             AuthToken.remove();
-            window.location.href = '/login';
+            window.location.href = '/';
         }
     }
 

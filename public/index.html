@@ -3,85 +3,142 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>スプレッドシートDB - ユーザー管理</title>
+    <title>ログイン - スプレッドシートDB</title>
     <link rel="stylesheet" href="styles.css">
 </head>
-<body>
-    <div class="container">
-        <div id="authHeader" class="auth-header" style="display: none;">
-            <div class="user-info-display">
-                <div class="user-avatar" id="userAvatar"></div>
-                <div class="user-details-display">
-                    <div class="name" id="userName"></div>
-                    <div class="role" id="userRole"></div>
+<body class="login-page">
+    <div class="login-container">
+        <div class="login-card">
+            <header class="login-header">
+                <h1>ログイン</h1>
+                <p>スプレッドシートDB ユーザー管理システム</p>
+            </header>
+
+            <form id="loginForm" class="login-form">
+                <div class="form-group">
+                    <label for="email">メールアドレス</label>
+                    <input type="email" id="email" name="email" required>
                 </div>
-            </div>
-            <div class="auth-actions">
-                <nav class="page-nav">
-                    <a href="/" class="nav-link active">ユーザー管理</a>
-                    <a href="/scores" class="nav-link">成績管理</a>
-                </nav>
-                <button id="logoutBtn" class="logout-btn">ログアウト</button>
-            </div>
+
+                <div class="form-group">
+                    <label for="password">パスワード</label>
+                    <input type="password" id="password" name="password" required>
+                </div>
+
+                <button type="submit" class="login-btn">ログイン</button>
+            </form>
         </div>
-
-        <main>
-            <section class="collapsible-section form-section">
-                <div class="section-header" onclick="toggleSection('user-form')">
-                    <h2>新規ユーザー追加</h2>
-                    <span class="toggle-icon">▼</span>
-                </div>
-                <div class="section-content collapsed" id="user-form-content">
-                    <form id="userForm">
-                        <div class="form-group">
-                            <label for="name">名前:</label>
-                            <input type="text" id="name" name="name" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="email">メールアドレス:</label>
-                            <input type="email" id="email" name="email" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="role">役割:</label>
-                            <select id="role" name="role">
-                                <option value="user">ユーザー</option>
-                                <option value="admin">管理者</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label for="password">パスワード:</label>
-                            <input type="password" id="password" name="password" minlength="6" required>
-                            <small>6文字以上で入力してください</small>
-                        </div>
-                        <button type="submit">ユーザーを追加</button>
-                    </form>
-                </div>
-            </section>
-
-            <section class="collapsible-section users-section">
-                <div class="section-header" onclick="toggleSection('users-list')">
-                    <h2>ユーザー一覧</h2>
-                    <span class="toggle-icon">▼</span>
-                </div>
-                <div class="section-content" id="users-list-content">
-                    <div class="section-controls">
-                        <div class="controls">
-                            <div class="control-buttons">
-                                <button id="refreshBtn">データ再読込</button>
-                                <button id="toggleDeletedBtn" class="toggle-btn">削除済みを表示</button>
-                            </div>
-                        </div>
-                    </div>
-                    <div id="usersContainer">
-                        <div class="loading">読み込み中...</div>
-                    </div>
-                </div>
-            </section>
-        </main>
 
         <div id="notification" class="notification hidden"></div>
     </div>
 
-    <script src="script.js"></script>
+    <script>
+        // JWT管理ユーティリティ
+        const AuthToken = {
+            get() {
+                return localStorage.getItem('authToken');
+            },
+            set(token) {
+                localStorage.setItem('authToken', token);
+            },
+            remove() {
+                localStorage.removeItem('authToken');
+            },
+            getHeaders() {
+                const token = this.get();
+                return token ? { 'Authorization': `Bearer ${token}` } : {};
+            }
+        };
+
+        class LoginManager {
+            constructor() {
+                this.init();
+            }
+
+            init() {
+                this.checkAuthStatus();
+                this.bindEvents();
+            }
+
+            async checkAuthStatus() {
+                try {
+                    const response = await fetch('/api/auth/status', {
+                        headers: {
+                            ...AuthToken.getHeaders(),
+                            'Content-Type': 'application/json'
+                        },
+                        credentials: 'include'
+                    });
+                    const result = await response.json();
+                    
+                    if (result.isAuthenticated) {
+                        window.location.href = '/users';
+                    }
+                } catch (error) {
+                    console.error('Auth check error:', error);
+                }
+            }
+
+            bindEvents() {
+                document.getElementById('loginForm').addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    this.handleLogin(e);
+                });
+            }
+
+            async handleLogin(e) {
+                const formData = new FormData(e.target);
+                const loginData = Object.fromEntries(formData.entries());
+
+                try {
+                    const response = await fetch('/api/auth/login', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(loginData),
+                        credentials: 'include'
+                    });
+
+                    const result = await response.json();
+
+                    if (result.success) {
+                        // JWTトークンを保存
+                        if (result.token) {
+                            AuthToken.set(result.token);
+                        }
+                        this.showNotification('ログインしました', 'success');
+                        setTimeout(() => {
+                            window.location.href = '/users';
+                        }, 1000);
+                    } else {
+                        this.showNotification(result.error, 'error');
+                    }
+                } catch (error) {
+                    this.showNotification('ログインエラーが発生しました: ' + error.message, 'error');
+                }
+            }
+
+            showNotification(message, type) {
+                const notification = document.getElementById('notification');
+                notification.textContent = message;
+                notification.className = `notification ${type}`;
+                notification.classList.remove('hidden');
+                
+                setTimeout(() => {
+                    notification.classList.add('show');
+                }, 100);
+
+                setTimeout(() => {
+                    notification.classList.remove('show');
+                    setTimeout(() => {
+                        notification.classList.add('hidden');
+                    }, 300);
+                }, 3000);
+            }
+        }
+
+        const loginManager = new LoginManager();
+    </script>
 </body>
 </html>
