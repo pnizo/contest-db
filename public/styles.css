@@ -42,6 +42,40 @@ main {
     margin-bottom: 40px;
 }
 
+/* 2ペインレイアウト */
+.two-pane-layout {
+    display: flex;
+    flex-direction: row;
+    gap: 20px;
+    align-items: flex-start;
+}
+
+.left-pane {
+    flex: 0 0 400px;
+    min-width: 300px;
+}
+
+.right-pane {
+    flex: 1;
+    min-width: 0;
+}
+
+/* レスポンシブ対応 */
+@media (max-width: 768px) {
+    .two-pane-layout {
+        flex-direction: column;
+    }
+    
+    .left-pane {
+        flex: none;
+        width: 100%;
+    }
+    
+    .right-pane {
+        width: 100%;
+    }
+}
+
 .form-section, .users-section, .import-section {
     background: white;
     padding: 30px;

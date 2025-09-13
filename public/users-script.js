@@ -125,7 +125,7 @@ class UserManager {
             // 管理者でない場合、読み取り専用モードにする
             if (!this.isAdmin) {
                 document.body.classList.add('readonly-mode');
-                document.querySelector('.form-section h2').textContent = 'ユーザー情報（閲覧のみ）';
+                document.querySelector('.left-pane .form-section h2').textContent = 'ユーザー情報（閲覧のみ）';
             }
         }
     }
@@ -152,7 +152,6 @@ class UserManager {
     }
 
     async handleSubmit(e) {
-        console.log('handleSubmit called (should be for new user creation)');
         const formData = new FormData(e.target);
         const userData = Object.fromEntries(formData.entries());
 
@@ -289,7 +288,7 @@ class UserManager {
                 submitBtn.dataset.editId = id;
                 
                 // フォームセクションのヘッダーを変更
-                const formHeader = document.querySelector('.form-section h2');
+                const formHeader = document.querySelector('.left-pane .form-section h2');
                 formHeader.textContent = `ユーザー編集 - ${user.name || user.email}`;
                 formHeader.style.color = '#007bff';
                 
@@ -301,15 +300,10 @@ class UserManager {
                 
                 form.onsubmit = (e) => {
                     e.preventDefault();
-                    console.log('Edit form submitted, calling handleUpdate with ID:', id);
                     this.handleUpdate(e, id);
                 };
                 
-                // フォームセクションを展開
-                const formSection = document.getElementById('user-form-content');
-                if (formSection.classList.contains('collapsed')) {
-                    toggleSection('user-form');
-                }
+                // 2ペインレイアウトではフォームは常に表示されているため展開処理不要
                 
                 // フォームまでスクロール
                 formHeader.scrollIntoView({ behavior: 'smooth' });
@@ -324,7 +318,6 @@ class UserManager {
     }
 
     async handleUpdate(e, id) {
-        console.log('handleUpdate called for user ID:', id);
         const formData = new FormData(e.target);
         const userData = Object.fromEntries(formData.entries());
 
@@ -430,7 +423,7 @@ class UserManager {
         form.classList.remove('edit-mode');
         
         // ヘッダーを元に戻す
-        const formHeader = document.querySelector('.form-section h2');
+        const formHeader = document.querySelector('.left-pane .form-section h2');
         formHeader.textContent = '新規ユーザー追加';
         formHeader.style.color = '';
         
@@ -527,17 +520,3 @@ class UserManager {
 }
 
 const userManager = new UserManager();
-
-// Collapsible section functionality
-function toggleSection(sectionId) {
-    const content = document.getElementById(sectionId + '-content');
-    const header = content.parentElement.querySelector('.section-header');
-    
-    if (content.classList.contains('collapsed')) {
-        content.classList.remove('collapsed');
-        header.classList.add('expanded');
-    } else {
-        content.classList.add('collapsed');
-        header.classList.remove('expanded');
-    }
-}

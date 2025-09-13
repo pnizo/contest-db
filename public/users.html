@@ -25,13 +25,11 @@
             </div>
         </div>
 
-        <main>
-            <section class="collapsible-section form-section">
-                <div class="section-header" onclick="toggleSection('user-form')">
+        <main class="two-pane-layout">
+            <!-- 左ペイン: フォーム -->
+            <aside class="left-pane">
+                <section class="form-section">
                     <h2>新規ユーザー追加</h2>
-                    <span class="toggle-icon">▼</span>
-                </div>
-                <div class="section-content collapsed" id="user-form-content">
                     <form id="userForm">
                         <div class="form-group">
                             <label for="name">名前:</label>
@@ -58,15 +56,13 @@
                             <button type="button" id="cancelEditBtn" style="display: none;" onclick="userManager.cancelEdit()">キャンセル</button>
                         </div>
                     </form>
-                </div>
-            </section>
+                </section>
+            </aside>
 
-            <section class="collapsible-section users-section">
-                <div class="section-header" onclick="toggleSection('users-list')">
+            <!-- 右ペイン: ユーザーリスト -->
+            <section class="right-pane">
+                <div class="users-section">
                     <h2>ユーザー一覧</h2>
-                    <span class="toggle-icon">▼</span>
-                </div>
-                <div class="section-content" id="users-list-content">
                     <div class="section-controls">
                         <div class="controls">
                             <div class="control-buttons">
