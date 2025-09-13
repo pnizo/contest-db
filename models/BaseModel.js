@@ -221,7 +221,7 @@ class BaseModel {
   async delete(id) {
     try {
       await this.ensureInitialized();
-      const all = await this.findAll();
+      const all = await this.findAllIncludingDeleted();
       const item = all.find(item => item.id === id);
       
       if (!item) {
