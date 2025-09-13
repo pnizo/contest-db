@@ -59,28 +59,47 @@ class UserManager {
 
     async checkAuthStatus() {
         try {
+            console.log('=== Users page checkAuthStatus START ===');
+            const token = AuthToken.get();
+            console.log('Token exists in localStorage on users page:', !!token);
+            if (token) {
+                console.log('Token preview on users page:', token.substring(0, 20) + '...');
+            }
+            
+            const headers = AuthToken.getHeaders();
+            console.log('Auth headers for /api/auth/status:', headers);
+            
             const response = await fetch('/api/auth/status', {
                 headers: {
-                    ...AuthToken.getHeaders(),
+                    ...headers,
                     'Content-Type': 'application/json'
                 },
                 credentials: 'include'
             });
+            
+            console.log('Auth status response status:', response.status);
             const result = await response.json();
+            console.log('Auth status result on users page:', result);
             
             if (!result.isAuthenticated) {
+                console.log('User NOT authenticated on users page, redirecting to /');
                 AuthToken.remove();
-                window.location.href = '/';
+                setTimeout(() => {
+                    window.location.href = '/';
+                }, 8000); // 8秒待機してログを確認
                 return;
             }
 
+            console.log('User authenticated on users page, proceeding...');
             this.currentUser = result.user;
             this.isAdmin = result.user.role === 'admin';
             this.updateUI();
         } catch (error) {
-            console.error('Auth check error:', error);
+            console.error('Auth check error on users page:', error);
             AuthToken.remove();
-            window.location.href = '/';
+            setTimeout(() => {
+                window.location.href = '/';
+            }, 2000); // 2秒待機してログを確認
         }
     }
 
@@ -144,12 +163,15 @@ class UserManager {
     }
 
     async loadUsers() {
+        console.log('=== loadUsers START ===');
         const container = document.getElementById('usersContainer');
         container.innerHTML = '<div class="loading">読み込み中...</div>';
 
         try {
             const url = this.showingDeleted ? `${this.apiUrl}/deleted/list` : this.apiUrl;
+            console.log('About to call authFetch for:', url);
             const response = await authFetch(url);
+            console.log('loadUsers response status:', response.status);
             const result = await response.json();
 
             if (result.success) {
