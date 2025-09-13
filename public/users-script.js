@@ -264,14 +264,21 @@ class UserManager {
 
     async editUser(id) {
         try {
+            console.log('=== EDIT USER CLICKED ===');
+            console.log('User ID:', id);
+            
             const response = await authFetch(`${this.apiUrl}/${id}`);
+            console.log('Edit user response status:', response.status);
             
             const result = await response.json();
+            console.log('Edit user result:', result);
 
             if (result.success) {
                 const user = result.data;
-                document.getElementById('name').value = user.name;
-                document.getElementById('email').value = user.email;
+                console.log('User data to populate form:', user);
+                
+                document.getElementById('name').value = user.name || '';
+                document.getElementById('email').value = user.email || '';
                 document.getElementById('role').value = user.role || 'user';
                 
                 const form = document.getElementById('userForm');
@@ -283,8 +290,22 @@ class UserManager {
                     e.preventDefault();
                     this.handleUpdate(e, id);
                 };
+                
+                console.log('Form populated successfully');
+                
+                // フォームセクションを展開
+                const formSection = document.getElementById('user-form-content');
+                if (formSection.classList.contains('collapsed')) {
+                    toggleSection('user-form');
+                }
+                
+                this.showNotification('編集モードになりました', 'success');
+            } else {
+                console.error('Edit user failed:', result.error);
+                this.showNotification(result.error || 'ユーザー情報の取得に失敗しました', 'error');
             }
         } catch (error) {
+            console.error('Edit user error:', error);
             this.showNotification('ユーザー情報の取得に失敗しました', 'error');
         }
     }
