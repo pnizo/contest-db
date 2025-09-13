@@ -54,7 +54,7 @@ app.get('/scores', (req, res) => {
 });
 
 // 静的ファイルを設定
-app.use(express.static('public'));
+app.use(express.static(path.join(__dirname, 'public')));
 
 // APIルート
 app.use('/api/auth', authRoutes);
