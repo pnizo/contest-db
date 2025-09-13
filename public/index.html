@@ -123,8 +123,9 @@
                         }
                         this.showNotification('ログインしました', 'success');
                         setTimeout(() => {
+                            console.log('Redirecting to /users after 5 second delay...');
                             window.location.href = '/users';
-                        }, 1000);
+                        }, 5000);
                     } else {
                         this.showNotification(result.error, 'error');
                     }
