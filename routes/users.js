@@ -48,13 +48,7 @@ router.put('/:id/restore', requireAdmin, async (req, res) => {
 
 router.delete('/:id/permanent', requireAdmin, async (req, res) => {
   try {
-    console.log('=== PERMANENT DELETE REQUEST ===');
-    console.log('User ID:', req.params.id);
-    console.log('Request path:', req.path);
-    console.log('Request method:', req.method);
-    
     const result = await userModel.delete(req.params.id);
-    console.log('Delete result:', result);
     
     if (result.success) {
       res.json({ success: true, message: 'ユーザーを完全に削除しました' });
@@ -70,11 +64,6 @@ router.delete('/:id/permanent', requireAdmin, async (req, res) => {
 // 汎用的なルートは後に配置
 router.get('/:id', async (req, res) => {
   try {
-    console.log('=== GET USER REQUEST ===');
-    console.log('User ID:', req.params.id);
-    console.log('Request path:', req.path);
-    console.log('Request method:', req.method);
-    
     const user = await userModel.findById(req.params.id);
     if (!user) {
       return res.status(404).json({ success: false, error: 'ユーザーが見つかりません' });

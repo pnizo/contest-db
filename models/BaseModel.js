@@ -228,11 +228,6 @@ class BaseModel {
         return { success: false, error: 'Item not found' };
       }
 
-      console.log('=== DELETE ROW DEBUG ===');
-      console.log('Item ID:', id);
-      console.log('Item _rowIndex (1-based):', item._rowIndex);
-      console.log('Calculated rowIndex for API (0-based):', item._rowIndex - 1);
-      
       // Google Sheets APIは0ベースなので、_rowIndex - 1が正しい
       const rowIndex = item._rowIndex - 1;
       await this.getSheetsService().deleteRow(this.sheetName, rowIndex);
