@@ -21,16 +21,22 @@ const AuthToken = {
 
 // 認証付きfetch関数
 async function authFetch(url, options = {}) {
+    const authHeaders = AuthToken.getHeaders();
+    console.log('authFetch called for:', url);
+    console.log('Auth headers:', authHeaders);
+    
     const defaultOptions = {
         headers: {
             'Content-Type': 'application/json',
-            ...AuthToken.getHeaders(),
+            ...authHeaders,
             ...(options.headers || {})
         },
         credentials: 'include'
     };
     
     const mergedOptions = { ...defaultOptions, ...options };
+    console.log('Final request headers:', mergedOptions.headers);
+    
     return fetch(url, mergedOptions);
 }
 

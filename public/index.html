@@ -117,6 +117,9 @@
                         if (result.token) {
                             AuthToken.set(result.token);
                             console.log('JWT token saved:', result.token.substring(0, 20) + '...');
+                            console.log('Verifying token storage...');
+                            const storedToken = AuthToken.get();
+                            console.log('Token retrieved from storage:', storedToken ? storedToken.substring(0, 20) + '...' : 'null');
                         } else {
                             console.log('No token received in login response');
                             console.log('Full response object:', result);
@@ -124,6 +127,7 @@
                         this.showNotification('ログインしました', 'success');
                         setTimeout(() => {
                             console.log('Redirecting to /users after 5 second delay...');
+                            console.log('Final token check before redirect:', AuthToken.get() ? 'exists' : 'missing');
                             window.location.href = '/users';
                         }, 5000);
                     } else {
