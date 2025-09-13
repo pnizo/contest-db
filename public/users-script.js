@@ -286,6 +286,17 @@ class UserManager {
                 submitBtn.textContent = 'ユーザーを更新';
                 submitBtn.dataset.editId = id;
                 
+                // フォームセクションのヘッダーを変更
+                const formHeader = document.querySelector('.form-section h2');
+                formHeader.textContent = `ユーザー編集 - ${user.name || user.email}`;
+                formHeader.style.color = '#007bff';
+                
+                // フォームに編集モードのスタイルを追加
+                form.classList.add('edit-mode');
+                
+                // キャンセルボタンを表示
+                document.getElementById('cancelEditBtn').style.display = 'inline-block';
+                
                 form.onsubmit = (e) => {
                     e.preventDefault();
                     this.handleUpdate(e, id);
@@ -299,7 +310,10 @@ class UserManager {
                     toggleSection('user-form');
                 }
                 
-                this.showNotification('編集モードになりました', 'success');
+                // フォームまでスクロール
+                formHeader.scrollIntoView({ behavior: 'smooth' });
+                
+                this.showNotification(`${user.name || user.email} の編集モードになりました`, 'success');
             } else {
                 console.error('Edit user failed:', result.error);
                 this.showNotification(result.error || 'ユーザー情報の取得に失敗しました', 'error');
@@ -406,13 +420,31 @@ class UserManager {
     resetForm() {
         const form = document.getElementById('userForm');
         form.reset();
+        
+        // 編集モードのスタイルを削除
+        form.classList.remove('edit-mode');
+        
+        // ヘッダーを元に戻す
+        const formHeader = document.querySelector('.form-section h2');
+        formHeader.textContent = '新規ユーザー追加';
+        formHeader.style.color = '';
+        
         const submitBtn = form.querySelector('button[type="submit"]');
         submitBtn.textContent = 'ユーザーを追加';
         delete submitBtn.dataset.editId;
+        
+        // キャンセルボタンを非表示
+        document.getElementById('cancelEditBtn').style.display = 'none';
+        
         form.onsubmit = (e) => {
             e.preventDefault();
             this.handleSubmit(e);
         };
+    }
+
+    cancelEdit() {
+        this.resetForm();
+        this.showNotification('編集をキャンセルしました', 'info');
     }
 
     showNotification(message, type) {
