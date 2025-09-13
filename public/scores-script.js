@@ -322,13 +322,9 @@ class ScoresManager {
             document.getElementById('importStatus').className = 'import-status';
             document.getElementById('importStatus').textContent = 'インポート中...';
 
-            const response = await fetch(`${this.apiUrl}/import`, {
+            const response = await authFetch(`${this.apiUrl}/import`, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ csvData }),
-                credentials: 'include'
+                body: JSON.stringify({ csvData })
             });
 
             const result = await response.json();
@@ -430,7 +426,7 @@ class ScoresManager {
                 url += `?${params.toString()}`;
             }
 
-            const response = await fetch(url, { credentials: 'include' });
+            const response = await authFetch(url);
             
             const result = await response.json();
 
@@ -649,9 +645,8 @@ class ScoresManager {
         }
 
         try {
-            const response = await fetch(`${this.apiUrl}/${id}`, {
-                method: 'DELETE',
-                credentials: 'include'
+            const response = await authFetch(`${this.apiUrl}/${id}`, {
+                method: 'DELETE'
             });
 
             const result = await response.json();
@@ -669,9 +664,8 @@ class ScoresManager {
 
     async restoreScore(id) {
         try {
-            const response = await fetch(`${this.apiUrl}/${id}/restore`, {
-                method: 'PUT',
-                credentials: 'include'
+            const response = await authFetch(`${this.apiUrl}/${id}/restore`, {
+                method: 'PUT'
             });
 
             const result = await response.json();
@@ -693,9 +687,8 @@ class ScoresManager {
         }
 
         try {
-            const response = await fetch(`${this.apiUrl}/${id}/permanent`, {
-                method: 'DELETE',
-                credentials: 'include'
+            const response = await authFetch(`${this.apiUrl}/${id}/permanent`, {
+                method: 'DELETE'
             });
 
             const result = await response.json();
@@ -750,14 +743,14 @@ class ScoresManager {
 
     async handleLogout() {
         try {
-            const response = await fetch('/api/auth/logout', {
-                method: 'POST',
-                credentials: 'include'
+            const response = await authFetch('/api/auth/logout', {
+                method: 'POST'
             });
 
             const result = await response.json();
             if (result.success) {
-                window.location.href = '/login';
+                AuthToken.remove();
+                window.location.href = '/';
             }
         } catch (error) {
             console.error('Logout error:', error);
@@ -839,13 +832,9 @@ class ScoresManager {
         }
 
         try {
-            const response = await fetch(`${this.apiUrl}/${this.currentEditId}`, {
+            const response = await authFetch(`${this.apiUrl}/${this.currentEditId}`, {
                 method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(updateData),
-                credentials: 'include'
+                body: JSON.stringify(updateData)
             });
 
             const result = await response.json();
