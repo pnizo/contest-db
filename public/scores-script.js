@@ -11,10 +11,10 @@ const AuthToken = {
     },
     getHeaders() {
         const token = this.get();
-        console.log('Getting auth headers, token exists:', !!token);
-        if (token) {
-            console.log('Token preview:', token.substring(0, 20) + '...');
-        }
+        // console.log('Getting auth headers, token exists:', !!token);
+        // if (token) {
+        //     console.log('Token preview:', token.substring(0, 20) + '...');
+        // }
         return token ? { 'Authorization': `Bearer ${token}` } : {};
     }
 };
@@ -22,8 +22,8 @@ const AuthToken = {
 // 認証付きfetch関数
 async function authFetch(url, options = {}) {
     const authHeaders = AuthToken.getHeaders();
-    console.log('authFetch called for:', url);
-    console.log('Auth headers:', authHeaders);
+    // console.log('authFetch called for:', url);
+    // console.log('Auth headers:', authHeaders);
     
     const defaultOptions = {
         headers: {
@@ -35,7 +35,7 @@ async function authFetch(url, options = {}) {
     };
     
     const mergedOptions = { ...defaultOptions, ...options };
-    console.log('Final request headers:', mergedOptions.headers);
+    // console.log('Final request headers:', mergedOptions.headers);
     
     return fetch(url, mergedOptions);
 }
@@ -72,16 +72,16 @@ class ScoresManager {
 
     async checkAuthStatus() {
         try {
-            console.log('=== Scores page checkAuthStatus START ===');
-            const token = AuthToken.get();
-            console.log('Token exists in localStorage on scores page:', !!token);
-            if (token) {
-                console.log('Token preview on scores page:', token.substring(0, 20) + '...');
-            }
+            // console.log('=== Scores page checkAuthStatus START ===');
+            // const token = AuthToken.get();
+            // console.log('Token exists in localStorage on scores page:', !!token);
+            // if (token) {
+            //     console.log('Token preview on scores page:', token.substring(0, 20) + '...');
+            // }
             
             const headers = AuthToken.getHeaders();
-            console.log('Auth headers for /api/auth/status on scores page:', headers);
-            
+            // console.log('Auth headers for /api/auth/status on scores page:', headers);
+
             const response = await fetch('/api/auth/status', {
                 headers: {
                     ...headers,
@@ -90,9 +90,9 @@ class ScoresManager {
                 credentials: 'include'
             });
             
-            console.log('Auth status response status on scores page:', response.status);
+            // console.log('Auth status response status on scores page:', response.status);
             const result = await response.json();
-            console.log('Auth status result on scores page:', result);
+            // console.log('Auth status result on scores page:', result);
             
             if (!result.isAuthenticated) {
                 console.log('User NOT authenticated on scores page, redirecting to /');
@@ -103,13 +103,13 @@ class ScoresManager {
                 return;
             }
 
-            console.log('User authenticated on scores page, proceeding...');
+            // console.log('User authenticated on scores page, proceeding...');
             this.currentUser = result.user;
             this.isAdmin = result.user.role === 'admin';
             
             try {
                 this.updateUI();
-                console.log('scores updateUI completed successfully');
+                // console.log('scores updateUI completed successfully');
             } catch (uiError) {
                 console.error('scores updateUI error (but keeping authentication):', uiError);
                 // UIエラーでもトークンは保持
@@ -125,12 +125,12 @@ class ScoresManager {
 
     updateUI() {
         if (this.currentUser) {
-            console.log('scores updateUI - currentUser:', this.currentUser);
+            // console.log('scores updateUI - currentUser:', this.currentUser);
             document.getElementById('authHeader').style.display = 'flex';
             
             const userName = this.currentUser.name || this.currentUser.email || 'User';
-            console.log('scores updateUI - userName:', userName);
-            
+            // console.log('scores updateUI - userName:', userName);
+
             document.getElementById('userAvatar').textContent = userName.charAt(0).toUpperCase();
             document.getElementById('userName').textContent = userName;
             document.getElementById('userRole').innerHTML = `<span class="role-badge ${this.currentUser.role}">${this.currentUser.role}</span>`;
@@ -143,15 +143,15 @@ class ScoresManager {
 
     async loadFilterOptions() {
         try {
-            console.log('Loading filter options...');
+            // console.log('Loading filter options...');
             const response = await authFetch(`${this.apiUrl}/filter-options`);
             
             const result = await response.json();
-            console.log('Filter options response:', result);
+            // console.log('Filter options response:', result);
 
             if (result.success) {
-                console.log('Contest names:', result.data.contestNames);
-                console.log('Category names:', result.data.categoryNames);
+                // console.log('Contest names:', result.data.contestNames);
+                // console.log('Category names:', result.data.categoryNames);
                 this.populateFilterOptions(result.data);
             } else {
                 console.error('Failed to load filter options:', result.error);
@@ -162,7 +162,7 @@ class ScoresManager {
     }
 
     populateFilterOptions(data) {
-        console.log('Populating filter options with data:', data);
+        // console.log('Populating filter options with data:', data);
         
         // 大会名のオプションを設定
         const contestSelect = document.getElementById('contestFilter');
@@ -179,9 +179,9 @@ class ScoresManager {
                 option.textContent = name;
                 contestSelect.appendChild(option);
             });
-            console.log(`Added ${data.contestNames.length} contest options`);
+            // console.log(`Added ${data.contestNames.length} contest options`);
         } else {
-            console.log('No contest names found');
+            // console.log('No contest names found');
         }
 
         // カテゴリー名のオプションを設定
@@ -199,9 +199,9 @@ class ScoresManager {
                 option.textContent = name;
                 categorySelect.appendChild(option);
             });
-            console.log(`Added ${data.categoryNames.length} category options`);
+            // console.log(`Added ${data.categoryNames.length} category options`);
         } else {
-            console.log('No category names found');
+            // console.log('No category names found');
         }
     }
 

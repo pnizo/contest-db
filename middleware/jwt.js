@@ -6,8 +6,8 @@ const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '24h';
 // JWTトークンを生成
 function generateToken(user) {
   try {
-    console.log('Generating JWT for user:', { id: user.id, email: user.email, role: user.role });
-    console.log('JWT_SECRET exists:', !!JWT_SECRET);
+    // console.log('Generating JWT for user:', { id: user.id, email: user.email, role: user.role });
+    // console.log('JWT_SECRET exists:', !!JWT_SECRET);
     
     const token = jwt.sign(
       { 
@@ -19,7 +19,7 @@ function generateToken(user) {
       { expiresIn: JWT_EXPIRES_IN }
     );
     
-    console.log('JWT generation successful, token length:', token.length);
+    //console.log('JWT generation successful, token length:', token.length);
     return token;
   } catch (error) {
     console.error('JWT generation failed:', error);
@@ -49,27 +49,27 @@ function sessionCompatibility(req, res, next) {
   
   if (authHeader && authHeader.startsWith('Bearer ')) {
     token = authHeader.slice(7);
-    console.log('JWT token found in Authorization header');
+    // console.log('JWT token found in Authorization header');
   } else if (req.cookies?.token) {
     token = req.cookies.token;
-    console.log('JWT token found in cookies');
+    // console.log('JWT token found in cookies');
   } else if (req.body?.token) {
     token = req.body.token;
-    console.log('JWT token found in body');
+    // console.log('JWT token found in body');
   } else if (req.query?.token) {
     token = req.query.token;
-    console.log('JWT token found in query');
+    // console.log('JWT token found in query');
   } else {
-    console.log('No JWT token found in request headers, cookies, body, or query');
+    // console.log('No JWT token found in request headers, cookies, body, or query');
   }
 
   if (token) {
     const decoded = verifyToken(token);
     if (decoded) {
       req.session.user = decoded;
-      console.log('JWT verified successfully for user:', decoded.email);
+      // console.log('JWT verified successfully for user:', decoded.email);
     } else {
-      console.log('JWT verification failed for token:', token.substring(0, 20) + '...');
+      // console.log('JWT verification failed for token:', token.substring(0, 20) + '...');
       // トークンが無効な場合、セッションからユーザー情報を削除
       req.session.user = null;
     }
