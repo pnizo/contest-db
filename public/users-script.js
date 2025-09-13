@@ -281,6 +281,12 @@ class UserManager {
                 document.getElementById('email').value = user.email || '';
                 document.getElementById('role').value = user.role || 'user';
                 
+                // パスワードフィールドをクリアし、必須属性を削除
+                const passwordField = document.getElementById('password');
+                passwordField.value = '';
+                passwordField.removeAttribute('required');
+                passwordField.placeholder = '変更する場合のみ入力してください';
+                
                 const form = document.getElementById('userForm');
                 const submitBtn = form.querySelector('button[type="submit"]');
                 submitBtn.textContent = 'ユーザーを更新';
@@ -327,6 +333,13 @@ class UserManager {
     async handleUpdate(e, id) {
         const formData = new FormData(e.target);
         const userData = Object.fromEntries(formData.entries());
+
+        // パスワードが空の場合は更新データから除外
+        if (!userData.password || userData.password.trim() === '') {
+            delete userData.password;
+        }
+
+        console.log('Update data (password filtered):', userData);
 
         try {
             const response = await authFetch(`${this.apiUrl}/${id}`, {
@@ -435,6 +448,11 @@ class UserManager {
         
         // キャンセルボタンを非表示
         document.getElementById('cancelEditBtn').style.display = 'none';
+        
+        // パスワードフィールドの属性を復元
+        const passwordField = document.getElementById('password');
+        passwordField.setAttribute('required', '');
+        passwordField.placeholder = '';
         
         form.onsubmit = (e) => {
             e.preventDefault();

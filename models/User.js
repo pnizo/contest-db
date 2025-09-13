@@ -131,6 +131,23 @@ class User extends BaseModel {
     }
   }
 
+  async update(id, data) {
+    // パスワードが含まれている場合はハッシュ化
+    if (data.password && data.password.trim() !== '') {
+      try {
+        data.password = await this.hashPassword(data.password);
+      } catch (error) {
+        console.error('Password hashing error:', error);
+        return { success: false, error: 'パスワードの暗号化に失敗しました' };
+      }
+    }
+
+    // updatedAtを追加
+    data.updatedAt = new Date().toISOString();
+
+    return await super.update(id, data);
+  }
+
   async softDelete(id) {
     const user = await this.findById(id);
     if (!user) {
