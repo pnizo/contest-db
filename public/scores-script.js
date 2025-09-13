@@ -99,7 +99,7 @@ class ScoresManager {
                 AuthToken.remove();
                 setTimeout(() => {
                     window.location.href = '/';
-                }, 2000); // 2秒待機してログを確認
+                }, 1000); // 1秒待機してログを確認
                 return;
             }
 
@@ -119,7 +119,7 @@ class ScoresManager {
             AuthToken.remove();
             setTimeout(() => {
                 window.location.href = '/';
-            }, 2000); // 2秒待機してログを確認
+            }, 1000); // 1秒待機してログを確認
         }
     }
 

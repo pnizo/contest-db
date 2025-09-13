@@ -86,7 +86,7 @@ class UserManager {
                 AuthToken.remove();
                 setTimeout(() => {
                     window.location.href = '/';
-                }, 8000); // 8秒待機してログを確認
+                }, 1000); // 1秒待機してログを確認
                 return;
             }
 
@@ -106,7 +106,7 @@ class UserManager {
             AuthToken.remove();
             setTimeout(() => {
                 window.location.href = '/';
-            }, 2000); // 2秒待機してログを確認
+            }, 1000); // 1秒待機してログを確認
         }
     }
 

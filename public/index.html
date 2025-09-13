@@ -98,6 +98,12 @@
             async handleLogin(e) {
                 const formData = new FormData(e.target);
                 const loginData = Object.fromEntries(formData.entries());
+                const submitBtn = e.target.querySelector('button[type="submit"]');
+                const originalText = submitBtn.textContent;
+
+                // ボタンを無効化
+                submitBtn.disabled = true;
+                submitBtn.textContent = 'ログイン中...';
 
                 try {
                     const response = await fetch('/api/auth/login', {
@@ -125,16 +131,23 @@
                             console.log('Full response object:', result);
                         }
                         this.showNotification('ログインしました', 'success');
+                        submitBtn.textContent = 'リダイレクト中...';
                         setTimeout(() => {
                             console.log('Redirecting to /users after 5 second delay...');
                             console.log('Final token check before redirect:', AuthToken.get() ? 'exists' : 'missing');
                             window.location.href = '/users';
-                        }, 5000);
+                        }, 1000);
                     } else {
                         this.showNotification(result.error, 'error');
+                        // ボタンを再有効化
+                        submitBtn.disabled = false;
+                        submitBtn.textContent = originalText;
                     }
                 } catch (error) {
                     this.showNotification('ログインエラーが発生しました: ' + error.message, 'error');
+                    // ボタンを再有効化
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = originalText;
                 }
             }
 
