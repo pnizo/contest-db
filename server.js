@@ -8,6 +8,7 @@ const userRoutes = require('./routes/users');
 const authRoutes = require('./routes/auth');
 const scoreRoutes = require('./routes/scores');
 const { checkAuth, requireIpRestriction } = require('./middleware/auth');
+const { sessionCompatibility } = require('./middleware/jwt');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -35,6 +36,9 @@ if (process.env.NODE_ENV !== 'production') {
 
 // セキュリティミドルウェア（IP制限のみ）
 app.use('/api', requireIpRestriction);
+
+// セッション互換性ミドルウェア（JWT対応）
+app.use(sessionCompatibility);
 
 // 認証チェックミドルウェア
 app.use(checkAuth);

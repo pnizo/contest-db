@@ -1,6 +1,7 @@
 const express = require('express');
 const User = require('../models/User');
 const { requireAuth } = require('../middleware/auth');
+const { generateToken } = require('../middleware/jwt');
 const router = express.Router();
 
 const userModel = new User();
@@ -19,12 +20,20 @@ router.post('/login', async (req, res) => {
     const result = await userModel.authenticateUser(email, password);
     
     if (result.success) {
-      req.session.user = result.user;
+      // セッションに保存（開発環境用）
+      if (req.session) {
+        req.session.user = result.user;
+      }
+      
+      // JWTトークンを生成
+      const token = generateToken(result.user);
+      
       res.json({ 
         success: true, 
         message: 'ログインしました',
         user: result.user,
-        role: result.user.role
+        role: result.user.role,
+        token: token
       });
     } else {
       res.status(401).json(result);
@@ -39,17 +48,19 @@ router.post('/login', async (req, res) => {
 });
 
 router.post('/logout', (req, res) => {
-  req.session.destroy((err) => {
-    if (err) {
-      return res.status(500).json({ 
-        success: false, 
-        error: 'ログアウトに失敗しました' 
-      });
-    }
-    res.json({ 
-      success: true, 
-      message: 'ログアウトしました' 
+  // セッションがある場合は破棄
+  if (req.session && req.session.destroy) {
+    req.session.destroy((err) => {
+      if (err) {
+        console.error('Session destroy error:', err);
+      }
     });
+  }
+  
+  // JWTは無効化できないので、フロントエンドでトークンを削除
+  res.json({ 
+    success: true, 
+    message: 'ログアウトしました' 
   });
 });
 

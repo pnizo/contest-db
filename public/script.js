@@ -1,3 +1,20 @@
+// JWT管理ユーティリティ
+const AuthToken = {
+    get() {
+        return localStorage.getItem('authToken');
+    },
+    set(token) {
+        localStorage.setItem('authToken', token);
+    },
+    remove() {
+        localStorage.removeItem('authToken');
+    },
+    getHeaders() {
+        const token = this.get();
+        return token ? { 'Authorization': `Bearer ${token}` } : {};
+    }
+};
+
 class UserManager {
     constructor() {
         this.apiUrl = '/api/users';
@@ -18,11 +35,16 @@ class UserManager {
     async checkAuthStatus() {
         try {
             const response = await fetch('/api/auth/status', {
+                headers: {
+                    ...AuthToken.getHeaders(),
+                    'Content-Type': 'application/json'
+                },
                 credentials: 'include'
             });
             const result = await response.json();
             
             if (!result.isAuthenticated) {
+                AuthToken.remove();
                 window.location.href = '/login';
                 return;
             }
@@ -32,6 +54,7 @@ class UserManager {
             this.updateUI();
         } catch (error) {
             console.error('Auth check error:', error);
+            AuthToken.remove();
             window.location.href = '/login';
         }
     }
