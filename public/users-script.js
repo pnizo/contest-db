@@ -131,10 +131,12 @@ class UserManager {
     }
 
     bindEvents() {
-        document.getElementById('userForm').addEventListener('submit', (e) => {
+        // フォームのsubmitイベントはonsubmitプロパティで管理
+        const form = document.getElementById('userForm');
+        form.onsubmit = (e) => {
             e.preventDefault();
             this.handleSubmit(e);
-        });
+        };
 
         document.getElementById('refreshBtn').addEventListener('click', () => {
             this.loadUsers();
@@ -150,6 +152,7 @@ class UserManager {
     }
 
     async handleSubmit(e) {
+        console.log('handleSubmit called (should be for new user creation)');
         const formData = new FormData(e.target);
         const userData = Object.fromEntries(formData.entries());
 
@@ -298,6 +301,7 @@ class UserManager {
                 
                 form.onsubmit = (e) => {
                     e.preventDefault();
+                    console.log('Edit form submitted, calling handleUpdate with ID:', id);
                     this.handleUpdate(e, id);
                 };
                 
@@ -320,6 +324,7 @@ class UserManager {
     }
 
     async handleUpdate(e, id) {
+        console.log('handleUpdate called for user ID:', id);
         const formData = new FormData(e.target);
         const userData = Object.fromEntries(formData.entries());
 
