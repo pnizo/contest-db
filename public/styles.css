@@ -341,6 +341,7 @@ button:active {
 }
 
 .login-header h1 {
+    color: white;
     margin-bottom: 10px;
     font-size: 28px;
 }
