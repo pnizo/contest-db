@@ -153,7 +153,6 @@ class SubjectManager {
             document.getElementById('modalNameJa').value = subject.name_ja || '';
             document.getElementById('modalFirstName').value = subject.first_name || '';
             document.getElementById('modalLastName').value = subject.last_name || '';
-            document.getElementById('modalEmail').value = subject.email || '';
             document.getElementById('modalNpcMemberNo').value = subject.npc_member_no || '';
             document.getElementById('modalNote').value = subject.note || '';
             
@@ -167,7 +166,6 @@ class SubjectManager {
             document.getElementById('modalNameJa').value = '';
             document.getElementById('modalFirstName').value = '';
             document.getElementById('modalLastName').value = '';
-            document.getElementById('modalEmail').value = '';
             document.getElementById('modalNpcMemberNo').value = '';
             document.getElementById('modalNote').value = '';
             
@@ -293,13 +291,10 @@ class SubjectManager {
                     <div class="user-info">
                         <div class="user-details">
                             <h3>${this.escapeHtml(subject.name_ja || '')} ${statusBadge}</h3>
-                            <p><strong>FWJカード番号:</strong> ${this.escapeHtml(subject.fwj_card_no || '')}</p>
                             <p><strong>英語名:</strong> ${this.escapeHtml(subject.first_name || '')} ${this.escapeHtml(subject.last_name || '')}</p>
-                            <p><strong>メール:</strong> ${this.escapeHtml(subject.email || '')}</p>
+                            <p><strong>FWJカード番号:</strong> ${this.escapeHtml(subject.fwj_card_no || '')}</p>
                             ${subject.npc_member_no ? `<p><strong>NPCメンバー番号:</strong> ${this.escapeHtml(subject.npc_member_no)}</p>` : ''}
                             ${subject.note ? `<p><strong>備考:</strong> ${this.escapeHtml(subject.note)}</p>` : ''}
-                            <p><strong>作成日:</strong> ${subject.createdAt ? new Date(subject.createdAt).toLocaleDateString('ja-JP') : '不明'}</p>
-                            ${isDeleted && subject.deletedAt ? `<p><strong>削除日:</strong> ${new Date(subject.deletedAt).toLocaleDateString('ja-JP')}</p>` : ''}
                         </div>
                         <div class="user-actions">
                             ${actions}

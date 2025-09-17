@@ -25,12 +25,6 @@ class Subject extends BaseModel {
       errors.push('姓（英語）は必須です');
     }
     
-    if (!subjectData.email || subjectData.email.trim() === '') {
-      errors.push('メールアドレスは必須です');
-    } else if (!/\S+@\S+\.\S+/.test(subjectData.email)) {
-      errors.push('有効なメールアドレスを入力してください');
-    }
-    
     if (!subjectData.id) {
       subjectData.id = Date.now().toString();
     }
@@ -44,11 +38,6 @@ class Subject extends BaseModel {
     subjectData.note = subjectData.note || '';
     
     return { isValid: errors.length === 0, errors, subjectData };
-  }
-
-  async findByEmail(email, includeDeleted = false) {
-    const all = includeDeleted ? await this.findAllIncludingDeleted() : await this.findAll();
-    return all.find(subject => subject.email === email);
   }
 
   async findByFwjCard(fwjCardNo, includeDeleted = false) {
@@ -73,17 +62,8 @@ class Subject extends BaseModel {
       return { success: false, errors: ['このFWJカード番号は既に登録されています'] };
     }
 
-    // 同じメールアドレスの既存のアクティブな記録をチェック
-    const existingActiveByEmail = await this.findByEmail(validation.subjectData.email, false);
-    if (existingActiveByEmail) {
-      return { success: false, errors: ['このメールアドレスは既に登録されています'] };
-    }
-
-    // 論理削除された記録があるかチェック（FWJカード番号優先）
-    let existingDeletedSubject = await this.findByFwjCard(validation.subjectData.fwj_card_no, true);
-    if (!existingDeletedSubject) {
-      existingDeletedSubject = await this.findByEmail(validation.subjectData.email, true);
-    }
+    // 論理削除された記録があるかチェック（FWJカード番号のみ）
+    const existingDeletedSubject = await this.findByFwjCard(validation.subjectData.fwj_card_no, true);
     
     if (existingDeletedSubject && existingDeletedSubject.isValid === 'FALSE') {
       // 論理削除されたレコードを復元
