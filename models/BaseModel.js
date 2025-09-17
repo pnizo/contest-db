@@ -114,6 +114,29 @@ class BaseModel {
           return itemDate >= start && itemDate <= end;
         });
       }
+      if (filters.search) {
+        const searchTerm = filters.search.toLowerCase();
+        allItems = allItems.filter(item => {
+          // スコア用の検索フィールド（選手名のみ）
+          const scoreFields = [
+            item.player_name
+          ];
+          
+          // 登録用の検索フィールド（氏名関連のみ）
+          const registrationFields = [
+            item.name_ja,
+            item.first_name,
+            item.last_name
+          ];
+          
+          // どちらかのフィールドセットで検索
+          const searchFields = scoreFields.concat(registrationFields);
+          
+          return searchFields.some(field => 
+            field && field.toString().toLowerCase().includes(searchTerm)
+          );
+        });
+      }
 
       // ソート処理
       if (sortBy && allItems.length > 0) {

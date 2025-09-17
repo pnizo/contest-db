@@ -169,12 +169,33 @@ class RegistrationsManager {
             this.clearFilters();
         });
 
+        // 検索ボタンのクリックイベント
+        document.getElementById('searchBtn').addEventListener('click', () => {
+            const searchTerm = document.getElementById('searchInput').value;
+            this.handleSearch(searchTerm);
+        });
+
+        // 検索入力時のEnterキー処理とクリアボタン表示制御
+        document.getElementById('searchInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                this.handleSearch(e.target.value);
+            }
+        });
+
+        // 検索入力時にクリアボタンの表示/非表示を制御（検索は実行しない）
         document.getElementById('searchInput').addEventListener('input', (e) => {
-            this.handleSearch(e.target.value);
+            const clearBtn = document.getElementById('clearSearchBtn');
+            if (e.target.value.length > 0) {
+                clearBtn.classList.remove('hidden');
+            } else {
+                clearBtn.classList.add('hidden');
+            }
         });
 
         document.getElementById('clearSearchBtn').addEventListener('click', () => {
             document.getElementById('searchInput').value = '';
+            const clearBtn = document.getElementById('clearSearchBtn');
+            clearBtn.classList.add('hidden');
             this.handleSearch('');
         });
 
@@ -791,6 +812,11 @@ class RegistrationsManager {
         document.getElementById('violationFilter').checked = false;
         document.getElementById('startDate').value = '';
         document.getElementById('endDate').value = '';
+        document.getElementById('searchInput').value = '';
+        
+        // クリアボタンも隠す
+        const clearBtn = document.getElementById('clearSearchBtn');
+        clearBtn.classList.add('hidden');
         
         this.currentFilters = {};
         this.currentPage = 1;

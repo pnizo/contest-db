@@ -791,10 +791,17 @@ button:active {
 }
 
 .search-container {
-    position: relative;
     flex: 1;
     min-width: 300px;
     max-width: 600px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.search-input-wrapper {
+    position: relative;
+    flex: 1;
 }
 
 .search-input {
@@ -869,6 +876,34 @@ button:active {
 
 .clear-btn:not(.hidden) {
     display: flex;
+}
+
+.search-btn {
+    padding: 10px 16px;
+    background: #3498db;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 0.2s, transform 0.1s;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.search-btn:hover {
+    background: #2980b9;
+}
+
+.search-btn:active {
+    background: #21618c;
+    transform: translateY(1px);
+}
+
+.search-btn:focus {
+    outline: 2px solid #3498db;
+    outline-offset: 2px;
 }
 
 .control-buttons {

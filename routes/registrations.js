@@ -70,6 +70,7 @@ router.get('/', requireAuth, async (req, res) => {
       contest_name, 
       class_name, 
       violation_only,
+      search,
       startDate, 
       endDate,
       sortBy = 'contest_date',
@@ -80,6 +81,7 @@ router.get('/', requireAuth, async (req, res) => {
     if (fwj_card_no) filters.fwj_card_no = fwj_card_no;
     if (contest_name) filters.contest_name = contest_name;
     if (class_name) filters.class = class_name;
+    if (search) filters.search = search;
     if (startDate) filters.startDate = startDate;
     if (endDate) filters.endDate = endDate;
 

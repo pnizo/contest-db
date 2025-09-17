@@ -68,6 +68,7 @@ router.get('/', requireAuth, async (req, res) => {
       category_name, 
       startDate, 
       endDate,
+      search,
       sortBy = 'contest_date',
       sortOrder = 'desc'
     } = req.query;
@@ -78,6 +79,7 @@ router.get('/', requireAuth, async (req, res) => {
     if (category_name) filters.category_name = category_name;
     if (startDate) filters.startDate = startDate;
     if (endDate) filters.endDate = endDate;
+    if (search) filters.search = search;
 
     const result = await scoreModel.findWithPaging(
       parseInt(page), 

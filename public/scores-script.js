@@ -266,7 +266,20 @@ class ScoresManager {
             e.target.blur(); // フォーカスを即座に外す
         });
 
-        // 検索入力時にクリアボタンの表示/非表示を制御
+        // 検索ボタンのクリックイベント
+        document.getElementById('searchBtn').addEventListener('click', () => {
+            const searchTerm = document.getElementById('searchInput').value;
+            this.handleSearch(searchTerm);
+        });
+
+        // 検索入力時のEnterキー処理とクリアボタン表示制御
+        document.getElementById('searchInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                this.handleSearch(e.target.value);
+            }
+        });
+
+        // 検索入力時にクリアボタンの表示/非表示を制御（検索は実行しない）
         document.getElementById('searchInput').addEventListener('input', (e) => {
             const clearBtn = document.getElementById('clearSearchBtn');
             if (e.target.value.length > 0) {
@@ -274,7 +287,6 @@ class ScoresManager {
             } else {
                 clearBtn.classList.add('hidden');
             }
-            this.searchScores();
         });
     }
 
@@ -731,21 +743,18 @@ class ScoresManager {
         });
         
         // 検索結果をリセット
-        this.searchScores();
+        this.handleSearch('');
     }
 
-    searchScores() {
-        const searchTerm = document.getElementById('searchInput').value.toLowerCase();
-        const tableRows = document.querySelectorAll('.scores-table tbody tr');
-        
-        tableRows.forEach(row => {
-            const text = row.textContent.toLowerCase();
-            if (text.includes(searchTerm)) {
-                row.style.display = '';
-            } else {
-                row.style.display = 'none';
-            }
-        });
+    handleSearch(searchTerm) {
+        // サーバーサイド検索実装（フィルターとして機能）
+        if (searchTerm.trim()) {
+            this.currentFilters.search = searchTerm;
+        } else {
+            delete this.currentFilters.search;
+        }
+        this.currentPage = 1;
+        this.loadScores();
     }
 
     async handleLogout() {
