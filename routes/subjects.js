@@ -8,8 +8,19 @@ const subjectModel = new Subject();
 // 全対象者データ取得（認証必要）
 router.get('/', requireAuth, async (req, res) => {
   try {
-    const subjects = await subjectModel.findAll();
-    res.json({ success: true, data: subjects });
+    const { search } = req.query;
+    const filters = {};
+    if (search) filters.search = search;
+
+    if (Object.keys(filters).length > 0) {
+      // フィルター付きの場合はBaseModelのfindWithPagingを使用
+      const result = await subjectModel.findWithPaging(1, Number.MAX_SAFE_INTEGER, filters);
+      res.json({ success: true, data: result.data });
+    } else {
+      // フィルターなしの場合は通常のfindAll
+      const subjects = await subjectModel.findAll();
+      res.json({ success: true, data: subjects });
+    }
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }

@@ -46,6 +46,7 @@ class SubjectManager {
         this.showingDeleted = false;
         this.currentUser = null;
         this.isAdmin = false;
+        this.currentFilters = {};
         this.init();
     }
 
@@ -131,6 +132,36 @@ class SubjectManager {
 
         document.getElementById('toggleDeletedBtn').addEventListener('click', () => {
             this.toggleDeletedView();
+        });
+
+        // 検索ボタンのクリックイベント
+        document.getElementById('searchBtn').addEventListener('click', () => {
+            const searchTerm = document.getElementById('searchInput').value;
+            this.handleSearch(searchTerm);
+        });
+
+        // 検索入力時のEnterキー処理とクリアボタン表示制御
+        document.getElementById('searchInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                this.handleSearch(e.target.value);
+            }
+        });
+
+        // 検索入力時にクリアボタンの表示/非表示を制御（検索は実行しない）
+        document.getElementById('searchInput').addEventListener('input', (e) => {
+            const clearBtn = document.getElementById('clearSearchBtn');
+            if (e.target.value.length > 0) {
+                clearBtn.classList.remove('hidden');
+            } else {
+                clearBtn.classList.add('hidden');
+            }
+        });
+
+        document.getElementById('clearSearchBtn').addEventListener('click', () => {
+            document.getElementById('searchInput').value = '';
+            const clearBtn = document.getElementById('clearSearchBtn');
+            clearBtn.classList.add('hidden');
+            this.handleSearch('');
         });
 
         document.getElementById('logoutBtn').addEventListener('click', () => {
@@ -225,7 +256,16 @@ class SubjectManager {
         container.innerHTML = '<div class="loading">読み込み中...</div>';
 
         try {
-            const url = this.showingDeleted ? `${this.apiUrl}/deleted/list` : this.apiUrl;
+            let url = this.showingDeleted ? `${this.apiUrl}/deleted/list` : this.apiUrl;
+            
+            // 検索パラメータがある場合はクエリストリングに追加
+            if (!this.showingDeleted && this.currentFilters.search) {
+                const params = new URLSearchParams({
+                    search: this.currentFilters.search
+                });
+                url += `?${params.toString()}`;
+            }
+
             console.log('About to call authFetch for:', url);
             const response = await authFetch(url);
             console.log('loadSubjects response status:', response.status);
@@ -239,6 +279,16 @@ class SubjectManager {
         } catch (error) {
             container.innerHTML = `<div class="empty-state">エラー: ${error.message}</div>`;
         }
+    }
+
+    handleSearch(searchTerm) {
+        // サーバーサイド検索実装（フィルターとして機能）
+        if (searchTerm.trim()) {
+            this.currentFilters.search = searchTerm;
+        } else {
+            delete this.currentFilters.search;
+        }
+        this.loadSubjects();
     }
 
     toggleDeletedView() {
