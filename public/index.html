@@ -78,8 +78,8 @@
                     console.log('Auth status result:', result);
                     
                     if (result.isAuthenticated) {
-                        console.log('User is authenticated, redirecting to /scores');
-                        window.location.href = '/scores';
+                        console.log('User is authenticated, redirecting to /registrations');
+                        window.location.href = '/registrations';
                     } else {
                         console.log('User is not authenticated, staying on login page');
                     }
@@ -133,9 +133,9 @@
                         this.showNotification('ログインしました', 'success');
                         submitBtn.textContent = 'リダイレクト中...';
                         setTimeout(() => {
-                            console.log('Redirecting to /scores after login...');
+                            console.log('Redirecting to /registrations after login...');
                             console.log('Final token check before redirect:', AuthToken.get() ? 'exists' : 'missing');
-                            window.location.href = '/scores';
+                            window.location.href = '/registrations';
                         }, 1000);
                     } else {
                         this.showNotification(result.error, 'error');

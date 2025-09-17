@@ -8,8 +8,15 @@ const userModel = new User();
 router.get('/', requireAuth, async (req, res) => {
   try {
     const users = await userModel.findAll();
+    let filteredUsers = users;
+
+    // 一般ユーザーの場合は自分の情報のみを返す
+    if (req.user.role !== 'admin') {
+      filteredUsers = users.filter(user => user.id === req.user.id);
+    }
+
     // パスワードフィールドを除外
-    const safeUsers = users.map(user => {
+    const safeUsers = filteredUsers.map(user => {
       const { password, ...safeUser } = user;
       return safeUser;
     });
@@ -87,12 +94,26 @@ router.post('/', requireAdmin, async (req, res) => {
   }
 });
 
-router.put('/:id', requireAdmin, async (req, res) => {
+router.put('/:id', requireAuth, async (req, res) => {
   try {
+    // 一般ユーザーは自分のIDのみ更新可能、管理者はすべて更新可能
+    if (req.user.role !== 'admin' && req.params.id !== req.user.id) {
+      return res.status(403).json({ 
+        success: false, 
+        error: '自分のプロフィールのみ更新できます' 
+      });
+    }
+
     const updateData = {
       ...req.body,
       updatedAt: new Date().toISOString()
     };
+
+    // 一般ユーザーはroleを変更できない
+    if (req.user.role !== 'admin' && updateData.role) {
+      delete updateData.role;
+    }
+
     const result = await userModel.update(req.params.id, updateData);
     if (result.success) {
       res.json(result);

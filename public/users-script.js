@@ -106,10 +106,14 @@ class UserManager {
             document.getElementById('userName').textContent = userName;
             document.getElementById('userRole').innerHTML = `<span class="role-badge ${this.currentUser.role}">${this.currentUser.role}</span>`;
 
-            // 管理者でない場合、新規追加ボタンを非表示にする
+            // 管理者でない場合、新規追加ボタンと削除済み表示ボタンを非表示にする
             if (!this.isAdmin) {
                 document.body.classList.add('readonly-mode');
                 document.getElementById('addUserModalBtn').style.display = 'none';
+                const toggleDeletedBtn = document.getElementById('toggleDeletedBtn');
+                if (toggleDeletedBtn) {
+                    toggleDeletedBtn.style.display = 'none';
+                }
             }
         }
     }
@@ -155,6 +159,18 @@ class UserManager {
             document.getElementById('modalRole').value = user.role || 'user';
             document.getElementById('modalPassword').value = '';
             document.getElementById('modalPassword').removeAttribute('required');
+
+            // 一般ユーザーはroleフィールドを変更できない
+            const roleField = document.getElementById('modalRole');
+            if (!this.isAdmin) {
+                roleField.disabled = true;
+                roleField.style.backgroundColor = '#f5f5f5';
+                roleField.style.cursor = 'not-allowed';
+            } else {
+                roleField.disabled = false;
+                roleField.style.backgroundColor = '';
+                roleField.style.cursor = '';
+            }
             
             this.editingUserId = user.id;
         } else {
@@ -274,21 +290,35 @@ class UserManager {
                 '<span class="status-badge deleted">削除済み</span>' :
                 '<span class="status-badge active">アクティブ</span>';
             
-            const actions = isDeleted ? `
-                <button class="restore-btn" onclick="userManager.restoreUser('${user.id}')">
-                    復元
-                </button>
-                <button class="delete-btn" onclick="userManager.permanentDeleteUser('${user.id}')">
-                    完全削除
-                </button>
-            ` : `
-                <button class="edit-btn" onclick="userManager.editUser('${user.id}')">
-                    編集
-                </button>
-                <button class="delete-btn" onclick="userManager.deleteUser('${user.id}')">
-                    削除
-                </button>
-            `;
+            let actions = '';
+            
+            if (this.isAdmin) {
+                // 管理者の場合：すべてのボタンを表示
+                actions = isDeleted ? `
+                    <button class="restore-btn" onclick="userManager.restoreUser('${user.id}')">
+                        復元
+                    </button>
+                    <button class="delete-btn" onclick="userManager.permanentDeleteUser('${user.id}')">
+                        完全削除
+                    </button>
+                ` : `
+                    <button class="edit-btn" onclick="userManager.editUser('${user.id}')">
+                        編集
+                    </button>
+                    <button class="delete-btn" onclick="userManager.deleteUser('${user.id}')">
+                        削除
+                    </button>
+                `;
+            } else {
+                // 一般ユーザーの場合：自分の情報なので編集ボタンのみ表示
+                if (!isDeleted) {
+                    actions = `
+                        <button class="edit-btn" onclick="userManager.editUser('${user.id}')">
+                            編集
+                        </button>
+                    `;
+                }
+            }
             
             return `
                 <div class="user-card ${isDeleted ? 'deleted' : ''}">

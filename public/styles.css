@@ -524,7 +524,6 @@ button:active {
     display: none;
 }
 
-.readonly-mode .user-actions .edit-btn,
 .readonly-mode .user-actions .delete-btn,
 .readonly-mode .user-actions .restore-btn {
     display: none;
@@ -963,7 +962,6 @@ button:active {
     font-size: 14px;
 }
 
-.readonly-mode .score-actions .edit-btn,
 .readonly-mode .score-actions .delete-btn,
 .readonly-mode .score-actions .restore-btn {
     display: none;
