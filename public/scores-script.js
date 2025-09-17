@@ -777,10 +777,7 @@ class ScoresManager {
 
     async editScore(id) {
         try {
-            const response = await fetch(`${this.apiUrl}/${id}`, {
-                credentials: 'include'
-            });
-            
+            const response = await authFetch(`${this.apiUrl}/${id}`);
             const result = await response.json();
             
             if (result.success) {
