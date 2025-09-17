@@ -7,6 +7,8 @@ require('dotenv').config();
 const userRoutes = require('./routes/users');
 const authRoutes = require('./routes/auth');
 const scoreRoutes = require('./routes/scores');
+const registrationRoutes = require('./routes/registrations');
+const subjectRoutes = require('./routes/subjects');
 const { checkAuth, requireIpRestriction } = require('./middleware/auth');
 const { sessionCompatibility } = require('./middleware/jwt');
 
@@ -60,6 +62,14 @@ app.get('/scores', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'scores.html'));
 });
 
+app.get('/registrations', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'registrations.html'));
+});
+
+app.get('/subjects', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'subjects.html'));
+});
+
 // 静的ファイルを設定
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -67,6 +77,8 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/scores', scoreRoutes);
+app.use('/api/registrations', registrationRoutes);
+app.use('/api/subjects', subjectRoutes);
 
 app.use((err, req, res, next) => {
   console.error(err.stack);

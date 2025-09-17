@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>スプレッドシートDB - ポリシー違反認定者管理</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <div id="authHeader" class="auth-header" style="display: none;">
+            <div class="user-info-display">
+                <div class="user-avatar" id="userAvatar"></div>
+                <div class="user-details-display">
+                    <div class="name" id="userName"></div>
+                    <div class="role" id="userRole"></div>
+                </div>
+            </div>
+            <div class="auth-actions">
+                <nav class="page-nav">
+                    <a href="/users" class="nav-link">ユーザー管理</a>
+                    <a href="/scores" class="nav-link">成績管理</a>
+                    <a href="/registrations" class="nav-link">登録管理</a>
+                    <a href="/subjects" class="nav-link active">違反認定者管理</a>
+                </nav>
+                <button id="logoutBtn" class="logout-btn">ログアウト</button>
+            </div>
+        </div>
+
+        <main class="subjects-main">
+            <section class="subjects-section">
+                <h2>ポリシー違反認定者一覧</h2>
+                <div class="section-controls">
+                    <div class="controls">
+                        <div class="control-buttons">
+                            <button id="refreshBtn">データ再読込</button>
+                            <button id="addSubjectModalBtn">新規認定者追加</button>
+                            <button id="toggleDeletedBtn" class="toggle-btn">削除済みを表示</button>
+                        </div>
+                    </div>
+                </div>
+                <div id="subjectsContainer">
+                    <div class="loading">読み込み中...</div>
+                </div>
+            </section>
+        </main>
+
+        <div id="notification" class="notification hidden"></div>
+    </div>
+
+    <!-- Subject Registration Modal -->
+    <div id="subjectModal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalTitle">新規認定者追加</h2>
+                <button class="modal-close" onclick="subjectManager.closeSubjectModal()">&times;</button>
+            </div>
+            <form id="subjectForm" class="modal-form">
+                <div class="form-group">
+                    <label for="modalFwjCardNo">FWJカード番号:</label>
+                    <input type="text" id="modalFwjCardNo" name="fwj_card_no" required>
+                </div>
+                <div class="form-group">
+                    <label for="modalNameJa">日本語名:</label>
+                    <input type="text" id="modalNameJa" name="name_ja" required>
+                </div>
+                <div class="form-group">
+                    <label for="modalFirstName">名（英語）:</label>
+                    <input type="text" id="modalFirstName" name="first_name" required>
+                </div>
+                <div class="form-group">
+                    <label for="modalLastName">姓（英語）:</label>
+                    <input type="text" id="modalLastName" name="last_name" required>
+                </div>
+                <div class="form-group">
+                    <label for="modalEmail">メールアドレス:</label>
+                    <input type="email" id="modalEmail" name="email" required>
+                </div>
+                <div class="form-group">
+                    <label for="modalNpcMemberNo">NPCメンバー番号:</label>
+                    <input type="text" id="modalNpcMemberNo" name="npc_member_no" placeholder="任意入力">
+                </div>
+                <div class="form-group">
+                    <label for="modalNote">備考:</label>
+                    <textarea id="modalNote" name="note" rows="3" placeholder="詳細情報や備考を入力してください"></textarea>
+                </div>
+                <div class="form-actions">
+                    <button type="button" onclick="subjectManager.closeSubjectModal()" class="btn btn-secondary">キャンセル</button>
+                    <button type="submit" class="btn btn-primary" id="modalSubmitBtn">認定者を追加</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="subjects-script.js"></script>
+</body>
+</html>

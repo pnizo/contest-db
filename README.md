@@ -94,7 +94,7 @@ J1: password
 
 ```
 A1: id
-B1: npcj_no
+B1: fwj_no
 C1: contest_date
 D1: contest_name
 E1: contest_place
@@ -189,7 +189,7 @@ npm run hash-password mySecurePassword123
 
 ### 大会成績管理
 - `GET /api/scores` - 全成績取得（クエリパラメータでフィルタリング可能）
-  - `?npcj_no=XXX` - NPCJ番号で絞り込み
+  - `?fwj_no=XXX` - NPCJ番号で絞り込み
   - `?contest_name=XXX` - 大会名で絞り込み
   - `?category_name=XXX` - カテゴリー名で絞り込み  
   - `?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD` - 期間で絞り込み

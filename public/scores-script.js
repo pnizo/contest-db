@@ -72,23 +72,7 @@ class ScoresManager {
 
     async checkAuthStatus() {
         try {
-            // console.log('=== Scores page checkAuthStatus START ===');
-            // const token = AuthToken.get();
-            // console.log('Token exists in localStorage on scores page:', !!token);
-            // if (token) {
-            //     console.log('Token preview on scores page:', token.substring(0, 20) + '...');
-            // }
-            
-            const headers = AuthToken.getHeaders();
-            // console.log('Auth headers for /api/auth/status on scores page:', headers);
-
-            const response = await fetch('/api/auth/status', {
-                headers: {
-                    ...headers,
-                    'Content-Type': 'application/json'
-                },
-                credentials: 'include'
-            });
+            const response = await authFetch('/api/auth/status');
             
             // console.log('Auth status response status on scores page:', response.status);
             const result = await response.json();
@@ -207,21 +191,27 @@ class ScoresManager {
 
 
     bindEvents() {
-        document.getElementById('csvFile').addEventListener('change', (e) => {
-            this.handleFileSelect(e);
+        // モーダル関連のイベント
+        document.getElementById('importModalBtn').addEventListener('click', () => {
+            this.openImportModal();
         });
 
-        document.getElementById('importBtn').addEventListener('click', () => {
-            this.handleImport();
+        document.getElementById('modalCsvFile').addEventListener('change', (e) => {
+            this.handleModalFileSelect(e);
+        });
+
+        document.getElementById('modalImportBtn').addEventListener('click', () => {
+            this.handleModalImport();
         });
 
         document.getElementById('refreshBtn').addEventListener('click', () => {
             this.loadScores();
         });
 
-        document.getElementById('toggleDeletedBtn').addEventListener('click', () => {
-            this.toggleDeletedView();
-        });
+        // 削除済み表示機能を削除
+        // document.getElementById('toggleDeletedBtn').addEventListener('click', () => {
+        //     this.toggleDeletedView();
+        // });
 
         document.getElementById('logoutBtn').addEventListener('click', () => {
             this.handleLogout();
@@ -244,9 +234,10 @@ class ScoresManager {
             this.nextPage();
         });
 
-        document.getElementById('editScoreForm').addEventListener('submit', (e) => {
-            this.handleEditSubmit(e);
-        });
+        // 編集フォーム機能を削除
+        // document.getElementById('editScoreForm').addEventListener('submit', (e) => {
+        //     this.handleEditSubmit(e);
+        // });
 
         const clearBtn = document.getElementById('clearSearchBtn');
         
@@ -287,30 +278,45 @@ class ScoresManager {
         });
     }
 
-    handleFileSelect(e) {
+    // モーダル関連のメソッド
+    openImportModal() {
+        document.getElementById('importModal').classList.remove('hidden');
+        // フォームをリセット
+        document.getElementById('modalCsvFile').value = '';
+        document.getElementById('modalImportBtn').disabled = true;
+        document.getElementById('modalImportStatus').className = 'import-status hidden';
+        this.selectedModalFile = null;
+    }
+
+    closeImportModal() {
+        document.getElementById('importModal').classList.add('hidden');
+        this.selectedModalFile = null;
+    }
+
+    handleModalFileSelect(e) {
         const file = e.target.files[0];
-        const importBtn = document.getElementById('importBtn');
+        const importBtn = document.getElementById('modalImportBtn');
         
         if (file && file.type === 'text/csv') {
             importBtn.disabled = false;
-            this.selectedFile = file;
+            this.selectedModalFile = file;
         } else {
             importBtn.disabled = true;
-            this.selectedFile = null;
+            this.selectedModalFile = null;
             if (file) {
                 this.showNotification('CSVファイルを選択してください', 'error');
             }
         }
     }
 
-    async handleImport() {
-        if (!this.selectedFile) {
+    async handleModalImport() {
+        if (!this.selectedModalFile) {
             this.showNotification('CSVファイルを選択してください', 'error');
             return;
         }
 
         try {
-            const csvText = await this.readFileAsText(this.selectedFile);
+            const csvText = await this.readFileAsText(this.selectedModalFile);
             const csvData = this.parseCSV(csvText);
             
             if (csvData.length === 0) {
@@ -318,9 +324,9 @@ class ScoresManager {
                 return;
             }
 
-            document.getElementById('importBtn').disabled = true;
-            document.getElementById('importStatus').className = 'import-status';
-            document.getElementById('importStatus').textContent = 'インポート中...';
+            document.getElementById('modalImportBtn').disabled = true;
+            document.getElementById('modalImportStatus').className = 'import-status';
+            document.getElementById('modalImportStatus').textContent = 'インポート中...';
 
             const response = await authFetch(`${this.apiUrl}/import`, {
                 method: 'POST',
@@ -333,25 +339,34 @@ class ScoresManager {
                 const { total, imported, message } = result.data;
                 
                 this.showNotification(message || `${imported}件の成績をインポートしました`, 'success');
-                document.getElementById('importStatus').textContent = message || `インポート完了: ${imported}件`;
+                document.getElementById('modalImportStatus').textContent = message || `インポート完了: ${imported}件`;
                 
                 // フィルターオプションを再読込み（新しいデータが追加されたため）
                 await this.loadFilterOptions();
                 this.loadScores();
                 
-                // ファイル選択をリセット
-                document.getElementById('csvFile').value = '';
-                document.getElementById('importBtn').disabled = true;
-                this.selectedFile = null;
+                // モーダルを閉じる
+                setTimeout(() => {
+                    this.closeImportModal();
+                }, 2000);
             } else {
-                this.showNotification(result.error, 'error');
-                document.getElementById('importStatus').textContent = 'インポートに失敗しました';
+                console.log('Import failed:', result.error);
+                // エラーメッセージを改行で分割して表示
+                const errorLines = result.error.split('\n');
+                const mainError = errorLines[0];
+                const detailError = errorLines.slice(1).join('\n');
+                
+                this.showNotification(mainError, 'error');
+                document.getElementById('modalImportStatus').innerHTML = 
+                    detailError ? 
+                    `インポートに失敗しました<br><small style="font-size: 0.9em; line-height: 1.3;">${detailError.replace(/\n/g, '<br>')}</small>` :
+                    'インポートに失敗しました';
             }
         } catch (error) {
             this.showNotification('エラーが発生しました: ' + error.message, 'error');
-            document.getElementById('importStatus').textContent = 'エラーが発生しました';
+            document.getElementById('modalImportStatus').textContent = 'エラーが発生しました';
         } finally {
-            document.getElementById('importBtn').disabled = false;
+            document.getElementById('modalImportBtn').disabled = false;
         }
     }
 
@@ -471,7 +486,7 @@ class ScoresManager {
             <table class="scores-table">
                 <thead>
                     <tr>
-                        <th class="sortable" data-column="npcj_no">NPCJ番号${getSortIcon('npcj_no')}</th>
+                        <th class="sortable" data-column="fwj_no">FWJカード番号${getSortIcon('fwj_no')}</th>
                         <th class="sortable" data-column="contest_date">開催日${getSortIcon('contest_date')}</th>
                         <th class="sortable" data-column="contest_name">大会名${getSortIcon('contest_name')}</th>
                         <th class="sortable" data-column="category_name">カテゴリー${getSortIcon('category_name')}</th>
@@ -479,7 +494,6 @@ class ScoresManager {
                         <th class="sortable" data-column="player_name">選手名${getSortIcon('player_name')}</th>
                         <th class="sortable" data-column="contest_place">開催地${getSortIcon('contest_place')}</th>
                         <th>ステータス</th>
-                        ${this.isAdmin ? '<th>操作</th>' : ''}
                     </tr>
                 </thead>
                 <tbody>
@@ -493,22 +507,13 @@ class ScoresManager {
             
             let actions = '';
             if (this.isAdmin) {
-                if (isDeleted) {
-                    actions = `
-                        <button class="btn btn-sm restore-btn" onclick="scoresManager.restoreScore('${score.id}')">復元</button>
-                        <button class="btn btn-sm delete-btn" onclick="scoresManager.permanentDeleteScore('${score.id}')">完全削除</button>
-                    `;
-                } else {
-                    actions = `
-                        <button class="btn btn-sm edit-btn" onclick="scoresManager.editScore('${score.id}')">編集</button>
-                        <button class="btn btn-sm delete-btn" onclick="scoresManager.deleteScore('${score.id}')">削除</button>
-                    `;
-                }
+                // 管理者向けの復元・完全削除機能も削除
+                actions = '';
             }
 
             tableHtml += `
                 <tr class="${isDeleted ? 'deleted' : ''}">
-                    <td>${this.escapeHtml(score.npcj_no || '')}</td>
+                    <td>${this.escapeHtml(score.fwj_no || '')}</td>
                     <td>${score.contest_date || ''}</td>
                     <td>${this.escapeHtml(score.contest_name || '')}</td>
                     <td>${this.escapeHtml(score.category_name || '')}</td>
@@ -516,7 +521,6 @@ class ScoresManager {
                     <td>${this.escapeHtml(score.player_name || '')}</td>
                     <td>${this.escapeHtml(score.contest_place || '')}</td>
                     <td>${statusBadge}</td>
-                    ${this.isAdmin ? `<td class="actions">${actions}</td>` : ''}
                 </tr>
             `;
         });
@@ -566,7 +570,7 @@ class ScoresManager {
 
         // 現在のフィルターを保存
         this.currentFilters = {};
-        if (npcjNo) this.currentFilters.npcj_no = npcjNo;
+        if (npcjNo) this.currentFilters.fwj_no = npcjNo;
         if (contestName) this.currentFilters.contest_name = contestName;
         if (categoryName) this.currentFilters.category_name = categoryName;
         if (startDate) this.currentFilters.startDate = startDate;
@@ -639,70 +643,73 @@ class ScoresManager {
         this.loadScores();
     }
 
-    async deleteScore(id) {
-        if (!confirm('この成績を論理削除してもよろしいですか？')) {
-            return;
-        }
+    // 削除機能を削除
+    // async deleteScore(id) {
+    //     if (!confirm('この成績を論理削除してもよろしいですか？')) {
+    //         return;
+    //     }
 
-        try {
-            const response = await authFetch(`${this.apiUrl}/${id}`, {
-                method: 'DELETE'
-            });
+    //     try {
+    //         const response = await authFetch(`${this.apiUrl}/${id}`, {
+    //             method: 'DELETE'
+    //         });
 
-            const result = await response.json();
+    //         const result = await response.json();
 
-            if (result.success) {
-                this.showNotification('成績が論理削除されました', 'success');
-                this.loadScores();
-            } else {
-                this.showNotification(result.error, 'error');
-            }
-        } catch (error) {
-            this.showNotification('エラーが発生しました: ' + error.message, 'error');
-        }
-    }
+    //         if (result.success) {
+    //             this.showNotification('成績が論理削除されました', 'success');
+    //             this.loadScores();
+    //         } else {
+    //             this.showNotification(result.error, 'error');
+    //         }
+    //     } catch (error) {
+    //         this.showNotification('エラーが発生しました: ' + error.message, 'error');
+    //     }
+    // }
 
-    async restoreScore(id) {
-        try {
-            const response = await authFetch(`${this.apiUrl}/${id}/restore`, {
-                method: 'PUT'
-            });
+    // 復元機能を削除
+    // async restoreScore(id) {
+    //     try {
+    //         const response = await authFetch(`${this.apiUrl}/${id}/restore`, {
+    //             method: 'PUT'
+    //         });
 
-            const result = await response.json();
+    //         const result = await response.json();
 
-            if (result.success) {
-                this.showNotification('成績が復元されました', 'success');
-                this.loadScores();
-            } else {
-                this.showNotification(result.error, 'error');
-            }
-        } catch (error) {
-            this.showNotification('エラーが発生しました: ' + error.message, 'error');
-        }
-    }
+    //         if (result.success) {
+    //             this.showNotification('成績が復元されました', 'success');
+    //             this.loadScores();
+    //         } else {
+    //             this.showNotification(result.error, 'error');
+    //         }
+    //     } catch (error) {
+    //         this.showNotification('エラーが発生しました: ' + error.message, 'error');
+    //     }
+    // }
 
-    async permanentDeleteScore(id) {
-        if (!confirm('この成績を完全に削除してもよろしいですか？この操作は元に戻せません。')) {
-            return;
-        }
+    // 完全削除機能を削除
+    // async permanentDeleteScore(id) {
+    //     if (!confirm('この成績を完全に削除してもよろしいですか？この操作は元に戻せません。')) {
+    //         return;
+    //     }
 
-        try {
-            const response = await authFetch(`${this.apiUrl}/${id}/permanent`, {
-                method: 'DELETE'
-            });
+    //     try {
+    //         const response = await authFetch(`${this.apiUrl}/${id}/permanent`, {
+    //             method: 'DELETE'
+    //         });
 
-            const result = await response.json();
+    //         const result = await response.json();
 
-            if (result.success) {
-                this.showNotification('成績が完全に削除されました', 'success');
-                this.loadScores();
-            } else {
-                this.showNotification(result.error, 'error');
-            }
-        } catch (error) {
-            this.showNotification('エラーが発生しました: ' + error.message, 'error');
-        }
-    }
+    //         if (result.success) {
+    //             this.showNotification('成績が完全に削除されました', 'success');
+    //             this.loadScores();
+    //         } else {
+    //             this.showNotification(result.error, 'error');
+    //         }
+    //     } catch (error) {
+    //         this.showNotification('エラーが発生しました: ' + error.message, 'error');
+    //     }
+    // }
 
     clearSearch() {
         const searchInput = document.getElementById('searchInput');
@@ -775,78 +782,79 @@ class ScoresManager {
         }, 3000);
     }
 
-    async editScore(id) {
-        try {
-            const response = await authFetch(`${this.apiUrl}/${id}`);
-            const result = await response.json();
+    // 編集機能をすべて削除
+    // async editScore(id) {
+    //     try {
+    //         const response = await authFetch(`${this.apiUrl}/${id}`);
+    //         const result = await response.json();
             
-            if (result.success) {
-                this.currentEditId = id;
-                this.populateEditForm(result.data);
-                this.showEditModal();
-            } else {
-                this.showNotification(result.error, 'error');
-            }
-        } catch (error) {
-            this.showNotification('エラーが発生しました: ' + error.message, 'error');
-        }
-    }
+    //         if (result.success) {
+    //             this.currentEditId = id;
+    //             this.populateEditForm(result.data);
+    //             this.showEditModal();
+    //         } else {
+    //             this.showNotification(result.error, 'error');
+    //         }
+    //     } catch (error) {
+    //         this.showNotification('エラーが発生しました: ' + error.message, 'error');
+    //     }
+    // }
 
-    populateEditForm(score) {
-        document.getElementById('editNpcjNo').value = score.npcj_no || '';
-        document.getElementById('editContestDate').value = score.contest_date || '';
-        document.getElementById('editContestName').value = score.contest_name || '';
-        document.getElementById('editCategoryName').value = score.category_name || '';
-        document.getElementById('editPlacing').value = score.placing || '';
-        document.getElementById('editPlayerName').value = score.player_name || '';
-        document.getElementById('editContestPlace').value = score.contest_place || '';
-    }
+    // populateEditForm(score) {
+    //     document.getElementById('editNpcjNo').value = score.fwj_no || '';
+    //     document.getElementById('editContestDate').value = score.contest_date || '';
+    //     document.getElementById('editContestName').value = score.contest_name || '';
+    //     document.getElementById('editCategoryName').value = score.category_name || '';
+    //     document.getElementById('editPlacing').value = score.placing || '';
+    //     document.getElementById('editPlayerName').value = score.player_name || '';
+    //     document.getElementById('editContestPlace').value = score.contest_place || '';
+    // }
 
-    showEditModal() {
-        document.getElementById('editModal').classList.remove('hidden');
-        document.body.style.overflow = 'hidden';
-    }
+    // showEditModal() {
+    //     document.getElementById('editModal').classList.remove('hidden');
+    //     document.body.style.overflow = 'hidden';
+    // }
 
-    closeEditModal() {
-        document.getElementById('editModal').classList.add('hidden');
-        document.body.style.overflow = '';
-        this.currentEditId = null;
-    }
+    // closeEditModal() {
+    //     document.getElementById('editModal').classList.add('hidden');
+    //     document.body.style.overflow = '';
+    //     this.currentEditId = null;
+    // }
 
-    async handleEditSubmit(e) {
-        e.preventDefault();
+    // async handleEditSubmit(e) {
+    //     e.preventDefault();
         
-        if (!this.currentEditId) {
-            this.showNotification('編集対象が見つかりません', 'error');
-            return;
-        }
+    //     if (!this.currentEditId) {
+    //         this.showNotification('編集対象が見つかりません', 'error');
+    //         return;
+    //     }
 
-        const formData = new FormData(e.target);
-        const updateData = {};
+    //     const formData = new FormData(e.target);
+    //     const updateData = {};
         
-        for (let [key, value] of formData.entries()) {
-            updateData[key] = value;
-        }
+    //     for (let [key, value] of formData.entries()) {
+    //         updateData[key] = value;
+    //     }
 
-        try {
-            const response = await authFetch(`${this.apiUrl}/${this.currentEditId}`, {
-                method: 'PUT',
-                body: JSON.stringify(updateData)
-            });
+    //     try {
+    //         const response = await authFetch(`${this.apiUrl}/${this.currentEditId}`, {
+    //             method: 'PUT',
+    //             body: JSON.stringify(updateData)
+    //         });
 
-            const result = await response.json();
+    //         const result = await response.json();
 
-            if (result.success) {
-                this.showNotification('成績を更新しました', 'success');
-                this.closeEditModal();
-                this.loadScores();
-            } else {
-                this.showNotification(result.error, 'error');
-            }
-        } catch (error) {
-            this.showNotification('エラーが発生しました: ' + error.message, 'error');
-        }
-    }
+    //         if (result.success) {
+    //             this.showNotification('成績を更新しました', 'success');
+    //             this.closeEditModal();
+    //             this.loadScores();
+    //         } else {
+    //             this.showNotification(result.error, 'error');
+    //         }
+    //     } catch (error) {
+    //         this.showNotification('エラーが発生しました: ' + error.message, 'error');
+    //     }
+    // }
 
     escapeHtml(text) {
         const div = document.createElement('div');
@@ -857,16 +865,3 @@ class ScoresManager {
 
 const scoresManager = new ScoresManager();
 
-// Collapsible section functionality
-function toggleSection(sectionId) {
-    const content = document.getElementById(sectionId + '-content');
-    const header = content.parentElement.querySelector('.section-header');
-    
-    if (content.classList.contains('collapsed')) {
-        content.classList.remove('collapsed');
-        header.classList.add('expanded');
-    } else {
-        content.classList.add('collapsed');
-        header.classList.remove('expanded');
-    }
-}

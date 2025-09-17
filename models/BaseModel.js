@@ -31,7 +31,7 @@ class BaseModel {
   async findAll() {
     try {
       await this.ensureInitialized();
-      const values = await this.getSheetsService().getValues(`${this.sheetName}!A:Z`);
+      const values = await this.getSheetsService().getValues(`${this.sheetName}!A:AD`);
       if (values.length === 0) return [];
       
       const headers = values[0];
@@ -54,7 +54,7 @@ class BaseModel {
 
   async findWithPaging(page = 1, limit = 50, filters = {}, sortBy = 'contest_date', sortOrder = 'desc') {
     try {
-      const values = await this.getSheetsService().getValues(`${this.sheetName}!A:Z`);
+      const values = await this.getSheetsService().getValues(`${this.sheetName}!A:AD`);
       if (values.length === 0) {
         return { data: [], total: 0, page, limit, totalPages: 0 };
       }
@@ -74,9 +74,14 @@ class BaseModel {
       allItems = allItems.filter(item => item.isValid !== 'FALSE');
 
       // フィルタリング適用
-      if (filters.npcj_no) {
+      if (filters.fwj_no) {
         allItems = allItems.filter(item => 
-          item.npcj_no && item.npcj_no.toLowerCase().includes(filters.npcj_no.toLowerCase())
+          item.fwj_no && item.fwj_no.toLowerCase().includes(filters.fwj_no.toLowerCase())
+        );
+      }
+      if (filters.fwj_card_no) {
+        allItems = allItems.filter(item => 
+          item.fwj_card_no && item.fwj_card_no.toLowerCase().includes(filters.fwj_card_no.toLowerCase())
         );
       }
       if (filters.contest_name) {
@@ -87,6 +92,17 @@ class BaseModel {
       if (filters.category_name) {
         allItems = allItems.filter(item => 
           item.category_name && item.category_name.toLowerCase().includes(filters.category_name.toLowerCase())
+        );
+      }
+      if (filters.class_name || filters.class) {
+        const className = filters.class_name || filters.class;
+        allItems = allItems.filter(item => 
+          item.class && item.class.toLowerCase().includes(className.toLowerCase())
+        );
+      }
+      if (filters.country) {
+        allItems = allItems.filter(item => 
+          item.country && item.country.toLowerCase().includes(filters.country.toLowerCase())
         );
       }
       if (filters.startDate && filters.endDate) {
@@ -146,7 +162,7 @@ class BaseModel {
 
   async findAllIncludingDeleted() {
     try {
-      const values = await this.getSheetsService().getValues(`${this.sheetName}!A:Z`);
+      const values = await this.getSheetsService().getValues(`${this.sheetName}!A:AD`);
       if (values.length === 0) return [];
       
       const headers = values[0];

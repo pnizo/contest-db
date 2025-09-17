@@ -20,65 +20,68 @@
                 <nav class="page-nav">
                     <a href="/users" class="nav-link active">ユーザー管理</a>
                     <a href="/scores" class="nav-link">成績管理</a>
+                    <a href="/registrations" class="nav-link">登録管理</a>
+                    <a href="/subjects" class="nav-link">違反認定者管理</a>
                 </nav>
                 <button id="logoutBtn" class="logout-btn">ログアウト</button>
             </div>
         </div>
 
-        <main class="two-pane-layout">
-            <!-- 左ペイン: フォーム -->
-            <aside class="left-pane">
-                <section class="form-section">
-                    <h2>新規ユーザー追加</h2>
-                    <form id="userForm">
-                        <div class="form-group">
-                            <label for="name">名前:</label>
-                            <input type="text" id="name" name="name" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="email">メールアドレス:</label>
-                            <input type="email" id="email" name="email" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="role">役割:</label>
-                            <select id="role" name="role">
-                                <option value="user">ユーザー</option>
-                                <option value="admin">管理者</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label for="password">パスワード:</label>
-                            <input type="password" id="password" name="password" minlength="6" required>
-                            <small>6文字以上で入力してください</small>
-                        </div>
-                        <div class="form-buttons">
-                            <button type="submit">ユーザーを追加</button>
-                            <button type="button" id="cancelEditBtn" style="display: none;" onclick="userManager.cancelEdit()">キャンセル</button>
-                        </div>
-                    </form>
-                </section>
-            </aside>
-
-            <!-- 右ペイン: ユーザーリスト -->
-            <section class="right-pane">
-                <div class="users-section">
-                    <h2>ユーザー一覧</h2>
-                    <div class="section-controls">
-                        <div class="controls">
-                            <div class="control-buttons">
-                                <button id="refreshBtn">データ再読込</button>
-                                <button id="toggleDeletedBtn" class="toggle-btn">削除済みを表示</button>
-                            </div>
+        <main class="users-main">
+            <section class="users-section">
+                <h2>ユーザー一覧</h2>
+                <div class="section-controls">
+                    <div class="controls">
+                        <div class="control-buttons">
+                            <button id="refreshBtn">データ再読込</button>
+                            <button id="addUserModalBtn">新規ユーザー追加</button>
+                            <button id="toggleDeletedBtn" class="toggle-btn">削除済みを表示</button>
                         </div>
                     </div>
-                    <div id="usersContainer">
-                        <div class="loading">読み込み中...</div>
-                    </div>
+                </div>
+                <div id="usersContainer">
+                    <div class="loading">読み込み中...</div>
                 </div>
             </section>
         </main>
 
         <div id="notification" class="notification hidden"></div>
+    </div>
+
+    <!-- User Registration Modal -->
+    <div id="userModal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalTitle">新規ユーザー追加</h2>
+                <button class="modal-close" onclick="userManager.closeUserModal()">&times;</button>
+            </div>
+            <form id="userForm" class="modal-form">
+                <div class="form-group">
+                    <label for="modalName">名前:</label>
+                    <input type="text" id="modalName" name="name" required>
+                </div>
+                <div class="form-group">
+                    <label for="modalEmail">メールアドレス:</label>
+                    <input type="email" id="modalEmail" name="email" required>
+                </div>
+                <div class="form-group">
+                    <label for="modalRole">役割:</label>
+                    <select id="modalRole" name="role">
+                        <option value="user">一般ユーザー</option>
+                        <option value="admin">管理者</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="modalPassword">パスワード:</label>
+                    <input type="password" id="modalPassword" name="password" minlength="6" required>
+                    <small>6文字以上で入力してください</small>
+                </div>
+                <div class="form-actions">
+                    <button type="button" onclick="userManager.closeUserModal()" class="btn btn-secondary">キャンセル</button>
+                    <button type="submit" class="btn btn-primary" id="modalSubmitBtn">ユーザーを追加</button>
+                </div>
+            </form>
+        </div>
     </div>
 
     <script src="users-script.js"></script>

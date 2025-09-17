@@ -7,7 +7,7 @@ class Score extends BaseModel {
 
   async findByNpcjNo(npcjNo) {
     const all = await this.findAll();
-    return all.filter(score => score.npcj_no === npcjNo);
+    return all.filter(score => score.fwj_no === npcjNo);
   }
 
   async findByContest(contestName) {
@@ -49,7 +49,7 @@ class Score extends BaseModel {
   async findByCompositeKey(npcjNo, contestDate, contestName, categoryName) {
     const all = await this.findAllIncludingDeleted();
     return all.find(score => 
-      score.npcj_no === npcjNo &&
+      score.fwj_no === npcjNo &&
       score.contest_date === contestDate &&
       score.contest_name === contestName &&
       score.category_name === categoryName
@@ -60,7 +60,7 @@ class Score extends BaseModel {
     const errors = [];
     
     // 複合キーの検証
-    if (!scoreData.npcj_no || scoreData.npcj_no.trim() === '') {
+    if (!scoreData.fwj_no || scoreData.fwj_no.trim() === '') {
       errors.push('NPCJ番号は必須です');
     }
     
@@ -104,6 +104,12 @@ class Score extends BaseModel {
   }
 
   async createScore(scoreData) {
+    // CSVのnpcj_noをfwj_noにマッピング
+    if (scoreData.npcj_no && !scoreData.fwj_no) {
+      scoreData.fwj_no = scoreData.npcj_no;
+      delete scoreData.npcj_no;
+    }
+    
     const validation = await this.validateScore(scoreData);
     if (!validation.isValid) {
       return { success: false, errors: validation.errors };
@@ -111,7 +117,7 @@ class Score extends BaseModel {
 
     // 複合キーで削除済みデータを検索
     const existingDeletedScore = await this.findByCompositeKey(
-      validation.scoreData.npcj_no,
+      validation.scoreData.fwj_no,
       validation.scoreData.contest_date,
       validation.scoreData.contest_name,
       validation.scoreData.category_name
@@ -152,14 +158,81 @@ class Score extends BaseModel {
     return await this.update(id, updateData);
   }
 
+  validateHeaders(csvData) {
+    if (!csvData || csvData.length === 0) {
+      return { isValid: false, error: 'データが空です' };
+    }
+
+    // 全てのヘッダーが必須（FWJ移行対応でfwj_noを標準とする）
+    const requiredHeaders = [
+      'fwj_no',
+      'contest_date',
+      'contest_name', 
+      'contest_place',
+      'category_name',
+      'placing',
+      'player_no',
+      'player_name'
+    ];
+
+    // 最初の行からヘッダーを取得
+    const firstRow = csvData[0];
+    const headers = Object.keys(firstRow);
+    
+    console.log('CSV headers found:', headers);
+    console.log('Required headers:', requiredHeaders);
+
+    // 必須ヘッダーの検証
+    const missingRequired = requiredHeaders.filter(required => 
+      !headers.find(header => header.trim() === required.trim())
+    );
+
+    // NPCJ番号からFWJ番号への移行対応
+    if (missingRequired.includes('fwj_no')) {
+      // fwj_noが見つからない場合、npcj_noで代替可能かチェック
+      const hasNpcjNo = headers.some(header => header.trim() === 'npcj_no');
+      if (hasNpcjNo) {
+        // npcj_noがある場合は、fwj_noの不足をリストから除外
+        const index = missingRequired.indexOf('fwj_no');
+        missingRequired.splice(index, 1);
+        console.log('Using npcj_no as substitute for fwj_no');
+      }
+    }
+
+    if (missingRequired.length > 0) {
+      return {
+        isValid: false,
+        error: `必須ヘッダーが不足しています: ${missingRequired.join(', ')}\n\n期待される全ヘッダー:\n${requiredHeaders.join(', ')} (npcj_noをfwj_noの代替として使用可能)\n\n見つかったヘッダー:\n${headers.join(', ')}`
+      };
+    }
+
+    return {
+      isValid: true,
+      warnings: []
+    };
+  }
+
   async batchImport(csvData) {
     try {
+      // ヘッダー検証
+      const headerValidation = this.validateHeaders(csvData);
+      if (!headerValidation.isValid) {
+        return { 
+          success: false, 
+          error: headerValidation.error 
+        };
+      }
+
       // CSVデータをスプレッドシート行形式に変換
       const rows = csvData.map(row => {
         const now = new Date().toISOString();
+        
+        // CSVのnpcj_noをfwj_noにマッピング
+        const fwjNo = row.fwj_no || row.npcj_no || '';
+        
         return [
           Date.now().toString() + Math.random().toString(36).substr(2, 9), // id (unique)
-          row.npcj_no || '',
+          fwjNo,
           row.contest_date || '',
           row.contest_name || '',
           row.contest_place || '',

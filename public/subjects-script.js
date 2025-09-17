@@ -40,9 +40,9 @@ async function authFetch(url, options = {}) {
     return fetch(url, mergedOptions);
 }
 
-class UserManager {
+class SubjectManager {
     constructor() {
-        this.apiUrl = '/api/users';
+        this.apiUrl = '/api/subjects';
         this.showingDeleted = false;
         this.currentUser = null;
         this.isAdmin = false;
@@ -53,7 +53,7 @@ class UserManager {
         await this.checkAuthStatus();
         this.bindEvents();
         if (this.currentUser) {
-            this.loadUsers();
+            this.loadSubjects();
         }
     }
 
@@ -63,18 +63,18 @@ class UserManager {
             
             console.log('Auth status response status:', response.status);
             const result = await response.json();
-            console.log('Auth status result on users page:', result);
+            console.log('Auth status result on subjects page:', result);
             
             if (!result.isAuthenticated) {
-                console.log('User NOT authenticated on users page, redirecting to /');
+                console.log('User NOT authenticated on subjects page, redirecting to /');
                 AuthToken.remove();
                 setTimeout(() => {
                     window.location.href = '/';
-                }, 1000); // 1秒待機してログを確認
+                }, 1000);
                 return;
             }
 
-            console.log('User authenticated on users page, proceeding...');
+            console.log('User authenticated on subjects page, proceeding...');
             this.currentUser = result.user;
             this.isAdmin = result.user.role === 'admin';
             
@@ -83,14 +83,13 @@ class UserManager {
                 console.log('updateUI completed successfully');
             } catch (uiError) {
                 console.error('updateUI error (but keeping authentication):', uiError);
-                // UIエラーでもトークンは保持
             }
         } catch (error) {
-            console.error('Auth check error on users page:', error);
+            console.error('Auth check error on subjects page:', error);
             AuthToken.remove();
             setTimeout(() => {
                 window.location.href = '/';
-            }, 1000); // 1秒待機してログを確認
+            }, 1000);
         }
     }
 
@@ -109,25 +108,25 @@ class UserManager {
             // 管理者でない場合、新規追加ボタンを非表示にする
             if (!this.isAdmin) {
                 document.body.classList.add('readonly-mode');
-                document.getElementById('addUserModalBtn').style.display = 'none';
+                document.getElementById('addSubjectModalBtn').style.display = 'none';
             }
         }
     }
 
     bindEvents() {
-        // フォームのsubmitイベントはonsubmitプロパティで管理
-        const form = document.getElementById('userForm');
+        // フォームのsubmitイベント
+        const form = document.getElementById('subjectForm');
         form.onsubmit = (e) => {
             e.preventDefault();
             this.handleSubmit(e);
         };
 
-        document.getElementById('addUserModalBtn').addEventListener('click', () => {
-            this.openUserModal();
+        document.getElementById('addSubjectModalBtn').addEventListener('click', () => {
+            this.openSubjectModal();
         });
 
         document.getElementById('refreshBtn').addEventListener('click', () => {
-            this.loadUsers();
+            this.loadSubjects();
         });
 
         document.getElementById('toggleDeletedBtn').addEventListener('click', () => {
@@ -140,81 +139,80 @@ class UserManager {
     }
 
     // モーダル関連のメソッド
-    openUserModal(user = null) {
-        const modal = document.getElementById('userModal');
+    openSubjectModal(subject = null) {
+        const modal = document.getElementById('subjectModal');
         const modalTitle = document.getElementById('modalTitle');
         const submitBtn = document.getElementById('modalSubmitBtn');
         
-        if (user) {
+        if (subject) {
             // 編集モード
-            modalTitle.textContent = 'ユーザー編集';
-            submitBtn.textContent = 'ユーザーを更新';
+            modalTitle.textContent = '認定者編集';
+            submitBtn.textContent = '認定者を更新';
             
-            document.getElementById('modalName').value = user.name || '';
-            document.getElementById('modalEmail').value = user.email || '';
-            document.getElementById('modalRole').value = user.role || 'user';
-            document.getElementById('modalPassword').value = '';
-            document.getElementById('modalPassword').removeAttribute('required');
+            document.getElementById('modalFwjCardNo').value = subject.fwj_card_no || '';
+            document.getElementById('modalNameJa').value = subject.name_ja || '';
+            document.getElementById('modalFirstName').value = subject.first_name || '';
+            document.getElementById('modalLastName').value = subject.last_name || '';
+            document.getElementById('modalEmail').value = subject.email || '';
+            document.getElementById('modalNpcMemberNo').value = subject.npc_member_no || '';
+            document.getElementById('modalNote').value = subject.note || '';
             
-            this.editingUserId = user.id;
+            this.editingSubjectId = subject.id;
         } else {
             // 新規作成モード
-            modalTitle.textContent = '新規ユーザー追加';
-            submitBtn.textContent = 'ユーザーを追加';
+            modalTitle.textContent = '新規認定者追加';
+            submitBtn.textContent = '認定者を追加';
             
-            document.getElementById('modalName').value = '';
+            document.getElementById('modalFwjCardNo').value = '';
+            document.getElementById('modalNameJa').value = '';
+            document.getElementById('modalFirstName').value = '';
+            document.getElementById('modalLastName').value = '';
             document.getElementById('modalEmail').value = '';
-            document.getElementById('modalRole').value = 'user';
-            document.getElementById('modalPassword').value = '';
-            document.getElementById('modalPassword').setAttribute('required', 'required');
+            document.getElementById('modalNpcMemberNo').value = '';
+            document.getElementById('modalNote').value = '';
             
-            this.editingUserId = null;
+            this.editingSubjectId = null;
         }
         
         modal.classList.remove('hidden');
     }
 
-    closeUserModal() {
-        document.getElementById('userModal').classList.add('hidden');
-        this.editingUserId = null;
+    closeSubjectModal() {
+        document.getElementById('subjectModal').classList.add('hidden');
+        this.editingSubjectId = null;
     }
 
     async handleSubmit(e) {
         const formData = new FormData(e.target);
-        const userData = Object.fromEntries(formData.entries());
+        const subjectData = Object.fromEntries(formData.entries());
 
         try {
             let response;
             let successMessage;
             
-            if (this.editingUserId) {
+            if (this.editingSubjectId) {
                 // 編集モード
-                // パスワードが空の場合は除外
-                if (!userData.password || userData.password.trim() === '') {
-                    delete userData.password;
-                }
-                
-                response = await authFetch(`${this.apiUrl}/${this.editingUserId}`, {
+                response = await authFetch(`${this.apiUrl}/${this.editingSubjectId}`, {
                     method: 'PUT',
-                    body: JSON.stringify(userData)
+                    body: JSON.stringify(subjectData)
                 });
-                successMessage = 'ユーザーが正常に更新されました';
+                successMessage = '認定者が正常に更新されました';
             } else {
                 // 新規作成モード
                 response = await authFetch(this.apiUrl, {
                     method: 'POST',
-                    body: JSON.stringify(userData)
+                    body: JSON.stringify(subjectData)
                 });
-                successMessage = 'ユーザーが正常に追加されました';
+                successMessage = '認定者が正常に追加されました';
             }
 
             const result = await response.json();
 
             if (result.success) {
-                const message = result.restored ? 'ユーザーが復元されました' : successMessage;
+                const message = result.restored ? '認定者が復元されました' : successMessage;
                 this.showNotification(message, 'success');
-                this.closeUserModal();
-                this.loadUsers();
+                this.closeSubjectModal();
+                this.loadSubjects();
             } else {
                 this.showNotification(result.errors ? result.errors.join(', ') : result.error, 'error');
             }
@@ -223,20 +221,20 @@ class UserManager {
         }
     }
 
-    async loadUsers() {
-        console.log('=== loadUsers START ===');
-        const container = document.getElementById('usersContainer');
+    async loadSubjects() {
+        console.log('=== loadSubjects START ===');
+        const container = document.getElementById('subjectsContainer');
         container.innerHTML = '<div class="loading">読み込み中...</div>';
 
         try {
             const url = this.showingDeleted ? `${this.apiUrl}/deleted/list` : this.apiUrl;
             console.log('About to call authFetch for:', url);
             const response = await authFetch(url);
-            console.log('loadUsers response status:', response.status);
+            console.log('loadSubjects response status:', response.status);
             const result = await response.json();
 
             if (result.success) {
-                this.renderUsers(result.data);
+                this.renderSubjects(result.data);
             } else {
                 throw new Error(result.error);
             }
@@ -257,35 +255,35 @@ class UserManager {
             toggleBtn.classList.remove('active');
         }
         
-        this.loadUsers();
+        this.loadSubjects();
     }
 
-    renderUsers(users) {
-        const container = document.getElementById('usersContainer');
+    renderSubjects(subjects) {
+        const container = document.getElementById('subjectsContainer');
         
-        if (users.length === 0) {
-            container.innerHTML = '<div class="empty-state">ユーザーが見つかりません</div>';
+        if (subjects.length === 0) {
+            container.innerHTML = '<div class="empty-state">認定者が見つかりません</div>';
             return;
         }
 
-        const usersHtml = users.map(user => {
-            const isDeleted = user.isValid === 'FALSE';
+        const subjectsHtml = subjects.map(subject => {
+            const isDeleted = subject.isValid === 'FALSE';
             const statusBadge = isDeleted ? 
                 '<span class="status-badge deleted">削除済み</span>' :
                 '<span class="status-badge active">アクティブ</span>';
             
             const actions = isDeleted ? `
-                <button class="restore-btn" onclick="userManager.restoreUser('${user.id}')">
+                <button class="restore-btn" onclick="subjectManager.restoreSubject('${subject.id}')">
                     復元
                 </button>
-                <button class="delete-btn" onclick="userManager.permanentDeleteUser('${user.id}')">
+                <button class="delete-btn" onclick="subjectManager.permanentDeleteSubject('${subject.id}')">
                     完全削除
                 </button>
             ` : `
-                <button class="edit-btn" onclick="userManager.editUser('${user.id}')">
+                <button class="edit-btn" onclick="subjectManager.editSubject('${subject.id}')">
                     編集
                 </button>
-                <button class="delete-btn" onclick="userManager.deleteUser('${user.id}')">
+                <button class="delete-btn" onclick="subjectManager.deleteSubject('${subject.id}')">
                     削除
                 </button>
             `;
@@ -294,11 +292,14 @@ class UserManager {
                 <div class="user-card ${isDeleted ? 'deleted' : ''}">
                     <div class="user-info">
                         <div class="user-details">
-                            <h3>${this.escapeHtml(user.name)} ${statusBadge}</h3>
-                            <p><strong>メール:</strong> ${this.escapeHtml(user.email)}</p>
-                            <p><strong>役割:</strong> ${this.escapeHtml(user.role || 'user')}</p>
-                            <p><strong>作成日:</strong> ${user.createdAt ? new Date(user.createdAt).toLocaleDateString('ja-JP') : '不明'}</p>
-                            ${isDeleted && user.deletedAt ? `<p><strong>削除日:</strong> ${new Date(user.deletedAt).toLocaleDateString('ja-JP')}</p>` : ''}
+                            <h3>${this.escapeHtml(subject.name_ja || '')} ${statusBadge}</h3>
+                            <p><strong>FWJカード番号:</strong> ${this.escapeHtml(subject.fwj_card_no || '')}</p>
+                            <p><strong>英語名:</strong> ${this.escapeHtml(subject.first_name || '')} ${this.escapeHtml(subject.last_name || '')}</p>
+                            <p><strong>メール:</strong> ${this.escapeHtml(subject.email || '')}</p>
+                            ${subject.npc_member_no ? `<p><strong>NPCメンバー番号:</strong> ${this.escapeHtml(subject.npc_member_no)}</p>` : ''}
+                            ${subject.note ? `<p><strong>備考:</strong> ${this.escapeHtml(subject.note)}</p>` : ''}
+                            <p><strong>作成日:</strong> ${subject.createdAt ? new Date(subject.createdAt).toLocaleDateString('ja-JP') : '不明'}</p>
+                            ${isDeleted && subject.deletedAt ? `<p><strong>削除日:</strong> ${new Date(subject.deletedAt).toLocaleDateString('ja-JP')}</p>` : ''}
                         </div>
                         <div class="user-actions">
                             ${actions}
@@ -308,29 +309,28 @@ class UserManager {
             `;
         }).join('');
 
-        container.innerHTML = usersHtml;
+        container.innerHTML = subjectsHtml;
     }
 
-    async editUser(id) {
+    async editSubject(id) {
         try {
             const response = await authFetch(`${this.apiUrl}/${id}`);
             const result = await response.json();
 
             if (result.success) {
-                const user = result.data;
-                this.openUserModal(user);
-                this.showNotification(`${user.name || user.email} の編集モードになりました`, 'success');
+                const subject = result.data;
+                this.openSubjectModal(subject);
+                this.showNotification(`${subject.name_ja || subject.fwj_card_no} の編集モードになりました`, 'success');
             } else {
-                this.showNotification(result.error || 'ユーザー情報の取得に失敗しました', 'error');
+                this.showNotification(result.error || '認定者情報の取得に失敗しました', 'error');
             }
         } catch (error) {
-            this.showNotification('ユーザー情報の取得に失敗しました', 'error');
+            this.showNotification('認定者情報の取得に失敗しました', 'error');
         }
     }
 
-
-    async deleteUser(id) {
-        if (!confirm('このユーザーを論理削除してもよろしいですか？\n（後で復元可能です）')) {
+    async deleteSubject(id) {
+        if (!confirm('この認定者を論理削除してもよろしいですか？\n（後で復元可能です）')) {
             return;
         }
 
@@ -342,8 +342,8 @@ class UserManager {
             const result = await response.json();
 
             if (result.success) {
-                this.showNotification('ユーザーが論理削除されました', 'success');
-                this.loadUsers();
+                this.showNotification('認定者が論理削除されました', 'success');
+                this.loadSubjects();
             } else {
                 this.showNotification(result.error, 'error');
             }
@@ -352,8 +352,8 @@ class UserManager {
         }
     }
 
-    async restoreUser(id) {
-        if (!confirm('このユーザーを復元してもよろしいですか？')) {
+    async restoreSubject(id) {
+        if (!confirm('この認定者を復元してもよろしいですか？')) {
             return;
         }
 
@@ -365,8 +365,8 @@ class UserManager {
             const result = await response.json();
 
             if (result.success) {
-                this.showNotification('ユーザーが復元されました', 'success');
-                this.loadUsers();
+                this.showNotification('認定者が復元されました', 'success');
+                this.loadSubjects();
             } else {
                 this.showNotification(result.error, 'error');
             }
@@ -375,8 +375,8 @@ class UserManager {
         }
     }
 
-    async permanentDeleteUser(id) {
-        if (!confirm('このユーザーを完全に削除してもよろしいですか？\n※この操作は取り消せません！')) {
+    async permanentDeleteSubject(id) {
+        if (!confirm('この認定者を完全に削除してもよろしいですか？\n※この操作は取り消せません！')) {
             return;
         }
 
@@ -388,8 +388,8 @@ class UserManager {
             const result = await response.json();
 
             if (result.success) {
-                this.showNotification('ユーザーが完全に削除されました', 'success');
-                this.loadUsers();
+                this.showNotification('認定者が完全に削除されました', 'success');
+                this.loadSubjects();
             } else {
                 this.showNotification(result.error, 'error');
             }
@@ -397,8 +397,6 @@ class UserManager {
             this.showNotification('エラーが発生しました: ' + error.message, 'error');
         }
     }
-
-
 
     showNotification(message, type) {
         const notification = document.getElementById('notification');
@@ -435,33 +433,6 @@ class UserManager {
         }
     }
 
-    // すべてのAPI呼び出しにcredentialsを追加
-    async apiCall(url, options = {}) {
-        const defaultOptions = {
-            credentials: 'include',
-            headers: {
-                'Content-Type': 'application/json',
-                ...options.headers
-            }
-        };
-
-        try {
-            const response = await fetch(url, { ...defaultOptions, ...options });
-            const result = await response.json();
-
-            // 認証エラーの場合、ログイン画面にリダイレクト
-            if (response.status === 401) {
-                window.location.href = '/login';
-                return null;
-            }
-
-            return { response, result };
-        } catch (error) {
-            console.error('API call error:', error);
-            throw error;
-        }
-    }
-
     escapeHtml(text) {
         const div = document.createElement('div');
         div.textContent = text;
@@ -469,4 +440,4 @@ class UserManager {
     }
 }
 
-const userManager = new UserManager();
+const subjectManager = new SubjectManager();

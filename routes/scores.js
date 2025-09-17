@@ -12,12 +12,26 @@ router.get('/filter-options', requireAuth, async (req, res) => {
     const allScores = await scoreModel.findAll();
     console.log(`Found ${allScores.length} scores for filter options`);
     
-    // 一意の大会名を取得（空文字と重複を除く）
-    const contestNames = [...new Set(
-      allScores
-        .map(score => score.contest_name)
-        .filter(name => name && name.trim() !== '')
-    )].sort();
+    // 一意の大会名を取得（開催日の降順で並び替え）
+    const contestNamesWithDates = allScores
+      .filter(score => score.contest_name && score.contest_name.trim() !== '' && score.contest_date)
+      .map(score => ({
+        name: score.contest_name,
+        date: score.contest_date
+      }));
+    
+    // 大会名でグループ化し、各大会の最新の開催日を取得
+    const contestMap = new Map();
+    contestNamesWithDates.forEach(item => {
+      if (!contestMap.has(item.name) || new Date(item.date) > new Date(contestMap.get(item.name))) {
+        contestMap.set(item.name, item.date);
+      }
+    });
+    
+    // 開催日の降順で並び替え
+    const contestNames = Array.from(contestMap.entries())
+      .sort((a, b) => new Date(b[1]) - new Date(a[1]))
+      .map(entry => entry[0]);
     
     // 一意のカテゴリー名を取得（空文字と重複を除く）
     const categoryNames = [...new Set(
@@ -27,7 +41,7 @@ router.get('/filter-options', requireAuth, async (req, res) => {
     )].sort();
     
     console.log(`Contest names: ${contestNames.length}, Category names: ${categoryNames.length}`);
-    console.log('Contest names:', contestNames.slice(0, 5)); // 最初の5個を表示
+    console.log('Contest names (sorted by date desc):', contestNames.slice(0, 5)); // 最初の5個を表示
     console.log('Category names:', categoryNames.slice(0, 5)); // 最初の5個を表示
     
     res.json({ 
@@ -49,7 +63,7 @@ router.get('/', requireAuth, async (req, res) => {
     const { 
       page = 1, 
       limit = 50,
-      npcj_no, 
+      fwj_no, 
       contest_name, 
       category_name, 
       startDate, 
@@ -59,7 +73,7 @@ router.get('/', requireAuth, async (req, res) => {
     } = req.query;
 
     const filters = {};
-    if (npcj_no) filters.npcj_no = npcj_no;
+    if (fwj_no) filters.fwj_no = fwj_no;
     if (contest_name) filters.contest_name = contest_name;
     if (category_name) filters.category_name = category_name;
     if (startDate) filters.startDate = startDate;
@@ -262,7 +276,7 @@ router.get('/text/:npcjNo', async (req, res) => {
     // 指定されたNPCJ番号の成績を取得
     const allScores = await scoreModel.findAll();
     const userScores = allScores.filter(score => 
-      score.npcj_no && score.npcj_no.toString() === npcjNo.toString()
+      score.fwj_no && score.fwj_no.toString() === npcjNo.toString()
     );
     
     if (userScores.length === 0) {
@@ -278,7 +292,7 @@ router.get('/text/:npcjNo', async (req, res) => {
       let bValue = b[sortBy] || '';
       
       // 数値の場合は数値として比較
-      if (sortBy === 'placing' || sortBy === 'npcj_no') {
+      if (sortBy === 'placing' || sortBy === 'fwj_no') {
         aValue = parseInt(aValue) || 0;
         bValue = parseInt(bValue) || 0;
       }
