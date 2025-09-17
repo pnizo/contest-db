@@ -267,8 +267,7 @@ class SubjectManager {
         const subjectsHtml = subjects.map(subject => {
             const isDeleted = subject.isValid === 'FALSE';
             const statusBadge = isDeleted ? 
-                '<span class="status-badge deleted">削除済み</span>' :
-                '<span class="status-badge active">アクティブ</span>';
+                '<span class="status-badge deleted">削除済み</span>' : '';
             
             const actions = isDeleted ? `
                 <button class="restore-btn" onclick="subjectManager.restoreSubject('${subject.id}')">

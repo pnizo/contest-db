@@ -287,8 +287,7 @@ class UserManager {
         const usersHtml = users.map(user => {
             const isDeleted = user.isValid === 'FALSE';
             const statusBadge = isDeleted ? 
-                '<span class="status-badge deleted">削除済み</span>' :
-                '<span class="status-badge active">アクティブ</span>';
+                '<span class="status-badge deleted">削除済み</span>' : '';
             
             let actions = '';
             
