@@ -498,7 +498,7 @@ class ScoresManager {
             <table class="scores-table">
                 <thead>
                     <tr>
-                        <th class="sortable" data-column="fwj_no">FWJカード番号${getSortIcon('fwj_no')}</th>
+                        <th class="sortable" data-column="fwj_card_no">FWJカード番号${getSortIcon('fwj_card_no')}</th>
                         <th class="sortable" data-column="contest_date">開催日${getSortIcon('contest_date')}</th>
                         <th class="sortable" data-column="contest_name">大会名${getSortIcon('contest_name')}</th>
                         <th class="sortable" data-column="category_name">カテゴリー${getSortIcon('category_name')}</th>
@@ -525,7 +525,7 @@ class ScoresManager {
 
             tableHtml += `
                 <tr class="${isDeleted ? 'deleted' : ''}">
-                    <td>${this.escapeHtml(score.fwj_no || '')}</td>
+                    <td>${this.escapeHtml(score.fwj_card_no || '')}</td>
                     <td>${score.contest_date || ''}</td>
                     <td>${this.escapeHtml(score.contest_name || '')}</td>
                     <td>${this.escapeHtml(score.category_name || '')}</td>
@@ -574,7 +574,7 @@ class ScoresManager {
     }
 
     async applyFilters() {
-        const npcjNo = document.getElementById('npcjFilter').value;
+        const fwjCardNo = document.getElementById('fwjCardFilter').value;
         const contestName = document.getElementById('contestFilter').value;
         const categoryName = document.getElementById('categoryFilter').value;
         const startDate = document.getElementById('startDate').value;
@@ -582,7 +582,7 @@ class ScoresManager {
 
         // 現在のフィルターを保存
         this.currentFilters = {};
-        if (npcjNo) this.currentFilters.fwj_no = npcjNo;
+        if (fwjCardNo) this.currentFilters.fwj_card_no = fwjCardNo;
         if (contestName) this.currentFilters.contest_name = contestName;
         if (categoryName) this.currentFilters.category_name = categoryName;
         if (startDate) this.currentFilters.startDate = startDate;
@@ -594,7 +594,7 @@ class ScoresManager {
     }
 
     clearFilters() {
-        document.getElementById('npcjFilter').value = '';
+        document.getElementById('fwjCardFilter').value = '';
         document.getElementById('contestFilter').selectedIndex = 0; // セレクトボックスを最初の選択肢にリセット
         document.getElementById('categoryFilter').selectedIndex = 0; // セレクトボックスを最初の選択肢にリセット
         document.getElementById('startDate').value = '';
@@ -810,7 +810,7 @@ class ScoresManager {
     // }
 
     // populateEditForm(score) {
-    //     document.getElementById('editNpcjNo').value = score.fwj_no || '';
+    //     document.getElementById('editNpcjNo').value = score.fwj_card_no || '';
     //     document.getElementById('editContestDate').value = score.contest_date || '';
     //     document.getElementById('editContestName').value = score.contest_name || '';
     //     document.getElementById('editCategoryName').value = score.category_name || '';

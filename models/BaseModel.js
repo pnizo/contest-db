@@ -144,15 +144,27 @@ class BaseModel {
           let aVal = a[sortBy] || '';
           let bVal = b[sortBy] || '';
           
+          // 数値型フィールドの定義
+          const numericFields = [
+            'placing',           // 順位（成績・登録共通）
+            'player_no',         // 選手番号（登録）
+            'fwj_card_no',       // FWJカード番号（成績・登録共通）
+            'npc_member_no',     // NPCメンバー番号（登録）
+            'score_card',        // スコアカード番号（登録）
+            'contest_order',     // 出場順（登録）
+            'backstage_pass'     // バックステージパス番号（登録）
+          ];
+          
           // 日付の場合は Date オブジェクトに変換
           if (sortBy === 'contest_date') {
             aVal = aVal ? new Date(aVal) : new Date(0);
             bVal = bVal ? new Date(bVal) : new Date(0);
           }
-          // 順位の場合は数値に変換
-          else if (sortBy === 'placing') {
-            aVal = parseInt(aVal) || 999999;
-            bVal = parseInt(bVal) || 999999;
+          // 数値型フィールドの場合は数値に変換
+          else if (numericFields.includes(sortBy)) {
+            // 空文字や無効な値の場合は最大値を設定（降順時に最後に表示）
+            aVal = aVal === '' || aVal == null ? Number.MAX_SAFE_INTEGER : (parseFloat(aVal) || Number.MAX_SAFE_INTEGER);
+            bVal = bVal === '' || bVal == null ? Number.MAX_SAFE_INTEGER : (parseFloat(bVal) || Number.MAX_SAFE_INTEGER);
           }
           // 文字列の場合は小文字で比較
           else {
