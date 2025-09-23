@@ -264,6 +264,88 @@ router.post('/import', requireAuth, async (req, res) => {
   }
 });
 
+// 複数のNPCJ番号の成績データをテキスト形式で取得
+router.get('/text/multiple', async (req, res) => {
+  try {
+    const { npcjNos } = req.query;
+    const sortBy = req.query.sort || 'contest_date';
+    const sortOrder = req.query.order || 'desc';
+    
+    if (!npcjNos) {
+      return res.status(400).json({ success: false, error: 'npcjNosパラメータが必要です（カンマ区切り）' });
+    }
+    
+    // カンマ区切りのNPCJ番号を配列に分割
+    const npcjList = npcjNos.split(',').map(n => n.trim()).filter(n => n);
+    
+    if (npcjList.length === 0) {
+      return res.status(400).json({ success: false, error: '有効なNPCJ番号が指定されていません' });
+    }
+    
+    // 全成績を取得
+    const allScores = await scoreModel.findAll();
+    
+    // 指定されたNPCJ番号の成績をマージ
+    const mergedScores = allScores.filter(score => 
+      score.fwj_no && npcjList.includes(score.fwj_no.toString())
+    );
+    
+    if (mergedScores.length === 0) {
+      return res.status(404).json({ 
+        success: false, 
+        error: `指定されたNPCJ番号 [${npcjList.join(', ')}] の成績が見つかりません` 
+      });
+    }
+    
+    // ソート処理
+    const sortedScores = mergedScores.sort((a, b) => {
+      let aValue = a[sortBy] || '';
+      let bValue = b[sortBy] || '';
+      
+      // 数値の場合は数値として比較
+      if (sortBy === 'placing' || sortBy === 'fwj_no') {
+        aValue = parseInt(aValue) || 0;
+        bValue = parseInt(bValue) || 0;
+      }
+      
+      // 日付の場合は日付として比較
+      if (sortBy === 'contest_date') {
+        aValue = new Date(aValue) || new Date(0);
+        bValue = new Date(bValue) || new Date(0);
+      }
+      
+      let comparison = 0;
+      if (aValue < bValue) comparison = -1;
+      if (aValue > bValue) comparison = 1;
+      
+      return sortOrder === 'desc' ? -comparison : comparison;
+    });
+    
+    // テキスト形式で出力（NPCJ番号は除く）
+    const textLines = sortedScores.map(score => {
+      const date = score.contest_date || '不明';
+      const contest = score.contest_name || '不明';
+      const category = score.category_name || '不明';
+      const placing = score.placing || '不明';
+      
+      return `${date} | ${contest} | ${category} | ${placing}位`;
+    });
+    
+    // 重複行を削除
+    const uniqueLines = [...new Set(textLines)];
+    
+    const resultText = uniqueLines.join('\n');
+    
+    // テキスト形式で返す
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    res.send(resultText);
+    
+  } catch (error) {
+    console.error('Multiple text API error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // テキスト形式で成績データを取得
 router.get('/text/:npcjNo', async (req, res) => {
   try {
