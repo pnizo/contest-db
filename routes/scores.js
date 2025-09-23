@@ -74,7 +74,7 @@ router.get('/', requireAuth, async (req, res) => {
     } = req.query;
 
     const filters = {};
-    if (fwj_no) filters.fwj_no = fwj_no;
+    if (fwj_no) filters.fwj_card_no = fwj_no;
     if (contest_name) filters.contest_name = contest_name;
     if (category_name) filters.category_name = category_name;
     if (startDate) filters.startDate = startDate;
@@ -287,7 +287,7 @@ router.get('/text/multiple', async (req, res) => {
     
     // 指定されたNPCJ番号の成績をマージ
     const mergedScores = allScores.filter(score => 
-      score.fwj_no && npcjList.includes(score.fwj_no.toString())
+      score.fwj_card_no && npcjList.includes(score.fwj_card_no.toString())
     );
     
     if (mergedScores.length === 0) {
@@ -303,7 +303,7 @@ router.get('/text/multiple', async (req, res) => {
       let bValue = b[sortBy] || '';
       
       // 数値の場合は数値として比較
-      if (sortBy === 'placing' || sortBy === 'fwj_no') {
+      if (sortBy === 'placing' || sortBy === 'fwj_card_no') {
         aValue = parseInt(aValue) || 0;
         bValue = parseInt(bValue) || 0;
       }
@@ -360,7 +360,7 @@ router.get('/text/:fwjNo', async (req, res) => {
     // 指定されたFWJ番号の成績を取得
     const allScores = await scoreModel.findAll();
     const userScores = allScores.filter(score => 
-      score.fwj_no && score.fwj_no.toString() === fwjNo.toString()
+      score.fwj_card_no && score.fwj_card_no.toString() === fwjNo.toString()
     );
     
     if (userScores.length === 0) {
@@ -376,7 +376,7 @@ router.get('/text/:fwjNo', async (req, res) => {
       let bValue = b[sortBy] || '';
       
       // 数値の場合は数値として比較
-      if (sortBy === 'placing' || sortBy === 'fwj_no') {
+      if (sortBy === 'placing' || sortBy === 'fwj_card_no') {
         aValue = parseInt(aValue) || 0;
         bValue = parseInt(bValue) || 0;
       }

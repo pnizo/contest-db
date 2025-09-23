@@ -81,7 +81,7 @@ class BaseModel {
       }
       if (filters.fwj_card_no) {
         allItems = allItems.filter(item => 
-          item.fwj_card_no && item.fwj_card_no.toLowerCase().includes(filters.fwj_card_no.toLowerCase())
+          item.fwj_card_no && item.fwj_card_no.toString() === filters.fwj_card_no.toString()
         );
       }
       if (filters.contest_name) {
