@@ -63,7 +63,7 @@ router.get('/', requireAuth, async (req, res) => {
     const { 
       page = 1, 
       limit = 50,
-      fwj_no, 
+      fwj_card_no, 
       contest_name, 
       category_name, 
       startDate, 
@@ -74,7 +74,7 @@ router.get('/', requireAuth, async (req, res) => {
     } = req.query;
 
     const filters = {};
-    if (fwj_no) filters.fwj_card_no = fwj_no;
+    if (fwj_card_no) filters.fwj_card_no = fwj_card_no;
     if (contest_name) filters.contest_name = contest_name;
     if (category_name) filters.category_name = category_name;
     if (startDate) filters.startDate = startDate;

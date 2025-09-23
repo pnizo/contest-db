@@ -74,11 +74,6 @@ class BaseModel {
       allItems = allItems.filter(item => item.isValid !== 'FALSE');
 
       // フィルタリング適用
-      if (filters.fwj_no) {
-        allItems = allItems.filter(item => 
-          item.fwj_no && item.fwj_no.toLowerCase().includes(filters.fwj_no.toLowerCase())
-        );
-      }
       if (filters.fwj_card_no) {
         allItems = allItems.filter(item => 
           item.fwj_card_no && item.fwj_card_no.toString() === filters.fwj_card_no.toString()

@@ -7,7 +7,7 @@ class Score extends BaseModel {
 
   async findByFwjNo(fwjNo) {
     const all = await this.findAll();
-    return all.filter(score => score.fwj_no === fwjNo);
+    return all.filter(score => score.fwj_card_no === fwjNo);
   }
 
   async findByContest(contestName) {
@@ -49,7 +49,7 @@ class Score extends BaseModel {
   async findByCompositeKey(fwjNo, contestDate, contestName, categoryName) {
     const all = await this.findAllIncludingDeleted();
     return all.find(score => 
-      score.fwj_no === fwjNo &&
+      score.fwj_card_no === fwjNo &&
       score.contest_date === contestDate &&
       score.contest_name === contestName &&
       score.category_name === categoryName
@@ -60,8 +60,8 @@ class Score extends BaseModel {
     const errors = [];
     
     // 複合キーの検証
-    if (!scoreData.fwj_no || scoreData.fwj_no.trim() === '') {
-      errors.push('NPCJ番号は必須です');
+    if (!scoreData.fwj_card_no || scoreData.fwj_card_no.trim() === '') {
+      errors.push('FWJカード番号は必須です');
     }
     
     if (!scoreData.contest_name || scoreData.contest_name.trim() === '') {
@@ -104,9 +104,9 @@ class Score extends BaseModel {
   }
 
   async createScore(scoreData) {
-    // CSVのnpcj_noをfwj_noにマッピング
-    if (scoreData.npcj_no && !scoreData.fwj_no) {
-      scoreData.fwj_no = scoreData.npcj_no;
+    // CSVのnpcj_noをfwj_card_noにマッピング
+    if (scoreData.npcj_no && !scoreData.fwj_card_no) {
+      scoreData.fwj_card_no = scoreData.npcj_no;
       delete scoreData.npcj_no;
     }
     
@@ -117,7 +117,7 @@ class Score extends BaseModel {
 
     // 複合キーで削除済みデータを検索
     const existingDeletedScore = await this.findByCompositeKey(
-      validation.scoreData.fwj_no,
+      validation.scoreData.fwj_card_no,
       validation.scoreData.contest_date,
       validation.scoreData.contest_name,
       validation.scoreData.category_name
@@ -163,9 +163,9 @@ class Score extends BaseModel {
       return { isValid: false, error: 'データが空です' };
     }
 
-    // 全てのヘッダーが必須（FWJ移行対応でfwj_noを標準とする）
+    // 全てのヘッダーが必須（FWJ移行対応でfwj_card_noを標準とする）
     const requiredHeaders = [
-      'fwj_no',
+      'fwj_card_no',
       'contest_date',
       'contest_name', 
       'contest_place',
@@ -188,21 +188,21 @@ class Score extends BaseModel {
     );
 
     // NPCJ番号からFWJ番号への移行対応
-    if (missingRequired.includes('fwj_no')) {
-      // fwj_noが見つからない場合、npcj_noで代替可能かチェック
+    if (missingRequired.includes('fwj_card_no')) {
+      // fwj_card_noが見つからない場合、npcj_noで代替可能かチェック
       const hasFwjNo = headers.some(header => header.trim() === 'npcj_no');
       if (hasFwjNo) {
-        // npcj_noがある場合は、fwj_noの不足をリストから除外
-        const index = missingRequired.indexOf('fwj_no');
+        // npcj_noがある場合は、fwj_card_noの不足をリストから除外
+        const index = missingRequired.indexOf('fwj_card_no');
         missingRequired.splice(index, 1);
-        console.log('Using npcj_no as substitute for fwj_no');
+        console.log('Using npcj_no as substitute for fwj_card_no');
       }
     }
 
     if (missingRequired.length > 0) {
       return {
         isValid: false,
-        error: `必須ヘッダーが不足しています: ${missingRequired.join(', ')}\n\n期待される全ヘッダー:\n${requiredHeaders.join(', ')} (npcj_noをfwj_noの代替として使用可能)\n\n見つかったヘッダー:\n${headers.join(', ')}`
+        error: `必須ヘッダーが不足しています: ${missingRequired.join(', ')}\n\n期待される全ヘッダー:\n${requiredHeaders.join(', ')} (npcj_noをfwj_card_noの代替として使用可能)\n\n見つかったヘッダー:\n${headers.join(', ')}`
       };
     }
 
@@ -227,8 +227,8 @@ class Score extends BaseModel {
       const rows = csvData.map(row => {
         const now = new Date().toISOString();
         
-        // CSVのnpcj_noをfwj_noにマッピング
-        const fwjNo = row.fwj_no || row.npcj_no || '';
+        // CSVのnpcj_noをfwj_card_noにマッピング
+        const fwjNo = row.fwj_card_no || row.npcj_no || '';
         
         return [
           Date.now().toString() + Math.random().toString(36).substr(2, 9), // id (unique)
