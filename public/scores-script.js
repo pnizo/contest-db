@@ -810,7 +810,7 @@ class ScoresManager {
     // }
 
     // populateEditForm(score) {
-    //     document.getElementById('editNpcjNo').value = score.fwj_card_no || '';
+    //     document.getElementById('editFwjNo').value = score.fwj_card_no || '';
     //     document.getElementById('editContestDate').value = score.contest_date || '';
     //     document.getElementById('editContestName').value = score.contest_name || '';
     //     document.getElementById('editCategoryName').value = score.category_name || '';

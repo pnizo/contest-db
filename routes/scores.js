@@ -197,10 +197,10 @@ router.delete('/:id/permanent', requireAdmin, async (req, res) => {
   }
 });
 
-// NPCJ番号別成績取得
-router.get('/npcj/:npcjNo', requireAuth, async (req, res) => {
+// FWJ番号別成績取得
+router.get('/fwj/:fwjNo', requireAuth, async (req, res) => {
   try {
-    const scores = await scoreModel.findByNpcjNo(req.params.npcjNo);
+    const scores = await scoreModel.findByFwjNo(req.params.fwjNo);
     res.json({ 
       success: true, 
       data: scores
@@ -211,11 +211,11 @@ router.get('/npcj/:npcjNo', requireAuth, async (req, res) => {
 });
 
 // 複合キー検索
-router.get('/composite/:npcjNo/:contestDate/:contestName/:categoryName', requireAuth, async (req, res) => {
+router.get('/composite/:fwjNo/:contestDate/:contestName/:categoryName', requireAuth, async (req, res) => {
   try {
-    const { npcjNo, contestDate, contestName, categoryName } = req.params;
+    const { fwjNo, contestDate, contestName, categoryName } = req.params;
     const score = await scoreModel.findByCompositeKey(
-      decodeURIComponent(npcjNo),
+      decodeURIComponent(fwjNo),
       decodeURIComponent(contestDate),
       decodeURIComponent(contestName),
       decodeURIComponent(categoryName)
@@ -347,26 +347,26 @@ router.get('/text/multiple', async (req, res) => {
 });
 
 // テキスト形式で成績データを取得
-router.get('/text/:npcjNo', async (req, res) => {
+router.get('/text/:fwjNo', async (req, res) => {
   try {
-    const { npcjNo } = req.params;
+    const { fwjNo } = req.params;
     const sortBy = req.query.sort || 'contest_date';
     const sortOrder = req.query.order || 'desc';
-    
-    if (!npcjNo) {
-      return res.status(400).json({ success: false, error: 'NPCJ番号が必要です' });
+
+    if (!fwjNo) {
+      return res.status(400).json({ success: false, error: 'FWJ番号が必要です' });
     }
     
-    // 指定されたNPCJ番号の成績を取得
+    // 指定されたFWJ番号の成績を取得
     const allScores = await scoreModel.findAll();
     const userScores = allScores.filter(score => 
-      score.fwj_no && score.fwj_no.toString() === npcjNo.toString()
+      score.fwj_no && score.fwj_no.toString() === fwjNo.toString()
     );
     
     if (userScores.length === 0) {
       return res.status(404).json({ 
         success: false, 
-        error: `NPCJ番号 ${npcjNo} の成績が見つかりません` 
+        error: `FWJ番号 ${fwjNo} の成績が見つかりません` 
       });
     }
     

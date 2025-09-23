@@ -1,13 +1,13 @@
 const BaseModel = require('./BaseModel');
 
 class Score extends BaseModel {
-  constructor() {
+  constructor() { 
     super('Scores');
   }
 
-  async findByNpcjNo(npcjNo) {
+  async findByFwjNo(fwjNo) {
     const all = await this.findAll();
-    return all.filter(score => score.fwj_no === npcjNo);
+    return all.filter(score => score.fwj_no === fwjNo);
   }
 
   async findByContest(contestName) {
@@ -46,10 +46,10 @@ class Score extends BaseModel {
   }
 
   // 複合キーでの検索
-  async findByCompositeKey(npcjNo, contestDate, contestName, categoryName) {
+  async findByCompositeKey(fwjNo, contestDate, contestName, categoryName) {
     const all = await this.findAllIncludingDeleted();
     return all.find(score => 
-      score.fwj_no === npcjNo &&
+      score.fwj_no === fwjNo &&
       score.contest_date === contestDate &&
       score.contest_name === contestName &&
       score.category_name === categoryName
@@ -190,8 +190,8 @@ class Score extends BaseModel {
     // NPCJ番号からFWJ番号への移行対応
     if (missingRequired.includes('fwj_no')) {
       // fwj_noが見つからない場合、npcj_noで代替可能かチェック
-      const hasNpcjNo = headers.some(header => header.trim() === 'npcj_no');
-      if (hasNpcjNo) {
+      const hasFwjNo = headers.some(header => header.trim() === 'npcj_no');
+      if (hasFwjNo) {
         // npcj_noがある場合は、fwj_noの不足をリストから除外
         const index = missingRequired.indexOf('fwj_no');
         missingRequired.splice(index, 1);

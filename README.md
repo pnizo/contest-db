@@ -204,8 +204,8 @@ npm run hash-password mySecurePassword123
 - `DELETE /api/scores/:id/permanent` - 成績完全削除
 
 ### 成績検索
-- `GET /api/scores/npcj/:npcjNo` - NPCJ番号別成績取得
-- `GET /api/scores/composite/:npcjNo/:contestDate/:contestName/:categoryName` - 複合キー検索
+- `GET /api/scores/npcj/:fwjNo` - NPCJ番号別成績取得
+- `GET /api/scores/composite/:fwjNo/:contestDate/:contestName/:categoryName` - 複合キー検索
 
 ## プロジェクト構造
 
