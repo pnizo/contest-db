@@ -267,16 +267,16 @@ router.post('/import', requireAuth, async (req, res) => {
 // 複数のNPCJ番号の成績データをテキスト形式で取得
 router.get('/text/multiple', async (req, res) => {
   try {
-    const { npcjNos } = req.query;
+    const { fwjNos } = req.query;
     const sortBy = req.query.sort || 'contest_date';
     const sortOrder = req.query.order || 'desc';
     
-    if (!npcjNos) {
-      return res.status(400).json({ success: false, error: 'npcjNosパラメータが必要です（カンマ区切り）' });
+    if (!fwjNos) {
+      return res.status(400).json({ success: false, error: 'fwjNosパラメータが必要です（カンマ区切り）' });
     }
     
     // カンマ区切りのNPCJ番号を配列に分割
-    const npcjList = npcjNos.split(',').map(n => n.trim()).filter(n => n);
+    const npcjList = fwjNos.split(',').map(n => n.trim()).filter(n => n);
     
     if (npcjList.length === 0) {
       return res.status(400).json({ success: false, error: '有効なNPCJ番号が指定されていません' });
