@@ -267,35 +267,59 @@ router.post('/import', requireAuth, async (req, res) => {
 // 複数のNPCJ番号の成績データをテキスト形式で取得
 router.get('/text/multiple', async (req, res) => {
   try {
-    const { fwjNos } = req.query;
+    const { fwjNos, id } = req.query;
     const sortBy = req.query.sort || 'contest_date';
     const sortOrder = req.query.order || 'desc';
     
-    if (!fwjNos) {
-      return res.status(400).json({ success: false, error: 'fwjNosパラメータが必要です（カンマ区切り）' });
-    }
-    
-    // カンマ区切りのNPCJ番号を配列に分割
-    const npcjList = fwjNos.split(',').map(n => n.trim()).filter(n => n);
-    
-    if (npcjList.length === 0) {
-      return res.status(400).json({ success: false, error: '有効なNPCJ番号が指定されていません' });
+    if (!fwjNos && !id) {
+      return res.status(400).json({ success: false, error: 'fwjNosまたはidパラメータが必要です' });
     }
     
     // 全成績を取得
     const allScores = await scoreModel.findAll();
+    let targetScores = [];
     
-    // 指定されたNPCJ番号の成績をマージ
-    const mergedScores = allScores.filter(score => 
-      score.fwj_card_no && npcjList.includes(score.fwj_card_no.toString())
+    // fwjNosによる絞り込み
+    if (fwjNos) {
+      const npcjList = fwjNos.split(',').map(n => n.trim()).filter(n => n);
+      if (npcjList.length > 0) {
+        const fwjScores = allScores.filter(score => 
+          score.fwj_card_no && npcjList.includes(score.fwj_card_no.toString())
+        );
+        targetScores = targetScores.concat(fwjScores);
+      }
+    }
+    
+    // idによる絞り込み（単一IDのみ）
+    if (id) {
+      const idScore = allScores.find(score => 
+        score.id && score.id.toString() === id.toString()
+      );
+      if (idScore) {
+        targetScores = targetScores.concat([idScore]);
+      }
+    }
+    
+    // 重複を除去（同じIDの成績が複数選択された場合）
+    const uniqueScores = targetScores.filter((score, index, self) => 
+      index === self.findIndex(s => s.id === score.id)
     );
     
-    if (mergedScores.length === 0) {
+    if (uniqueScores.length === 0) {
+      const errorMsg = fwjNos && id ? 
+        `指定されたFWJ番号 [${fwjNos}] または ID ${id} の成績が見つかりません` :
+        fwjNos ? 
+        `指定されたFWJ番号 [${fwjNos}] の成績が見つかりません` :
+        `指定されたID ${id} の成績が見つかりません`;
+      
       return res.status(404).json({ 
         success: false, 
-        error: `指定されたNPCJ番号 [${npcjList.join(', ')}] の成績が見つかりません` 
+        error: errorMsg
       });
     }
+    
+    // マージした成績をソート処理用の変数に代入
+    const mergedScores = uniqueScores;
     
     // ソート処理
     const sortedScores = mergedScores.sort((a, b) => {
