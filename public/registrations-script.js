@@ -360,14 +360,13 @@ class RegistrationsManager {
             ...data.map(row => headers.map(header => {
                 const value = row[header] || '';
                 // カンマや改行を含む値は引用符で囲む
-                return value.toString().includes(',') || value.toString().includes('\n') ? 
+                return value.toString().includes(',') || value.toString().includes('\n') ?
                     `"${value.toString().replace(/"/g, '""')}"` : value.toString();
             }).join(','))
-        ].join('\n');
+        ].join('\r\n');
 
-        // BOM付きUTF-8でファイルを作成
-        const bom = '\uFEFF';
-        const blob = new Blob([bom + csvContent], { type: 'text/csv;charset=utf-8;' });
+        // UTF-8（BOMなし）でファイルを作成
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
         
         // ダウンロードリンクを作成
         const link = document.createElement('a');
