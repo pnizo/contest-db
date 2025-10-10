@@ -106,7 +106,7 @@ class Registration extends BaseModel {
       'Athlete #',
       '氏名', 
       'シメイ',
-      'FWJカード',
+      'npcj_no',
       'First Name',
       'Last Name',
       'Email Address', 
@@ -183,7 +183,7 @@ class Registration extends BaseModel {
           row['Athlete #'] || '', // player_no (D列)
           row['氏名'] || '', // name_ja (E列)
           row['シメイ'] || '', // name_ja_kana (F列)
-          row['FWJカード'] || '', // fwj_card_no (G列)
+          row['npcj_no'] || '', // fwj_card_no (G列)
           row['First Name']?.trim() || '', // first_name (H列)
           row['Last Name']?.trim() || '', // last_name (I列)
           row['Email Address'] || '', // email (J列)
