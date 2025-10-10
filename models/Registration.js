@@ -160,9 +160,9 @@ class Registration extends BaseModel {
       // ヘッダー検証
       const headerValidation = this.validateHeaders(csvData);
       if (!headerValidation.isValid) {
-        return { 
-          success: false, 
-          error: headerValidation.error 
+        return {
+          success: false,
+          error: headerValidation.error
         };
       }
 
@@ -170,38 +170,44 @@ class Registration extends BaseModel {
       if (headerValidation.warnings && headerValidation.warnings.length > 0) {
         console.log('Header warnings:', headerValidation.warnings);
       }
-      
+
       // CSVデータをスプレッドシート行形式に変換（バッチ処理でAPIリクエスト数を削減）
       const rows = csvData.map(row => {
         const now = new Date().toISOString();
         const id = Date.now().toString() + Math.random().toString(36).substr(2, 9);
-        
+
+        // ヘッダーを小文字に変換してアクセス
+        const normalizedRow = {};
+        for (const key in row) {
+          normalizedRow[key.toLowerCase()] = row[key];
+        }
+
         return [
           id, // id (A列)
           contestDate, // contest_date (B列)
           contestName, // contest_name (C列)
-          row['Athlete #'] || '', // player_no (D列)
-          row['氏名'] || '', // name_ja (E列)
-          row['シメイ'] || '', // name_ja_kana (F列)
-          row['npcj_no'] || '', // fwj_card_no (G列)
-          row['First Name']?.trim() || '', // first_name (H列)
-          row['Last Name']?.trim() || '', // last_name (I列)
-          row['Email Address'] || '', // email (J列)
-          row['Member Number'] || '', // npc_member_no (K列)
-          row['Country'] || '', // country (L列)
-          row['Age'] || '', // age (M列)
-          row['Class'] || '', // class (N列)
-          row['Class Code'] || '', // class_code (O列)
-          row['Sort Index'] || '', // sort_index (P列)
-          row['Membership Status'] || '', // npc_member_status (Q列)
-          row['Class 2'] || '', // class_2 (R列)
-          row['Score card'] || '', // score_card (S列)
-          row['開催順'] || '', // contest_order (T列)
-          row['Backstage Pass'] || '', // backstage_pass (U列)
-          row['Height'] || '', // height (V列)
-          row['Weight'] || '', // weight (W列)
-          row['Occupation'] || '', // occupation (X列)
-          row['Biography'] || '', // biography (Y列)
+          normalizedRow['athlete #'] || '', // player_no (D列)
+          normalizedRow['氏名'] || '', // name_ja (E列)
+          normalizedRow['シメイ'] || '', // name_ja_kana (F列)
+          normalizedRow['npcj_no'] || '', // fwj_card_no (G列)
+          normalizedRow['first name']?.trim() || '', // first_name (H列)
+          normalizedRow['last name']?.trim() || '', // last_name (I列)
+          normalizedRow['email address'] || '', // email (J列)
+          normalizedRow['member number'] || '', // npc_member_no (K列)
+          normalizedRow['country'] || '', // country (L列)
+          normalizedRow['age'] || '', // age (M列)
+          normalizedRow['class'] || '', // class (N列)
+          normalizedRow['class code'] || '', // class_code (O列)
+          normalizedRow['sort index'] || '', // sort_index (P列)
+          normalizedRow['membership status'] || '', // npc_member_status (Q列)
+          normalizedRow['class 2'] || '', // class_2 (R列)
+          normalizedRow['score card'] || '', // score_card (S列)
+          normalizedRow['開催順'] || '', // contest_order (T列)
+          normalizedRow['backstage pass'] || '', // backstage_pass (U列)
+          normalizedRow['height'] || '', // height (V列)
+          normalizedRow['weight'] || '', // weight (W列)
+          normalizedRow['occupation'] || '', // occupation (X列)
+          normalizedRow['biography'] || '', // biography (Y列)
           now, // createdAt (Z列)
           'TRUE', // isValid (AA列)
           '', // deletedAt (AB列)

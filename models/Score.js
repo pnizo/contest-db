@@ -217,29 +217,35 @@ class Score extends BaseModel {
       // ヘッダー検証
       const headerValidation = this.validateHeaders(csvData);
       if (!headerValidation.isValid) {
-        return { 
-          success: false, 
-          error: headerValidation.error 
+        return {
+          success: false,
+          error: headerValidation.error
         };
       }
 
       // CSVデータをスプレッドシート行形式に変換
       const rows = csvData.map(row => {
         const now = new Date().toISOString();
-        
+
+        // ヘッダーを小文字に変換してアクセス
+        const normalizedRow = {};
+        for (const key in row) {
+          normalizedRow[key.toLowerCase()] = row[key];
+        }
+
         // CSVのnpcj_noをfwj_card_noにマッピング
-        const fwjNo = row.fwj_card_no || row.npcj_no || '';
-        
+        const fwjNo = normalizedRow.fwj_card_no || normalizedRow.npcj_no || '';
+
         return [
           Date.now().toString() + Math.random().toString(36).substr(2, 9), // id (unique)
           fwjNo,
-          row.contest_date || '',
-          row.contest_name || '',
-          row.contest_place || '',
-          row.category_name || '',
-          row.placing || '',
-          row.player_no || '',
-          row.player_name || '',
+          normalizedRow.contest_date || '',
+          normalizedRow.contest_name || '',
+          normalizedRow.contest_place || '',
+          normalizedRow.category_name || '',
+          normalizedRow.placing || '',
+          normalizedRow.player_no || '',
+          normalizedRow.player_name || '',
           now, // createdAt
           'TRUE', // isValid
           '', // deletedAt
