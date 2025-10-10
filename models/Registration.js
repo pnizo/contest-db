@@ -136,7 +136,7 @@ class Registration extends BaseModel {
 
     // 必須ヘッダーの検証
     const missingRequired = requiredHeaders.filter(required => 
-      !headers.find(header => header.trim() === required.trim())
+      !headers.find(header => header.trim().toLowerCase() === required.trim().toLowerCase())
     );
 
     if (missingRequired.length > 0) {
