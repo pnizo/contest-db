@@ -109,7 +109,7 @@ class NotesManager {
             // 管理者の場合、admin-onlyリンクを表示
             if (this.isAdmin) {
                 document.querySelectorAll('.admin-only').forEach(el => {
-                    el.style.display = '';
+                    el.style.display = 'inline-block';
                 });
             }
 
