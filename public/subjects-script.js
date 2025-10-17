@@ -61,11 +61,11 @@ class SubjectManager {
     async checkAuthStatus() {
         try {
             const response = await authFetch('/api/auth/status');
-            
+
             console.log('Auth status response status:', response.status);
             const result = await response.json();
             console.log('Auth status result on subjects page:', result);
-            
+
             if (!result.isAuthenticated) {
                 console.log('User NOT authenticated on subjects page, redirecting to /');
                 AuthToken.remove();
@@ -78,7 +78,21 @@ class SubjectManager {
             console.log('User authenticated on subjects page, proceeding...');
             this.currentUser = result.user;
             this.isAdmin = result.user.role === 'admin';
-            
+
+            // 一般ユーザー（非管理者）の場合はログアウトしてログイン画面に遷移
+            if (!this.isAdmin) {
+                console.log('User is not admin, logging out and redirecting to /');
+                AuthToken.remove();
+                // ログアウトAPIを呼び出す
+                try {
+                    await authFetch('/api/auth/logout', { method: 'POST' });
+                } catch (logoutError) {
+                    console.error('Logout API error:', logoutError);
+                }
+                window.location.href = '/';
+                return;
+            }
+
             try {
                 this.updateUI();
                 console.log('updateUI completed successfully');
