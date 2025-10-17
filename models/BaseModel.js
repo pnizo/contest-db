@@ -96,8 +96,13 @@ class BaseModel {
         );
       }
       if (filters.country) {
-        allItems = allItems.filter(item => 
+        allItems = allItems.filter(item =>
           item.country && item.country.toLowerCase().includes(filters.country.toLowerCase())
+        );
+      }
+      if (filters.type) {
+        allItems = allItems.filter(item =>
+          item.type && item.type.toLowerCase().includes(filters.type.toLowerCase())
         );
       }
       if (filters.startDate && filters.endDate) {

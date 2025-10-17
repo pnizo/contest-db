@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>コンテスト登録管理 - スプレッドシートDB</title>
+    <title>出場登録 - スプレッドシートDB</title>
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -18,10 +18,11 @@
             </div>
             <div class="auth-actions">
                 <nav class="page-nav">
-                    <a href="/users" class="nav-link">ユーザー管理</a>
-                    <a href="/scores" class="nav-link">成績管理</a>
-                    <a href="/registrations" class="nav-link active">登録管理</a>
-                    <a href="/subjects" class="nav-link">違反認定者管理</a>
+                    <a href="/users" class="nav-link">ユーザー</a>
+                    <a href="/scores" class="nav-link">大会成績</a>
+                    <a href="/registrations" class="nav-link active">出場登録</a>
+                    <a href="/subjects" class="nav-link">違反認定者</a>
+                    <a href="/notes" class="nav-link">特記事項</a>
                 </nav>
                 <button id="logoutBtn" class="logout-btn">ログアウト</button>
             </div>
@@ -29,7 +30,7 @@
 
         <main class="registrations-main">
             <section class="registrations-section">
-                <h2>コンテスト登録</h2>
+                <h2>出場登録</h2>
                 <div class="section-controls">
                     <div class="controls">
                         <div class="search-container">
@@ -58,6 +59,10 @@
                         <div class="filter-checkbox">
                             <input type="checkbox" id="violationFilter" name="violationFilter">
                             <label for="violationFilter">ポリシー違反認定者のみ表示</label>
+                        </div>
+                        <div class="filter-checkbox">
+                            <input type="checkbox" id="noteExistsFilter" name="noteExistsFilter">
+                            <label for="noteExistsFilter">特記事項あり</label>
                         </div>
                     </div>
                     <div class="filter-row">
@@ -98,12 +103,15 @@
             <div class="modal-form">
                 <div class="contest-info">
                     <div class="form-group">
-                        <label for="modalContestDate">大会開催日:</label>
-                        <input type="date" id="modalContestDate" name="contestDate" required>
+                        <label for="modalContestName">大会名:</label>
+                        <select id="modalContestName" name="contestName" required>
+                            <option value="">大会を選択してください</option>
+                        </select>
                     </div>
                     <div class="form-group">
-                        <label for="modalContestName">大会名:</label>
-                        <input type="text" id="modalContestName" name="contestName" placeholder="大会名を入力" required>
+                        <label for="modalContestDate">大会開催日:</label>
+                        <input type="date" id="modalContestDate" name="contestDate" readonly required>
+                        <small>※大会名を選択すると自動的に設定されます</small>
                     </div>
                 </div>
                 <div class="form-group">
