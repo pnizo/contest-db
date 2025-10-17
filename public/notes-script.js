@@ -512,7 +512,6 @@ class NotesManager {
 
     applyFilters() {
         this.currentFilters = {
-            fwj_card_no: document.getElementById('fwjCardFilter').value,
             contest_name: document.getElementById('contestFilter').value,
             type: document.getElementById('typeFilter').value,
             startDate: document.getElementById('startDate').value,
@@ -531,7 +530,6 @@ class NotesManager {
     }
 
     clearFilters() {
-        document.getElementById('fwjCardFilter').value = '';
         document.getElementById('contestFilter').value = '';
         document.getElementById('typeFilter').value = '';
         document.getElementById('startDate').value = '';
