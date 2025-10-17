@@ -2,8 +2,13 @@ const { google } = require('googleapis');
 require('dotenv').config();
 
 class SheetsService {
-  constructor() {
-    this.spreadsheetId = process.env.GOOGLE_SHEETS_SPREADSHEET_ID;
+  constructor(spreadsheetType = 'contest') {
+    // spreadsheetType: 'contest' または 'guest'
+    if (spreadsheetType === 'guest') {
+      this.spreadsheetId = process.env.GUEST_DB_SPREADSHEET_ID;
+    } else {
+      this.spreadsheetId = process.env.CONTEST_DB_SPREADSHEET_ID;
+    }
     this._auth = null;
     this._sheets = null;
   }

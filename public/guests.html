@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>大会成績 - スプレッドシートDB</title>
+    <title>関係者チケット - スプレッドシートDB</title>
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -19,65 +19,58 @@
             <div class="auth-actions">
                 <nav class="page-nav">
                     <a href="/users" class="nav-link">ユーザー</a>
-                    <a href="/scores" class="nav-link active">大会成績</a>
+                    <a href="/scores" class="nav-link">大会成績</a>
                     <a href="/registrations" class="nav-link">出場登録</a>
                     <a href="/notes" class="nav-link">特記事項</a>
-                    <a href="/guests" class="nav-link">関係者チケット</a>
+                    <a href="/guests" class="nav-link active">関係者チケット</a>
                     <a href="/subjects" class="nav-link admin-only">違反認定者</a>
                 </nav>
                 <button id="logoutBtn" class="logout-btn">ログアウト</button>
             </div>
         </div>
 
-        <main class="scores-main">
-            <section class="scores-section">
-                <h2>大会成績</h2>
+        <main class="guests-main">
+            <section class="guests-section">
+                <h2>関係者チケット</h2>
                 <div class="section-controls">
                     <div class="controls">
                         <div class="search-container">
                             <div class="search-input-wrapper">
-                                <input type="text" id="searchInput" placeholder="選手名で検索..." class="search-input">
+                                <input type="text" id="searchInput" placeholder="代表者氏名、団体名で検索..." class="search-input">
                                 <button type="button" id="clearSearchBtn" class="clear-btn hidden" title="検索をクリア">×</button>
                             </div>
                             <button type="button" id="searchBtn" class="search-btn" title="検索">検索</button>
-                        </div>
-                        <div class="control-buttons">
-                            <button id="importModalBtn">インポート</button>
                         </div>
                     </div>
                 </div>
                 <div class="filters">
                     <div class="filter-row">
-                        <input type="text" id="fwjCardFilter" placeholder="FWJカード番号" class="filter-input">
                         <select id="contestFilter" class="filter-select">
                             <option value="">大会名を選択</option>
                         </select>
-                        <select id="categoryFilter" class="filter-select">
-                            <option value="">カテゴリー名を選択</option>
+                        <select id="organizationTypeFilter" class="filter-select">
+                            <option value="">団体/個人を選択</option>
+                        </select>
+                        <select id="passTypeFilter" class="filter-select">
+                            <option value="">付与パスを選択</option>
                         </select>
                     </div>
                     <div class="filter-row">
-                        <div class="date-range">
-                            <input type="date" id="startDate" class="filter-input">
-                            <span class="date-separator">〜</span>
-                            <input type="date" id="endDate" class="filter-input">
-                        </div>
                         <div class="filter-actions">
                             <button id="applyFiltersBtn" class="filter-btn">絞り込み</button>
                             <button id="clearFiltersBtn" class="filter-btn">クリア</button>
                         </div>
                     </div>
                 </div>
-                
-                <div id="scoresTableContainer" class="table-scroll-container">
+
+                <div id="guestsTableContainer" class="table-scroll-container">
                     <div class="loading">読み込み中...</div>
                 </div>
-                
+
                 <div id="pagination" class="pagination hidden">
                     <button id="prevPageBtn" class="pagination-btn">前へ</button>
                     <span id="pageInfo" class="page-info">ページ 1 / 1 (全 0 件)</span>
                     <button id="nextPageBtn" class="pagination-btn">次へ</button>
-                </div>
                 </div>
             </section>
         </main>
@@ -85,28 +78,6 @@
         <div id="notification" class="notification hidden"></div>
     </div>
 
-    <!-- Import Modal -->
-    <div id="importModal" class="modal hidden">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2>CSVインポート</h2>
-                <button class="modal-close" onclick="scoresManager.closeImportModal()">&times;</button>
-            </div>
-            <div class="modal-form">
-                <div class="form-group">
-                    <label for="modalCsvFile">CSVファイルを選択:</label>
-                    <input type="file" id="modalCsvFile" name="csvFile" accept=".csv" required>
-                    <small>※CSV形式のファイルを選択してください</small>
-                </div>
-                <div class="form-actions">
-                    <button type="button" onclick="scoresManager.closeImportModal()" class="btn btn-secondary">キャンセル</button>
-                    <button type="button" id="modalImportBtn" disabled class="btn btn-primary">CSVをインポート</button>
-                </div>
-                <div id="modalImportStatus" class="import-status hidden"></div>
-            </div>
-        </div>
-    </div>
-
-    <script src="scores-script.js"></script>
+    <script src="guests-script.js"></script>
 </body>
 </html>

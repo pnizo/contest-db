@@ -11,6 +11,7 @@ const registrationRoutes = require('./routes/registrations');
 const subjectRoutes = require('./routes/subjects');
 const noteRoutes = require('./routes/notes');
 const contestRoutes = require('./routes/contests');
+const guestRoutes = require('./routes/guests');
 const { checkAuth, requireIpRestriction } = require('./middleware/auth');
 const { sessionCompatibility } = require('./middleware/jwt');
 
@@ -76,6 +77,10 @@ app.get('/notes', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'notes.html'));
 });
 
+app.get('/guests', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'guests.html'));
+});
+
 // 静的ファイルを設定
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -87,6 +92,7 @@ app.use('/api/registrations', registrationRoutes);
 app.use('/api/subjects', subjectRoutes);
 app.use('/api/notes', noteRoutes);
 app.use('/api/contests', contestRoutes);
+app.use('/api/guests', guestRoutes);
 
 app.use((err, req, res, next) => {
   console.error(err.stack);

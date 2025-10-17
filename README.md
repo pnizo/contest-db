@@ -61,7 +61,8 @@ cp .env.example .env
 ```env
 GOOGLE_SHEETS_CLIENT_EMAIL=your-service-account-email@your-project.iam.gserviceaccount.com
 GOOGLE_SHEETS_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\nyour-private-key\n-----END PRIVATE KEY-----\n"
-GOOGLE_SHEETS_SPREADSHEET_ID=your-spreadsheet-id
+CONTEST_DB_SPREADSHEET_ID=your-contest-spreadsheet-id
+GUEST_DB_SPREADSHEET_ID=your-guest-spreadsheet-id
 PORT=3000
 ```
 

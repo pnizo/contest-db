@@ -1,8 +1,9 @@
 const SheetsService = require('../config/sheets');
 
 class BaseModel {
-  constructor(sheetName) {
+  constructor(sheetName, spreadsheetType = 'contest') {
     this.sheetName = sheetName;
+    this.spreadsheetType = spreadsheetType; // 'contest' または 'guest'
     this.sheetsService = null;
     this.headers = [];
     this._initialized = false;
@@ -10,7 +11,7 @@ class BaseModel {
 
   getSheetsService() {
     if (!this.sheetsService) {
-      this.sheetsService = new SheetsService();
+      this.sheetsService = new SheetsService(this.spreadsheetType);
     }
     return this.sheetsService;
   }
