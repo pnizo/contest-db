@@ -124,10 +124,6 @@ class NotesManager {
 
     bindEvents() {
         // 基本操作ボタン
-        document.getElementById('refreshBtn').addEventListener('click', () => {
-            this.loadNotes();
-        });
-
         document.getElementById('addNoteBtn').addEventListener('click', () => {
             this.openNoteModal();
         });

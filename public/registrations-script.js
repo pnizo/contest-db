@@ -192,10 +192,6 @@ class RegistrationsManager {
             this.handleModalExport();
         });
 
-        document.getElementById('refreshBtn').addEventListener('click', () => {
-            this.loadRegistrations();
-        });
-
         // 削除済み表示機能を削除
         // document.getElementById('toggleDeletedBtn').addEventListener('click', () => {
         //     this.toggleDeletedRecords();

@@ -211,10 +211,6 @@ class ScoresManager {
             this.handleModalImport();
         });
 
-        document.getElementById('refreshBtn').addEventListener('click', () => {
-            this.loadScores();
-        });
-
         // 削除済み表示機能を削除
         // document.getElementById('toggleDeletedBtn').addEventListener('click', () => {
         //     this.toggleDeletedView();

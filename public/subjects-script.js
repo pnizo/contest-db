@@ -147,10 +147,6 @@ class SubjectManager {
             this.openSubjectModal();
         });
 
-        document.getElementById('refreshBtn').addEventListener('click', () => {
-            this.loadSubjects();
-        });
-
         document.getElementById('toggleDeletedBtn').addEventListener('click', () => {
             this.toggleDeletedView();
         });

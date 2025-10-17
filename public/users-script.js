@@ -137,10 +137,6 @@ class UserManager {
             this.openUserModal();
         });
 
-        document.getElementById('refreshBtn').addEventListener('click', () => {
-            this.loadUsers();
-        });
-
         document.getElementById('toggleDeletedBtn').addEventListener('click', () => {
             this.toggleDeletedView();
         });
