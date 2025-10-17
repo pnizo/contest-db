@@ -49,6 +49,7 @@ class RegistrationsManager {
             column: 'contest_date',
             direction: 'desc'
         };
+        this.contestsMap = new Map(); // 大会名と開催日のマップ
         console.log('REGISTRATIONS: About to call init()');
         this.init();
     }
@@ -62,13 +63,45 @@ class RegistrationsManager {
         if (this.currentUser) {
             console.log('REGISTRATIONS: User exists, loading data in 100ms...');
             setTimeout(async () => {
-                console.log('REGISTRATIONS: Loading filter options and registrations...');
+                console.log('REGISTRATIONS: Loading contests, filter options and registrations...');
+                await this.loadContests();
                 await this.loadFilterOptions();
                 await this.loadRegistrations();
                 console.log('REGISTRATIONS: Data loading completed');
             }, 100);
         } else {
             console.log('REGISTRATIONS: No user found, skipping data loading');
+        }
+    }
+
+    async loadContests() {
+        try {
+            const response = await authFetch('/api/contests');
+            const result = await response.json();
+
+            if (result.success && result.data) {
+                result.data.forEach(contest => {
+                    if (contest.contest_name && contest.contest_date) {
+                        this.contestsMap.set(contest.contest_name, contest.contest_date);
+                    }
+                });
+
+                // 今日以降の最も近い大会を保存
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+
+                const upcomingContests = result.data
+                    .filter(contest => {
+                        if (!contest.contest_date) return false;
+                        const contestDate = new Date(contest.contest_date);
+                        return contestDate >= today;
+                    })
+                    .sort((a, b) => new Date(a.contest_date) - new Date(b.contest_date)); // 昇順：古い順
+
+                this.defaultContest = upcomingContests.length > 0 ? upcomingContests[0] : null;
+            }
+        } catch (error) {
+            console.error('Contests loading failed:', error);
         }
     }
 
@@ -226,26 +259,60 @@ class RegistrationsManager {
     // モーダル関連のメソッド
     openImportModal() {
         document.getElementById('importModal').classList.remove('hidden');
+
+        // コンテスト選択肢を設定
+        const contestSelect = document.getElementById('modalContestName');
+        contestSelect.innerHTML = '<option value="">大会を選択してください</option>';
+
+        // 開催日順（降順）にソートしてオプションを追加
+        const contests = Array.from(this.contestsMap.entries())
+            .sort((a, b) => new Date(b[1]) - new Date(a[1]));
+
+        contests.forEach(([name, date]) => {
+            const option = document.createElement('option');
+            option.value = name;
+            option.textContent = name;
+            option.setAttribute('data-date', date);
+            contestSelect.appendChild(option);
+        });
+
         // フォームをリセット
-        document.getElementById('modalContestDate').value = '';
-        document.getElementById('modalContestName').value = '';
         document.getElementById('modalCsvFile').value = '';
         document.getElementById('modalImportBtn').disabled = true;
         document.getElementById('modalImportStatus').className = 'import-status hidden';
         this.selectedModalFile = null;
-        
-        // モーダル内の入力監視イベントを設定（重複回避のため一度削除してから追加）
-        const contestDateEl = document.getElementById('modalContestDate');
-        const contestNameEl = document.getElementById('modalContestName');
-        
-        // 既存のイベントリスナーを削除（もしあれば）
-        contestDateEl.removeEventListener('input', this.validateModalImportFormBound);
-        contestNameEl.removeEventListener('input', this.validateModalImportFormBound);
-        
-        // 新しいイベントリスナーを追加
-        this.validateModalImportFormBound = () => this.validateModalImportForm();
-        contestDateEl.addEventListener('input', this.validateModalImportFormBound);
-        contestNameEl.addEventListener('input', this.validateModalImportFormBound);
+
+        // 今日以降で最も近い大会をデフォルト値として設定
+        if (this.defaultContest) {
+            document.getElementById('modalContestName').value = this.defaultContest.contest_name;
+            document.getElementById('modalContestDate').value = this.formatDateForInput(this.defaultContest.contest_date);
+        } else {
+            document.getElementById('modalContestDate').value = '';
+            document.getElementById('modalContestName').value = '';
+        }
+
+        // コンテスト名選択時に開催日を自動設定
+        contestSelect.removeEventListener('change', this.contestSelectChangeBound);
+        this.contestSelectChangeBound = (e) => {
+            const selectedName = e.target.value;
+            if (selectedName && this.contestsMap.has(selectedName)) {
+                const contestDate = this.contestsMap.get(selectedName);
+                // 日付フォーマットを yyyy/MM/dd から yyyy-MM-dd に変換
+                const formattedDate = this.formatDateForInput(contestDate);
+                document.getElementById('modalContestDate').value = formattedDate;
+            } else {
+                document.getElementById('modalContestDate').value = '';
+            }
+            this.validateModalImportForm();
+        };
+        contestSelect.addEventListener('change', this.contestSelectChangeBound);
+    }
+
+    // 日付を yyyy/MM/dd から yyyy-MM-dd に変換
+    formatDateForInput(dateString) {
+        if (!dateString) return '';
+        // スラッシュをハイフンに置換
+        return dateString.replace(/\//g, '-');
     }
 
     closeImportModal() {
@@ -581,12 +648,22 @@ class RegistrationsManager {
         try {
             const response = await authFetch(`${this.apiUrl}/filter-options`);
             const result = await response.json();
-            
+
             if (result.success) {
                 const { contestNames, classNames } = result.data;
-                
+
                 this.populateFilterSelect('contestFilter', contestNames);
                 this.populateFilterSelect('classFilter', classNames);
+
+                // 今日以降で最も近い大会をフィルターの初期値として設定
+                if (this.defaultContest) {
+                    const contestFilter = document.getElementById('contestFilter');
+                    if (contestFilter) {
+                        contestFilter.value = this.defaultContest.contest_name;
+                        // フィルターを適用
+                        this.currentFilters.contest_name = this.defaultContest.contest_name;
+                    }
+                }
             }
         } catch (error) {
             console.error('Filter options loading failed:', error);
@@ -690,10 +767,15 @@ class RegistrationsManager {
             if (registration.isValid === 'FALSE') {
                 row.classList.add('deleted-row');
             }
-            
+
             // ポリシー違反認定者の強調表示
             if (registration.isViolationSubject) {
                 row.classList.add('violation-subject');
+            }
+
+            // 特記事項ありの強調表示（violation-subjectを上書きしない）
+            if (registration.hasNote && !registration.isViolationSubject) {
+                row.classList.add('has-note');
             }
 
             headers.forEach(header => {
@@ -789,6 +871,7 @@ class RegistrationsManager {
             contest_name: document.getElementById('contestFilter').value,
             class_name: document.getElementById('classFilter').value,
             violation_only: document.getElementById('violationFilter').checked ? 'true' : '',
+            note_exists: document.getElementById('noteExistsFilter').checked ? 'true' : '',
             startDate: document.getElementById('startDate').value,
             endDate: document.getElementById('endDate').value
         };
@@ -809,14 +892,15 @@ class RegistrationsManager {
         document.getElementById('contestFilter').value = '';
         document.getElementById('classFilter').value = '';
         document.getElementById('violationFilter').checked = false;
+        document.getElementById('noteExistsFilter').checked = false;
         document.getElementById('startDate').value = '';
         document.getElementById('endDate').value = '';
         document.getElementById('searchInput').value = '';
-        
+
         // クリアボタンも隠す
         const clearBtn = document.getElementById('clearSearchBtn');
         clearBtn.classList.add('hidden');
-        
+
         this.currentFilters = {};
         this.currentPage = 1;
         this.loadRegistrations();

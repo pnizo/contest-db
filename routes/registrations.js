@@ -1,6 +1,7 @@
 const express = require('express');
 const Registration = require('../models/Registration');
 const Subject = require('../models/Subject');
+const Note = require('../models/Note');
 const { requireAuth, requireAdmin, checkAuth } = require('../middleware/auth');
 const XLSX = require('xlsx');
 const iconv = require('iconv-lite');
@@ -8,6 +9,59 @@ const router = express.Router();
 
 const registrationModel = new Registration();
 const subjectModel = new Subject();
+const noteModel = new Note();
+
+// 氏名を正規化する関数（スペースを除去）
+function normalizeNameJa(nameJa) {
+  if (!nameJa) return '';
+  return nameJa.replace(/\s+/g, '');
+}
+
+// 登録データと特記事項をマッチングする関数
+function hasMatchingNote(registration, notes) {
+  // 同じ大会名のNotesのみ対象
+  const contestNotes = notes.filter(note => note.contest_name === registration.contest_name);
+
+  if (contestNotes.length === 0) return false;
+
+  // マッチング条件をチェック
+  return contestNotes.some(note => {
+    // player_noでマッチ
+    if (registration.player_no && note.player_no &&
+        registration.player_no.toString() === note.player_no.toString()) {
+      return true;
+    }
+
+    // fwj_card_noでマッチ
+    if (registration.fwj_card_no && note.fwj_card_no &&
+        registration.fwj_card_no.toString() === note.fwj_card_no.toString()) {
+      return true;
+    }
+
+    // npc_member_noでマッチ
+    if (registration.npc_member_no && note.npc_member_no &&
+        registration.npc_member_no.toString() === note.npc_member_no.toString()) {
+      return true;
+    }
+
+    // emailでマッチ
+    if (registration.email && note.email &&
+        registration.email.toLowerCase() === note.email.toLowerCase()) {
+      return true;
+    }
+
+    // 正規化したname_jaでマッチ
+    if (registration.name_ja && note.name_ja) {
+      const normalizedRegName = normalizeNameJa(registration.name_ja);
+      const normalizedNoteName = normalizeNameJa(note.name_ja);
+      if (normalizedRegName && normalizedNoteName && normalizedRegName === normalizedNoteName) {
+        return true;
+      }
+    }
+
+    return false;
+  });
+}
 
 // フィルター用の一意値取得
 router.get('/filter-options', requireAuth, async (req, res) => {
@@ -60,18 +114,92 @@ router.get('/filter-options', requireAuth, async (req, res) => {
   }
 });
 
+// 番号による検索エンドポイント（特記事項用）
+router.get('/search/by-number', requireAuth, async (req, res) => {
+  try {
+    const { contest_name, player_no, fwj_card_no, npc_member_no } = req.query;
+
+    console.log('=== SEARCH BY NUMBER DEBUG ===');
+    console.log('Parameters:', { contest_name, player_no, fwj_card_no, npc_member_no });
+
+    if (!contest_name) {
+      return res.status(400).json({ success: false, error: '大会名は必須です' });
+    }
+
+    if (!player_no && !fwj_card_no && !npc_member_no) {
+      return res.status(400).json({ success: false, error: 'いずれかの番号フィールドが必要です' });
+    }
+
+    // 全データを取得
+    const allRegistrations = await registrationModel.findAll();
+    console.log('Total registrations:', allRegistrations.length);
+
+    // 大会名でフィルター
+    const contestRegistrations = allRegistrations.filter(reg =>
+      reg.contest_name === contest_name && reg.isValid === 'TRUE'
+    );
+    console.log('Contest registrations:', contestRegistrations.length);
+
+    // 番号で検索（完全一致）
+    let foundRecord = null;
+
+    if (player_no) {
+      console.log('Searching by player_no:', player_no);
+      foundRecord = contestRegistrations.find(reg =>
+        reg.player_no && reg.player_no.toString() === player_no.toString()
+      );
+      console.log('Found by player_no:', !!foundRecord);
+    }
+
+    if (!foundRecord && fwj_card_no) {
+      console.log('Searching by fwj_card_no:', fwj_card_no);
+      foundRecord = contestRegistrations.find(reg =>
+        reg.fwj_card_no && reg.fwj_card_no.toString() === fwj_card_no.toString()
+      );
+      console.log('Found by fwj_card_no:', !!foundRecord);
+    }
+
+    if (!foundRecord && npc_member_no) {
+      console.log('Searching by npc_member_no:', npc_member_no);
+      foundRecord = contestRegistrations.find(reg =>
+        reg.npc_member_no && reg.npc_member_no.toString() === npc_member_no.toString()
+      );
+      console.log('Found by npc_member_no:', !!foundRecord);
+    }
+
+    console.log('Final result:', foundRecord ? 'FOUND' : 'NOT FOUND');
+    console.log('===============================');
+
+    if (!foundRecord) {
+      return res.status(404).json({
+        success: false,
+        error: '該当する選手が見つかりません'
+      });
+    }
+
+    res.json({
+      success: true,
+      data: foundRecord
+    });
+  } catch (error) {
+    console.error('Search by number error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // 全登録データ取得（ページング対応）
 router.get('/', requireAuth, async (req, res) => {
   try {
-    const { 
-      page = 1, 
+    const {
+      page = 1,
       limit = 50,
-      fwj_card_no, 
-      contest_name, 
-      class_name, 
+      fwj_card_no,
+      contest_name,
+      class_name,
       violation_only,
+      note_exists,
       search,
-      startDate, 
+      startDate,
       endDate,
       sortBy = 'contest_date',
       sortOrder = 'desc'
@@ -89,26 +217,38 @@ router.get('/', requireAuth, async (req, res) => {
     const activeSubjects = await subjectModel.findAllActive();
     const violationFwjCards = new Set(activeSubjects.map(subject => subject.fwj_card_no).filter(Boolean));
 
-    if (violation_only === 'true') {
-      // ポリシー違反認定者フィルタが適用されている場合は全データを取得してフィルタリング
+    // アクティブなNotesデータを取得
+    const activeNotes = await noteModel.findAllActive();
+
+    if (violation_only === 'true' || note_exists === 'true') {
+      // ポリシー違反認定者または特記事項フィルタが適用されている場合は全データを取得してフィルタリング
       const allResult = await registrationModel.findWithPaging(
-        1, 
+        1,
         Number.MAX_SAFE_INTEGER, // 全件取得
         filters,
         sortBy,
         sortOrder
       );
 
-      // ポリシー違反認定者のみにフィルタリング
-      const violationRegistrations = allResult.data
-        .map(registration => ({
-          ...registration,
-          isViolationSubject: violationFwjCards.has(registration.fwj_card_no)
-        }))
-        .filter(registration => registration.isViolationSubject);
+      // フラグを追加してフィルタリング
+      let filteredRegistrations = allResult.data.map(registration => ({
+        ...registration,
+        isViolationSubject: violationFwjCards.has(registration.fwj_card_no),
+        hasNote: hasMatchingNote(registration, activeNotes)
+      }));
+
+      // violation_onlyフィルタ
+      if (violation_only === 'true') {
+        filteredRegistrations = filteredRegistrations.filter(registration => registration.isViolationSubject);
+      }
+
+      // note_existsフィルタ
+      if (note_exists === 'true') {
+        filteredRegistrations = filteredRegistrations.filter(registration => registration.hasNote);
+      }
 
       // フィルタ後の総件数を計算
-      const filteredTotal = violationRegistrations.length;
+      const filteredTotal = filteredRegistrations.length;
       const pageSize = Math.min(parseInt(limit), 100);
       const totalPages = Math.ceil(filteredTotal / pageSize);
       const currentPage = parseInt(page);
@@ -116,10 +256,10 @@ router.get('/', requireAuth, async (req, res) => {
       // 現在のページのデータを取得
       const startIndex = (currentPage - 1) * pageSize;
       const endIndex = startIndex + pageSize;
-      const pageData = violationRegistrations.slice(startIndex, endIndex);
+      const pageData = filteredRegistrations.slice(startIndex, endIndex);
 
-      res.json({ 
-        success: true, 
+      res.json({
+        success: true,
         data: pageData,
         pagination: {
           currentPage: currentPage,
@@ -132,23 +272,24 @@ router.get('/', requireAuth, async (req, res) => {
     } else {
       // 通常のページング処理
       const result = await registrationModel.findWithPaging(
-        parseInt(page), 
+        parseInt(page),
         Math.min(parseInt(limit), 100), // 最大100件に制限
         filters,
         sortBy,
         sortOrder
       );
 
-      // 各登録データにviolationフラグを追加
-      const dataWithViolationFlags = result.data.map(registration => ({
+      // 各登録データにフラグを追加
+      const dataWithFlags = result.data.map(registration => ({
         ...registration,
-        isViolationSubject: violationFwjCards.has(registration.fwj_card_no)
+        isViolationSubject: violationFwjCards.has(registration.fwj_card_no),
+        hasNote: hasMatchingNote(registration, activeNotes)
       }));
 
-      res.json({ 
-        success: true, 
+      res.json({
+        success: true,
         ...result,
-        data: dataWithViolationFlags 
+        data: dataWithFlags
       });
     }
   } catch (error) {

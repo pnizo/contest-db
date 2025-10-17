@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>特記事項 - スプレッドシートDB</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <div id="authHeader" class="auth-header" style="display: none;">
+            <div class="user-info-display">
+                <div class="user-avatar" id="userAvatar"></div>
+                <div class="user-details-display">
+                    <div class="name" id="userName"></div>
+                    <div class="role" id="userRole"></div>
+                </div>
+            </div>
+            <div class="auth-actions">
+                <nav class="page-nav">
+                    <a href="/users" class="nav-link">ユーザー</a>
+                    <a href="/scores" class="nav-link">大会成績</a>
+                    <a href="/registrations" class="nav-link">出場登録</a>
+                    <a href="/subjects" class="nav-link">違反認定者</a>
+                    <a href="/notes" class="nav-link active">特記事項</a>
+                </nav>
+                <button id="logoutBtn" class="logout-btn">ログアウト</button>
+            </div>
+        </div>
+
+        <main class="notes-main">
+            <section class="notes-section">
+                <h2>特記事項</h2>
+                <div class="section-controls">
+                    <div class="controls">
+                        <div class="search-container">
+                            <div class="search-input-wrapper">
+                                <input type="text" id="searchInput" placeholder="氏名で検索..." class="search-input">
+                                <button type="button" id="clearSearchBtn" class="clear-btn hidden" title="検索をクリア">×</button>
+                            </div>
+                            <button type="button" id="searchBtn" class="search-btn" title="検索">検索</button>
+                        </div>
+                        <div class="control-buttons">
+                            <button id="refreshBtn">データ再読込</button>
+                            <button id="addNoteBtn" class="btn-primary">新規追加</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="filters">
+                    <div class="filter-row">
+                        <input type="text" id="fwjCardFilter" placeholder="FWJカード番号" class="filter-input">
+                        <select id="contestFilter" class="filter-select">
+                            <option value="">大会名を選択</option>
+                        </select>
+                        <select id="typeFilter" class="filter-select">
+                            <option value="">タイプを選択</option>
+                        </select>
+                    </div>
+                    <div class="filter-row">
+                        <div class="date-range">
+                            <input type="date" id="startDate" class="filter-input">
+                            <span class="date-separator">〜</span>
+                            <input type="date" id="endDate" class="filter-input">
+                        </div>
+                        <div class="filter-actions">
+                            <button id="applyFiltersBtn" class="filter-btn">絞り込み</button>
+                            <button id="clearFiltersBtn" class="filter-btn">クリア</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="notesTableContainer" class="table-scroll-container">
+                    <div class="loading">読み込み中...</div>
+                </div>
+
+                <div id="pagination" class="pagination hidden">
+                    <button id="prevPageBtn" class="pagination-btn">前へ</button>
+                    <span id="pageInfo" class="page-info">ページ 1 / 1 (全 0 件)</span>
+                    <button id="nextPageBtn" class="pagination-btn">次へ</button>
+                </div>
+            </section>
+        </main>
+
+        <div id="notification" class="notification hidden"></div>
+    </div>
+
+    <!-- Add/Edit Note Modal -->
+    <div id="noteModal" class="modal hidden">
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <h2 id="modalTitle">特記事項を追加</h2>
+                <button class="modal-close" onclick="notesManager.closeNoteModal()">&times;</button>
+            </div>
+            <div class="modal-form">
+                <form id="noteForm">
+                    <input type="hidden" id="noteId" name="id">
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="contestName">コンテスト名: <span class="required">*</span></label>
+                            <select id="contestName" name="contest_name" required>
+                                <option value="">大会を選択してください</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="contestDate">コンテスト開催日: <span class="required">*</span></label>
+                            <input type="date" id="contestDate" name="contest_date" required>
+                        </div>
+                    </div>
+
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="playerNo">ゼッケン番号:</label>
+                            <input type="text" id="playerNo" name="player_no" placeholder="ゼッケン番号">
+                        </div>
+                        <div class="form-group">
+                            <label for="fwjCardNo">FWJカード番号:</label>
+                            <input type="text" id="fwjCardNo" name="fwj_card_no" placeholder="FWJカード番号">
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="npcMemberNo">NPC Worldwide 会員番号:</label>
+                            <input type="text" id="npcMemberNo" name="npc_member_no" placeholder="NPC会員番号">
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group full-width">
+                            <button type="button" id="searchRegistrationBtn" class="btn btn-secondary" disabled>
+                                出場登録データから検索して自動入力
+                            </button>
+                            <small>大会名といずれかの番号（ゼッケン、FWJカード、NPC会員）を入力すると検索できます</small>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="nameJa">氏名（日本語）: <span class="required">*</span></label>
+                            <input type="text" id="nameJa" name="name_ja" placeholder="氏名を入力" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="noteType">登録内容: <span class="required">*</span></label>
+                            <select id="noteType" name="type" required>
+                                <option value="">選択してください</option>
+                                <option value="欠席">欠席</option>
+                                <option value="クラス変更">クラス変更</option>
+                                <option value="チェックイン時刻変更">チェックイン時刻変更</option>
+                                <option value="当日クラス追加">当日クラス追加</option>
+                                <option value="FWJカード現地支払">FWJカード現地支払</option>
+                                <option value="帰宅">帰宅</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+
+                        <div class="form-group">
+                            <label for="email">メールアドレス:</label>
+                            <input type="email" id="email" name="email" placeholder="メールアドレス">
+                        </div>
+                        <div class="form-group">
+                            <label for="phone">電話番号:</label>
+                            <input type="tel" id="phone" name="phone" placeholder="電話番号">
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group full-width">
+                            <label for="noteDetail">詳細メモ:</label>
+                            <textarea id="noteDetail" name="note" rows="5" placeholder="特記事項の詳細を入力してください"></textarea>
+                        </div>
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="button" onclick="notesManager.closeNoteModal()" class="btn btn-secondary">キャンセル</button>
+                        <button type="submit" class="btn btn-primary">保存</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script src="notes-script.js"></script>
+</body>
+</html>
