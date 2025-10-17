@@ -98,13 +98,20 @@ class SubjectManager {
         if (this.currentUser) {
             console.log('updateUI - currentUser:', this.currentUser);
             document.getElementById('authHeader').style.display = 'flex';
-            
+
             const userName = this.currentUser.name || this.currentUser.email || 'User';
             console.log('updateUI - userName:', userName);
-            
+
             document.getElementById('userAvatar').textContent = userName.charAt(0).toUpperCase();
             document.getElementById('userName').textContent = userName;
             document.getElementById('userRole').innerHTML = `<span class="role-badge ${this.currentUser.role}">${this.currentUser.role}</span>`;
+
+            // 管理者の場合、admin-onlyリンクを表示
+            if (this.isAdmin) {
+                document.querySelectorAll('.admin-only').forEach(el => {
+                    el.style.display = '';
+                });
+            }
 
             // 管理者でない場合、新規追加ボタンを非表示にする
             if (!this.isAdmin) {

@@ -133,22 +133,29 @@ class RegistrationsManager {
             
             this.currentUser = result.user;
             this.isAdmin = result.user.role === 'admin';
-            
+
             console.log('REGISTRATIONS: User authenticated successfully');
             console.log('REGISTRATIONS: Full user object:', result.user);
             console.log('REGISTRATIONS: User name:', result.user.name);
             console.log('REGISTRATIONS: User username:', result.user.username);
             console.log('REGISTRATIONS: User role:', result.user.role);
             console.log('REGISTRATIONS: Is admin:', this.isAdmin);
-            
+
             // nameとusernameがundefinedの場合はemailを使用
             const displayName = result.user.name || result.user.username || result.user.email || 'Unknown';
-            
+
             document.getElementById('userName').textContent = displayName;
             document.getElementById('userRole').textContent = result.user.role === 'admin' ? '管理者' : 'ユーザー';
             document.getElementById('userAvatar').textContent = displayName.charAt(0).toUpperCase();
             document.getElementById('authHeader').style.display = 'flex';
-            
+
+            // 管理者の場合、admin-onlyリンクを表示
+            if (this.isAdmin) {
+                document.querySelectorAll('.admin-only').forEach(el => {
+                    el.style.display = '';
+                });
+            }
+
             console.log('REGISTRATIONS: Auth header displayed');
             
         } catch (error) {

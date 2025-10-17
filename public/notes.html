@@ -21,8 +21,8 @@
                     <a href="/users" class="nav-link">ユーザー</a>
                     <a href="/scores" class="nav-link">大会成績</a>
                     <a href="/registrations" class="nav-link">出場登録</a>
-                    <a href="/subjects" class="nav-link">違反認定者</a>
                     <a href="/notes" class="nav-link active">特記事項</a>
+                    <a href="/subjects" class="nav-link admin-only">違反認定者</a>
                 </nav>
                 <button id="logoutBtn" class="logout-btn">ログアウト</button>
             </div>
@@ -132,7 +132,7 @@
                             <button type="button" id="searchRegistrationBtn" class="btn btn-secondary" disabled>
                                 出場登録データから検索して自動入力
                             </button>
-                            <small>大会名といずれかの番号（ゼッケン、FWJカード、NPC会員）を入力すると検索できます</small>
+                            <small>大会名といずれかの番号（ゼッケン、FWJカード、NPC Worldwide会員）を入力すると検索できます</small>
                         </div>
                     </div>
 
@@ -151,6 +151,7 @@
                                 <option value="当日クラス追加">当日クラス追加</option>
                                 <option value="FWJカード現地支払">FWJカード現地支払</option>
                                 <option value="帰宅">帰宅</option>
+                                <option value="その他">その他</option>
                             </select>
                         </div>
                     </div>

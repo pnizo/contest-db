@@ -111,13 +111,20 @@ class ScoresManager {
         if (this.currentUser) {
             // console.log('scores updateUI - currentUser:', this.currentUser);
             document.getElementById('authHeader').style.display = 'flex';
-            
+
             const userName = this.currentUser.name || this.currentUser.email || 'User';
             // console.log('scores updateUI - userName:', userName);
 
             document.getElementById('userAvatar').textContent = userName.charAt(0).toUpperCase();
             document.getElementById('userName').textContent = userName;
             document.getElementById('userRole').innerHTML = `<span class="role-badge ${this.currentUser.role}">${this.currentUser.role}</span>`;
+
+            // 管理者の場合、admin-onlyリンクを表示
+            if (this.isAdmin) {
+                document.querySelectorAll('.admin-only').forEach(el => {
+                    el.style.display = '';
+                });
+            }
 
             if (!this.isAdmin) {
                 document.body.classList.add('readonly-mode');

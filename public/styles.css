@@ -1846,3 +1846,8 @@ input[type="file"]:hover {
 .btn-secondary:not(:disabled):hover {
     background-color: #2980b9;
 }
+
+/* Admin-only navigation link (hidden by default) */
+.admin-only {
+    display: none;
+}
