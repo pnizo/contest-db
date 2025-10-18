@@ -484,12 +484,27 @@ router.post('/import', requireAuth, async (req, res) => {
           console.log('ERROR: Sheet has no data');
           return res.status(400).json({ success: false, error: 'シートにデータがありません' });
         }
-        
-        const headers = parsedData[0];
+
+        let headers = parsedData[0];
         const rows = parsedData.slice(1);
-        console.log('Headers:', headers);
+        console.log('Original Headers:', headers);
         console.log('Data rows:', rows.length);
-        
+
+        // ヘッダーを正規化（小文字化）して、FWJカード → npcj_no への読み替えを行う
+        headers = headers.map(header => {
+          if (!header) return '';
+          const normalizedHeader = header.toString().toLowerCase().trim();
+
+          // FWJカード → npcj_no への読み替え
+          if (normalizedHeader === 'fwjカード') {
+            console.log('Mapping "FWJカード" to "npcj_no"');
+            return 'npcj_no';
+          }
+
+          return normalizedHeader;
+        });
+        console.log('Normalized Headers:', headers);
+
         // オブジェクト形式に変換
         parsedData = rows.map(row => {
           const obj = {};
@@ -501,7 +516,7 @@ router.post('/import', requireAuth, async (req, res) => {
           // 空行をフィルタリング
           return Object.values(row).some(value => value && value.toString().trim() !== '');
         });
-        
+
         console.log('Processed data rows:', parsedData.length);
         console.log('Sample row:', parsedData[0]);
 
