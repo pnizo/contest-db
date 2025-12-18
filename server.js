@@ -42,8 +42,14 @@ if (process.env.NODE_ENV !== 'production') {
   }));
 }
 
-// セキュリティミドルウェア（IP制限のみ）
-app.use('/api', requireIpRestriction);
+// セキュリティミドルウェア（IP制限 - 認証API以外に適用）
+app.use('/api/users', requireIpRestriction);
+app.use('/api/scores', requireIpRestriction);
+app.use('/api/registrations', requireIpRestriction);
+app.use('/api/subjects', requireIpRestriction);
+app.use('/api/notes', requireIpRestriction);
+app.use('/api/contests', requireIpRestriction);
+app.use('/api/guests', requireIpRestriction);
 
 // セッション互換性ミドルウェア（JWT対応）
 app.use(sessionCompatibility);
