@@ -24,7 +24,7 @@ router.get('/', async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 50;
-    const sortBy = req.query.sortBy || '大会名';
+    const sortBy = req.query.sortBy || 'contest_name';
     const sortOrder = req.query.sortOrder || 'asc';
 
     const filters = {};
@@ -66,7 +66,7 @@ router.post('/', async (req, res) => {
     const guestData = req.body;
 
     // 必須フィールドチェック
-    if (!guestData['代表者氏名'] || !guestData['代表者氏名'].trim()) {
+    if (!guestData['name_ja'] || !guestData['name_ja'].trim()) {
       return res.status(400).json({ success: false, error: '代表者氏名は必須です' });
     }
 
@@ -85,7 +85,7 @@ router.put('/:rowIndex', async (req, res) => {
     const guestData = req.body;
 
     // 必須フィールドチェック
-    if (!guestData['代表者氏名'] || !guestData['代表者氏名'].trim()) {
+    if (!guestData['name_ja'] || !guestData['name_ja'].trim()) {
       return res.status(400).json({ success: false, error: '代表者氏名は必須です' });
     }
 
@@ -93,6 +93,27 @@ router.put('/:rowIndex', async (req, res) => {
     res.json(result);
   } catch (error) {
     console.error('Error updating guest:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ゲスト削除
+router.delete('/:rowIndex', async (req, res) => {
+  try {
+    const rowIndex = parseInt(req.params.rowIndex);
+
+    // 存在確認
+    const guest = await guestModel.findByRowIndex(rowIndex);
+    if (!guest) {
+      return res.status(404).json({ success: false, error: 'ゲストが見つかりません' });
+    }
+
+    // 行を削除
+    await guestModel.getSheetsService().deleteRow(guestModel.sheetName, rowIndex - 1);
+
+    res.json({ success: true, message: 'ゲストレコードを削除しました' });
+  } catch (error) {
+    console.error('Error deleting guest:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });

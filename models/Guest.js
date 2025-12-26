@@ -2,10 +2,10 @@ const BaseModel = require('./BaseModel');
 
 class Guest extends BaseModel {
   constructor() {
-    super('【FWJ2025】マスターシート', 'guest');
+    super('Guests');
   }
 
-  // 有効なフィールドのみを取得（代表者氏名が必須）
+  // 有効なフィールドのみを取得（name_jaが必須）
   async findAll() {
     try {
       await this.ensureInitialized();
@@ -17,20 +17,22 @@ class Guest extends BaseModel {
 
       // 有効なフィールドのマッピング
       const validFields = [
-        '大会名',
-        '団体/個人',
-        '付与パス',
-        '代表者氏名',
-        '団体名（企業名）',
-        '連絡先メールアドレス',
-        '緊急電話番号',
-        '社内担当者名',
-        '申請種別',
-        '合計付与枚数',
-        '事前案内メール',
-        'Check-In',
-        '開催後メール',
-        '備考欄（同伴者氏名など）'
+        'id',
+        'ticket_type',
+        'contest_name',
+        'group_type',
+        'name_ja',
+        'pass_type',
+        'company_ja',
+        'request_type',
+        'ticket_count',
+        'is_checked_in',
+        'note',
+        'email',
+        'phone',
+        'contact_person',
+        'is_pre_notified',
+        'is_post_mailed'
       ];
 
       const allItems = data.map((row, index) => {
@@ -44,8 +46,8 @@ class Guest extends BaseModel {
         return obj;
       });
 
-      // 代表者氏名が必須：空白のレコードは除外
-      return allItems.filter(item => item['代表者氏名'] && item['代表者氏名'].trim() !== '');
+      // name_jaが必須：空白のレコードは除外
+      return allItems.filter(item => item['name_ja'] && item['name_ja'].trim() !== '');
     } catch (error) {
       console.error('Error in Guest.findAll:', error);
       return [];
@@ -53,7 +55,7 @@ class Guest extends BaseModel {
   }
 
   // ページング付きで取得
-  async findWithPaging(page = 1, limit = 50, filters = {}, sortBy = '大会名', sortOrder = 'asc') {
+  async findWithPaging(page = 1, limit = 50, filters = {}, sortBy = 'contest_name', sortOrder = 'asc') {
     try {
       const values = await this.getSheetsService().getValues(`${this.sheetName}!A:Z`);
       if (values.length === 0) {
@@ -65,20 +67,22 @@ class Guest extends BaseModel {
 
       // 有効なフィールドのマッピング
       const validFields = [
-        '大会名',
-        '団体/個人',
-        '付与パス',
-        '代表者氏名',
-        '団体名（企業名）',
-        '連絡先メールアドレス',
-        '緊急電話番号',
-        '社内担当者名',
-        '申請種別',
-        '合計付与枚数',
-        '事前案内メール',
-        'Check-In',
-        '開催後メール',
-        '備考欄（同伴者氏名など）'
+        'id',
+        'ticket_type',
+        'contest_name',
+        'group_type',
+        'name_ja',
+        'pass_type',
+        'company_ja',
+        'request_type',
+        'ticket_count',
+        'is_checked_in',
+        'note',
+        'email',
+        'phone',
+        'contact_person',
+        'is_pre_notified',
+        'is_post_mailed'
       ];
 
       let allItems = data.map((row, index) => {
@@ -91,43 +95,43 @@ class Guest extends BaseModel {
         return obj;
       });
 
-      // 代表者氏名が必須：空白のレコードは除外
-      allItems = allItems.filter(item => item['代表者氏名'] && item['代表者氏名'].trim() !== '');
+      // name_jaが必須：空白のレコードは除外
+      allItems = allItems.filter(item => item['name_ja'] && item['name_ja'].trim() !== '');
 
       // フィルタリング適用
       if (filters.contest_name) {
         allItems = allItems.filter(item =>
-          item['大会名'] && item['大会名'].toLowerCase().includes(filters.contest_name.toLowerCase())
+          item['contest_name'] && item['contest_name'].toLowerCase().includes(filters.contest_name.toLowerCase())
         );
       }
       if (filters.organization_type) {
         allItems = allItems.filter(item =>
-          item['団体/個人'] && item['団体/個人'].toLowerCase().includes(filters.organization_type.toLowerCase())
+          item['group_type'] && item['group_type'].toLowerCase().includes(filters.organization_type.toLowerCase())
         );
       }
       if (filters.pass_type) {
         allItems = allItems.filter(item =>
-          item['付与パス'] && item['付与パス'].toLowerCase().includes(filters.pass_type.toLowerCase())
+          item['pass_type'] && item['pass_type'].toLowerCase().includes(filters.pass_type.toLowerCase())
         );
       }
       if (filters.representative_name) {
         allItems = allItems.filter(item =>
-          item['代表者氏名'] && item['代表者氏名'].toLowerCase().includes(filters.representative_name.toLowerCase())
+          item['name_ja'] && item['name_ja'].toLowerCase().includes(filters.representative_name.toLowerCase())
         );
       }
       if (filters.organization_name) {
         allItems = allItems.filter(item =>
-          item['団体名（企業名）'] && item['団体名（企業名）'].toLowerCase().includes(filters.organization_name.toLowerCase())
+          item['company_ja'] && item['company_ja'].toLowerCase().includes(filters.organization_name.toLowerCase())
         );
       }
       if (filters.search) {
         const searchTerm = filters.search.toLowerCase();
         allItems = allItems.filter(item => {
           const searchFields = [
-            item['代表者氏名'],
-            item['団体名（企業名）'],
-            item['社内担当者名'],
-            item['連絡先メールアドレス']
+            item['name_ja'],
+            item['company_ja'],
+            item['contact_person'],
+            item['email']
           ];
 
           return searchFields.some(field =>
@@ -143,7 +147,7 @@ class Guest extends BaseModel {
           let bVal = b[sortBy] || '';
 
           // 数値型フィールドの定義
-          const numericFields = ['合計付与枚数'];
+          const numericFields = ['ticket_count'];
 
           // 数値型フィールドの場合は数値に変換
           if (numericFields.includes(sortBy)) {
@@ -184,9 +188,9 @@ class Guest extends BaseModel {
     try {
       const allGuests = await this.findAll();
 
-      const contestNames = [...new Set(allGuests.map(g => g['大会名']).filter(Boolean))];
-      const organizationTypes = [...new Set(allGuests.map(g => g['団体/個人']).filter(Boolean))];
-      const passTypes = [...new Set(allGuests.map(g => g['付与パス']).filter(Boolean))];
+      const contestNames = [...new Set(allGuests.map(g => g['contest_name']).filter(Boolean))];
+      const organizationTypes = [...new Set(allGuests.map(g => g['group_type']).filter(Boolean))];
+      const passTypes = [...new Set(allGuests.map(g => g['pass_type']).filter(Boolean))];
 
       return {
         contestNames,
@@ -215,7 +219,7 @@ class Guest extends BaseModel {
       const headers = values[0];
 
       // Boolean型フィールドのリスト
-      const booleanFields = ['事前案内メール', 'Check-In', '開催後メール'];
+      const booleanFields = ['is_pre_notified', 'is_checked_in', 'is_post_mailed'];
 
       // 有効なフィールドのみを含む行データを作成
       const newRow = headers.map(header => {
@@ -255,7 +259,7 @@ class Guest extends BaseModel {
       const headers = values[0];
 
       // Boolean型フィールドのリスト
-      const booleanFields = ['事前案内メール', 'Check-In', '開催後メール'];
+      const booleanFields = ['is_pre_notified', 'is_checked_in', 'is_post_mailed'];
 
       // 更新する行データを作成
       const updatedRow = headers.map(header => {

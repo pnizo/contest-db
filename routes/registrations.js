@@ -2,14 +2,15 @@ const express = require('express');
 const Registration = require('../models/Registration');
 const Subject = require('../models/Subject');
 const Note = require('../models/Note');
+const Member = require('../models/Member');
 const { requireAuth, requireAdmin, checkAuth } = require('../middleware/auth');
-const XLSX = require('xlsx');
-const iconv = require('iconv-lite');
+const wanakana = require('wanakana');
 const router = express.Router();
 
 const registrationModel = new Registration();
 const subjectModel = new Subject();
 const noteModel = new Note();
+const memberModel = new Member();
 
 // 氏名を正規化する関数（スペースを除去）
 function normalizeNameJa(nameJa) {
@@ -91,11 +92,26 @@ router.get('/filter-options', requireAuth, async (req, res) => {
       .sort((a, b) => new Date(b[1]) - new Date(a[1]))
       .map(entry => entry[0]);
     
-    // 一意のクラス名を取得
+    // 一意のクラス名を取得（カテゴリー + "-" + 最初の1ワードまで）
     const classNames = [...new Set(
       allRegistrations
-        .map(reg => reg.class)
-        .filter(name => name && name.trim() !== '')
+        .map(reg => {
+          if (!reg.class_name || reg.class_name.trim() === '') return null;
+
+          // class_name を "-" で分割
+          const parts = reg.class_name.split('-');
+          if (parts.length < 2) return reg.class_name; // "-" がない場合はそのまま
+
+          // カテゴリー部分（最初のパート）
+          const category = parts[0].trim();
+
+          // 2番目のパート（"-" の後）から最初の1ワードを取得
+          const afterDash = parts.slice(1).join('-').trim();
+          const firstWord = afterDash.split(/\s+/)[0];
+
+          return `${category} - ${firstWord}`;
+        })
+        .filter(name => name !== null)
     )].sort();
     
     console.log(`Contest names: ${contestNames.length}, Class names: ${classNames.length}`);
@@ -208,7 +224,7 @@ router.get('/', requireAuth, async (req, res) => {
     const filters = {};
     if (fwj_card_no) filters.fwj_card_no = fwj_card_no;
     if (contest_name) filters.contest_name = contest_name;
-    if (class_name) filters.class = class_name;
+    if (class_name) filters.class_name = class_name;
     if (search) filters.search = search;
     if (startDate) filters.startDate = startDate;
     if (endDate) filters.endDate = endDate;
@@ -412,16 +428,17 @@ router.get('/fwj/:fwjCard', requireAuth, async (req, res) => {
   }
 });
 
-// ファイルインポート（CSV/XLSX対応、認証済みユーザー）
+// ファイルインポート（Muscleware CSV専用、認証済みユーザー）
 router.post('/import', requireAuth, async (req, res) => {
   try {
     console.log('=== IMPORT REQUEST START ===');
-    const { fileData, fileType, contestDate, contestName } = req.body;
-    console.log('Import request:', { 
-      fileType, 
-      contestDate, 
-      contestName, 
-      fileDataLength: fileData ? fileData.length : 0 
+    const { fileData, fileType, fileFormat, contestDate, contestName } = req.body;
+    console.log('Import request:', {
+      fileType,
+      fileFormat,
+      contestDate,
+      contestName,
+      fileDataLength: fileData ? fileData.length : 0
     });
     
     if (!fileData) {
@@ -436,100 +453,167 @@ router.post('/import', requireAuth, async (req, res) => {
 
     let parsedData = [];
 
+    // まずファイルを2D配列にパース
+    let rawData = [];
+
     if (fileType === 'csv') {
       console.log('Processing CSV file...');
       // CSVファイルの処理
-      if (!Array.isArray(fileData)) {
-        console.log('ERROR: CSV data is not an array');
+      if (typeof fileData !== 'string') {
+        console.log('ERROR: CSV data is not a string');
         return res.status(400).json({ success: false, error: 'CSVデータが無効です' });
       }
-      parsedData = fileData;
-      console.log('CSV parsed, rows:', parsedData.length);
-    } else if (fileType === 'xlsx') {
-      console.log('Processing XLSX file...');
-      // XLSXファイルの処理
-      try {
-        console.log('Converting base64 to buffer...');
-        // Base64データをBufferに変換
-        const buffer = Buffer.from(fileData, 'base64');
-        console.log('Buffer created, size:', buffer.length);
-        
-        // XLSXファイルを直接読み込み（文字コード変換は後で検討）
-        console.log('Reading XLSX workbook...');
-        const workbook = XLSX.read(buffer, { type: 'buffer' });
-        console.log('Workbook loaded, sheet names:', workbook.SheetNames);
-        
-        // "Registrations"で始まるシート名を検索
-        const sheetName = workbook.SheetNames.find(name => 
-          name.toLowerCase().startsWith('registrations')
-        );
-        console.log('Found target sheet:', sheetName);
-        
-        if (!sheetName) {
-          console.log('ERROR: No registrations sheet found');
-          return res.status(400).json({ 
-            success: false, 
-            error: '"Registrations"で始まるシート名が見つかりません。利用可能なシート: ' + workbook.SheetNames.join(', ')
-          });
-        }
 
-        // シートをJSONに変換
-        console.log('Converting sheet to JSON...');
-        const worksheet = workbook.Sheets[sheetName];
-        parsedData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-        console.log('Raw sheet data rows:', parsedData.length);
-        
-        // ヘッダー行を取得
-        if (parsedData.length === 0) {
-          console.log('ERROR: Sheet has no data');
-          return res.status(400).json({ success: false, error: 'シートにデータがありません' });
-        }
+      // CSVテキストを行に分割
+      const lines = fileData.split(/\r?\n/).filter(line => line.trim());
+      if (lines.length < 2) {
+        console.log('ERROR: CSV has insufficient data');
+        return res.status(400).json({ success: false, error: 'CSVファイルにデータがありません' });
+      }
 
-        let headers = parsedData[0];
-        const rows = parsedData.slice(1);
-        console.log('Original Headers:', headers);
-        console.log('Data rows:', rows.length);
+      // CSVパース（簡易版 - 引用符対応）
+      const parseCSVLine = (line) => {
+        const values = [];
+        let current = '';
+        let inQuotes = false;
 
-        // ヘッダーを正規化（小文字化）して、FWJカード → npcj_no への読み替えを行う
-        headers = headers.map(header => {
-          if (!header) return '';
-          const normalizedHeader = header.toString().toLowerCase().trim();
+        for (let i = 0; i < line.length; i++) {
+          const char = line[i];
 
-          // FWJカード → npcj_no への読み替え
-          if (normalizedHeader === 'fwjカード') {
-            console.log('Mapping "FWJカード" to "npcj_no"');
-            return 'npcj_no';
+          if (char === '"') {
+            inQuotes = !inQuotes;
+          } else if (char === ',' && !inQuotes) {
+            values.push(current);
+            current = '';
+          } else {
+            current += char;
           }
+        }
+        values.push(current);
+        return values;
+      };
 
-          return normalizedHeader;
-        });
-        console.log('Normalized Headers:', headers);
+      rawData = lines.map(line => parseCSVLine(line));
+      console.log('CSV parsed to 2D array, rows:', rawData.length);
+    } else {
+      console.log('ERROR: Unsupported file type');
+      return res.status(400).json({ success: false, error: 'CSV形式のみサポートしています' });
+    }
 
-        // オブジェクト形式に変換
-        parsedData = rows.map(row => {
-          const obj = {};
-          headers.forEach((header, index) => {
-            obj[header] = row[index] || '';
-          });
-          return obj;
-        }).filter(row => {
-          // 空行をフィルタリング
-          return Object.values(row).some(value => value && value.toString().trim() !== '');
-        });
+    // CSVデータの処理
+    if (rawData.length === 0) {
+      console.log('ERROR: No data to process');
+      return res.status(400).json({ success: false, error: 'データがありません' });
+    }
 
-        console.log('Processed data rows:', parsedData.length);
-        console.log('Sample row:', parsedData[0]);
+    let headers = rawData[0];
+    const rows = rawData.slice(1);
+    console.log('Original Headers:', headers);
+    console.log('Data rows:', rows.length);
 
-      } catch (xlsxError) {
-        console.error('XLSX parsing error:', xlsxError);
-        return res.status(400).json({ 
-          success: false, 
-          error: 'XLSXファイルの解析に失敗しました: ' + xlsxError.message 
+    // ヘッダーを正規化（小文字化）して、形式別の読み替えを行う
+    headers = headers.map(header => {
+      if (!header) return '';
+      const normalizedHeader = header.toString().toLowerCase().trim();
+
+      if (fileFormat === 'muscleware') {
+        // Muscleware形式のヘッダーマッピング
+        const musclewareMapping = {
+          // 基本情報
+          'register date': 'register_date',
+          'register time': 'register_time',
+          'first name': 'first_name',
+          'last name': 'last_name',
+          'dob': 'date_of_birth',
+          'email': 'email',
+          'phone': 'phone',
+          'member #': 'npc_member_no',
+          'country': 'country',
+
+          // クラス情報
+          'class name': 'class_name',
+          'class code': 'class_code',
+
+          // バックステージパス
+          '1 backstage pass (add-on)': 'backstage_pass_1',
+          '2 backstage passes (add-on)': 'backstage_pass_2',
+
+          // カスタムフィールド
+          'height (cm) (custom)': 'height',
+          'weight (kg) (custom)': 'weight',
+          'occupation (custom)': 'occupation',
+          'instagram (custom)': 'instagram',
+          'biography (custom)': 'biography'
+        };
+        return musclewareMapping[normalizedHeader] || normalizedHeader;
+      } else {
+        // Standard形式 - 既存のロジック
+        if (normalizedHeader === 'fwjカード') {
+          console.log('Mapping "FWJカード" to "npcj_no"');
+          return 'npcj_no';
+        }
+        return normalizedHeader;
+      }
+    });
+    console.log('Normalized Headers:', headers);
+
+    // オブジェクト形式に変換
+    parsedData = rows.map(row => {
+      const obj = {};
+      headers.forEach((header, index) => {
+        obj[header] = row[index] || '';
+      });
+      return obj;
+    }).filter(row => {
+      // 空行をフィルタリング
+      return Object.values(row).some(value => value && value.toString().trim() !== '');
+    });
+
+    console.log('Processed data rows:', parsedData.length);
+    console.log('Sample row:', parsedData[0]);
+
+    // Muscleware形式固有の変換処理
+    if (fileFormat === 'muscleware') {
+      console.log('Applying Muscleware-specific transformations...');
+
+      const errors = [];
+      parsedData = parsedData.map((row, index) => {
+        // Backstage Pass ロジック
+        const pass1 = row.backstage_pass_1 && row.backstage_pass_1.toString().trim().toUpperCase();
+        const pass2 = row.backstage_pass_2 && row.backstage_pass_2.toString().trim().toUpperCase();
+
+        const hasPass1 = pass1 === 'Y';
+        const hasPass2 = pass2 === 'Y';
+
+        if (hasPass1 && hasPass2) {
+          // 両方Yの場合はエラー
+          const errorMsg = `Row ${index + 2}: Both backstage passes are set to Y`;
+          console.error(errorMsg);
+          errors.push(errorMsg);
+          row['backstage_pass'] = '';
+        } else if (hasPass1) {
+          // 1 Backstage Pass のみYの場合
+          row['backstage_pass'] = '1';
+        } else if (hasPass2) {
+          // 2 Backstage Passes のみYの場合
+          row['backstage_pass'] = '2';
+        } else {
+          // 両方空白の場合
+          row['backstage_pass'] = '';
+        }
+
+        return row;
+      });
+
+      if (errors.length > 0) {
+        console.error('Backstage pass validation errors:', errors);
+        return res.status(400).json({
+          success: false,
+          error: 'Backstage Passのエラーがあります:\n' + errors.join('\n')
         });
       }
-    } else {
-      console.log('ERROR: Unsupported file type:', fileType);
-      return res.status(400).json({ success: false, error: 'サポートされていないファイル形式です' });
+
+      console.log('Muscleware transformations applied');
     }
 
     if (parsedData.length === 0) {
@@ -537,9 +621,130 @@ router.post('/import', requireAuth, async (req, res) => {
       return res.status(400).json({ success: false, error: 'データが空です' });
     }
 
+    // Membersシートからデータを取得してemailで補完
+    console.log('Fetching Members data for enrichment...');
+    try {
+      const allMembers = await memberModel.findAll();
+      console.log(`Found ${allMembers.length} members in Members sheet`);
+
+      // emailをキーにしたMapを作成（高速検索用）
+      const membersByEmail = new Map();
+      allMembers.forEach(member => {
+        if (member.email && member.email.trim()) {
+          const emailKey = member.email.toLowerCase().trim();
+          membersByEmail.set(emailKey, member);
+        }
+      });
+
+      // 各レコードをMembersデータで補完
+      let enrichedCount = 0;
+      parsedData.forEach(record => {
+        if (record.email && record.email.trim()) {
+          const emailKey = record.email.toLowerCase().trim();
+          const member = membersByEmail.get(emailKey);
+
+          if (member) {
+            // Membersのshopify_idをfwj_card_noにセット
+            if (member.shopify_id && member.shopify_id.trim()) {
+              record.fwj_card_no = member.shopify_id.trim();
+            }
+
+            // Membersのfwj_lastnameとfwj_firstnameを連結してname_jaにセット
+            const memberFwjLastName = member.fwj_lastname ? member.fwj_lastname.trim() : '';
+            const memberFwjFirstName = member.fwj_firstname ? member.fwj_firstname.trim() : '';
+            if (memberFwjLastName || memberFwjFirstName) {
+              record.name_ja = `${memberFwjLastName} ${memberFwjFirstName}`.trim();
+            }
+
+            // Membersのfwj_lastname_kanaとfwj_firstname_kanaを連結してname_ja_kanaにセット
+            const memberFwjLastNameKana = member.fwj_lastname_kana ? member.fwj_lastname_kana.trim() : '';
+            const memberFwjFirstNameKana = member.fwj_firstname_kana ? member.fwj_firstname_kana.trim() : '';
+            if (memberFwjLastNameKana || memberFwjFirstNameKana) {
+              record.name_ja_kana = `${memberFwjLastNameKana} ${memberFwjFirstNameKana}`.trim();
+            }
+
+            enrichedCount++;
+          }
+        }
+
+        // name_ja_kanaが未設定の場合、MusclewareのCSVのfirst_nameとlast_nameからWanaKanaで生成
+        if (!record.name_ja_kana || record.name_ja_kana.trim() === '') {
+          const csvLastName = record.last_name ? record.last_name.trim() : '';
+          const csvFirstName = record.first_name ? record.first_name.trim() : '';
+          if (csvLastName || csvFirstName) {
+            // WanaKanaを使ってローマ字からカタカナに変換
+            const lastNameKana = csvLastName ? wanakana.toKatakana(csvLastName) : '';
+            const firstNameKana = csvFirstName ? wanakana.toKatakana(csvFirstName) : '';
+            if (lastNameKana || firstNameKana) {
+              record.name_ja_kana = `${lastNameKana} ${firstNameKana}`.trim();
+            }
+          }
+        }
+      });
+
+      console.log(`Enriched ${enrichedCount} records with Members data`);
+    } catch (memberError) {
+      console.error('Error fetching Members data:', memberError);
+      // Members取得エラーは警告のみで処理を続行
+      console.log('Continuing import without Members enrichment');
+    }
+
+    // ゼッケン番号(player_no)を自動採番
+    console.log('Assigning player numbers...');
+    try {
+      // 1. register_dateとregister_timeでソート
+      const sortedData = [...parsedData].sort((a, b) => {
+        const dateA = a.register_date || '';
+        const dateB = b.register_date || '';
+        if (dateA !== dateB) {
+          return dateA.localeCompare(dateB);
+        }
+        const timeA = a.register_time || '';
+        const timeB = b.register_time || '';
+        return timeA.localeCompare(timeB);
+      });
+
+      // 2. emailごとに最も早い登録順で番号を割り当て
+      const emailToPlayerNo = new Map();
+      let nextPlayerNo = 1;
+
+      sortedData.forEach(record => {
+        const email = record.email ? record.email.toLowerCase().trim() : '';
+
+        if (email) {
+          // emailがある場合：同じemailには同じ番号を割り当て
+          if (!emailToPlayerNo.has(email)) {
+            emailToPlayerNo.set(email, nextPlayerNo);
+            nextPlayerNo++;
+          }
+        }
+        // emailが無い場合は後で個別に処理
+      });
+
+      // 3. 元のparsedDataの各レコードにplayer_noを設定
+      parsedData.forEach(record => {
+        const email = record.email ? record.email.toLowerCase().trim() : '';
+
+        if (email && emailToPlayerNo.has(email)) {
+          // emailがあり、既に番号が割り当てられている
+          record.player_no = String(emailToPlayerNo.get(email));
+        } else {
+          // emailが無いレコードには個別に新しい番号を割り当て
+          record.player_no = String(nextPlayerNo);
+          nextPlayerNo++;
+        }
+      });
+
+      console.log(`Assigned player numbers to ${parsedData.length} records (unique players: ${emailToPlayerNo.size})`);
+    } catch (playerNoError) {
+      console.error('Error assigning player numbers:', playerNoError);
+      // エラーが発生しても処理を続行（player_noは空のまま）
+      console.log('Continuing import without player number assignment');
+    }
+
     console.log('Starting batch import...');
     // バッチインポートを実行
-    const result = await registrationModel.batchImport(parsedData, contestDate, contestName);
+    const result = await registrationModel.batchImport(parsedData, contestDate, contestName, fileFormat);
     console.log('Batch import result:', result.success ? 'SUCCESS' : 'FAILED');
     
     if (result.success) {

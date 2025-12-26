@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>大会情報 - スプレッドシートDB</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <div id="authHeader" class="auth-header" style="display: none;">
+            <div class="user-info-display">
+                <div class="user-avatar" id="userAvatar"></div>
+                <div class="user-details-display">
+                    <div class="name" id="userName"></div>
+                    <div class="role" id="userRole"></div>
+                </div>
+            </div>
+            <div class="auth-actions">
+                <nav class="page-nav">
+                    <a href="/users" class="nav-link">ユーザー</a>
+                    <a href="/scores" class="nav-link">大会成績</a>
+                    <a href="/registrations" class="nav-link">出場登録</a>
+                    <a href="/notes" class="nav-link">特記事項</a>
+                    <a href="/guests" class="nav-link">関係者チケット</a>
+                    <a href="/contests" class="nav-link active">大会情報</a>
+                    <a href="/members" class="nav-link">FWJ会員情報</a>
+                    <a href="/subjects" class="nav-link admin-only">違反認定者</a>
+                </nav>
+                <button id="logoutBtn" class="logout-btn">ログアウト</button>
+            </div>
+        </div>
+
+        <main class="contests-main">
+            <section class="contests-section">
+                <h2>大会情報</h2>
+                <div class="section-controls">
+                    <div class="controls">
+                        <div class="search-container">
+                            <div class="search-input-wrapper">
+                                <input type="text" id="searchInput" placeholder="大会名、開催地で検索..." class="search-input">
+                                <button type="button" id="clearSearchBtn" class="clear-btn hidden" title="検索をクリア">×</button>
+                            </div>
+                            <button type="button" id="searchBtn" class="search-btn" title="検索">検索</button>
+                        </div>
+                        <button type="button" id="addNewBtn" class="action-btn primary">新規追加</button>
+                    </div>
+                </div>
+                <div class="filters">
+                    <div class="filter-row">
+                        <select id="placeFilter" class="filter-select">
+                            <option value="">開催地を選択</option>
+                        </select>
+                        <div class="date-range">
+                            <input type="date" id="startDate" class="filter-input" placeholder="開始日">
+                            <span class="date-separator">〜</span>
+                            <input type="date" id="endDate" class="filter-input" placeholder="終了日">
+                        </div>
+                    </div>
+                    <div class="filter-row">
+                        <div class="filter-actions">
+                            <button id="applyFiltersBtn" class="filter-btn">絞り込み</button>
+                            <button id="clearFiltersBtn" class="filter-btn">クリア</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="contestsTableContainer" class="table-scroll-container">
+                    <div class="loading">読み込み中...</div>
+                </div>
+
+                <div id="pagination" class="pagination hidden">
+                    <button id="prevPageBtn" class="pagination-btn">前へ</button>
+                    <span id="pageInfo" class="page-info">ページ 1 / 1 (全 0 件)</span>
+                    <button id="nextPageBtn" class="pagination-btn">次へ</button>
+                </div>
+            </section>
+        </main>
+
+        <div id="notification" class="notification hidden"></div>
+    </div>
+
+    <!-- 編集/新規追加ダイアログ -->
+    <div id="editDialog" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="editDialogTitle">大会情報を編集</h3>
+                <button type="button" class="modal-close" id="closeEditDialog">&times;</button>
+            </div>
+            <form id="editForm">
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="edit_contest_name">大会名 <span class="required">*</span></label>
+                        <input type="text" id="edit_contest_name" name="contest_name" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="edit_contest_date">開催日</label>
+                        <input type="date" id="edit_contest_date" name="contest_date">
+                    </div>
+                    <div class="form-group">
+                        <label for="edit_contest_place">開催地</label>
+                        <input type="text" id="edit_contest_place" name="contest_place">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn-secondary" id="cancelEditBtn">キャンセル</button>
+                    <button type="submit" class="btn-primary" id="saveEditBtn">保存</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 削除確認ダイアログ -->
+    <div id="deleteDialog" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>削除確認</h3>
+                <button type="button" class="modal-close" id="closeDeleteDialog">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p>以下の大会情報を削除しますか？</p>
+                <p class="delete-target-info">
+                    <strong>大会名:</strong> <span id="deleteTargetName"></span><br>
+                    <strong>開催日:</strong> <span id="deleteTargetDate"></span><br>
+                    <strong>開催地:</strong> <span id="deleteTargetPlace"></span>
+                </p>
+                <p class="warning-text">この操作は取り消せません。</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn-secondary" id="cancelDeleteBtn">キャンセル</button>
+                <button type="button" class="btn-danger" id="confirmDeleteBtn">削除</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="contests-script.js"></script>
+</body>
+</html>

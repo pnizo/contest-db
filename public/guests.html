@@ -23,6 +23,8 @@
                     <a href="/registrations" class="nav-link">出場登録</a>
                     <a href="/notes" class="nav-link">特記事項</a>
                     <a href="/guests" class="nav-link active">関係者チケット</a>
+                    <a href="/contests" class="nav-link">大会情報</a>
+                    <a href="/members" class="nav-link">FWJ会員情報</a>
                     <a href="/subjects" class="nav-link admin-only">違反認定者</a>
                 </nav>
                 <button id="logoutBtn" class="logout-btn">ログアウト</button>
@@ -41,6 +43,7 @@
                             </div>
                             <button type="button" id="searchBtn" class="search-btn" title="検索">検索</button>
                         </div>
+                        <button type="button" id="addNewBtn" class="action-btn primary">新規追加</button>
                     </div>
                 </div>
                 <div class="filters">
@@ -76,6 +79,112 @@
         </main>
 
         <div id="notification" class="notification hidden"></div>
+    </div>
+
+    <!-- 編集/新規追加ダイアログ -->
+    <div id="editDialog" class="modal hidden">
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <h3 id="editDialogTitle">関係者チケットを編集</h3>
+                <button type="button" class="modal-close" id="closeEditDialog">&times;</button>
+            </div>
+            <form id="editForm">
+                <div class="modal-body">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="edit_contest_name">大会名</label>
+                            <select id="edit_contest_name" name="contest_name" class="filter-select">
+                                <option value="">大会名を選択</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="edit_group_type">団体/個人</label>
+                            <input type="text" id="edit_group_type" name="group_type">
+                        </div>
+                        <div class="form-group">
+                            <label for="edit_pass_type">付与パス</label>
+                            <input type="text" id="edit_pass_type" name="pass_type">
+                        </div>
+                        <div class="form-group">
+                            <label for="edit_name_ja">代表者氏名 <span class="required">*</span></label>
+                            <input type="text" id="edit_name_ja" name="name_ja" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="edit_company_ja">団体名（企業名）</label>
+                            <input type="text" id="edit_company_ja" name="company_ja">
+                        </div>
+                        <div class="form-group">
+                            <label for="edit_email">連絡先メールアドレス</label>
+                            <input type="email" id="edit_email" name="email">
+                        </div>
+                        <div class="form-group">
+                            <label for="edit_phone">緊急電話番号</label>
+                            <input type="tel" id="edit_phone" name="phone">
+                        </div>
+                        <div class="form-group">
+                            <label for="edit_contact_person">社内担当者名</label>
+                            <input type="text" id="edit_contact_person" name="contact_person">
+                        </div>
+                        <div class="form-group">
+                            <label for="edit_request_type">申請種別</label>
+                            <input type="text" id="edit_request_type" name="request_type">
+                        </div>
+                        <div class="form-group">
+                            <label for="edit_ticket_count">合計付与枚数</label>
+                            <input type="number" id="edit_ticket_count" name="ticket_count" min="0">
+                        </div>
+                        <div class="form-group checkbox-group">
+                            <label>
+                                <input type="checkbox" id="edit_is_pre_notified" name="is_pre_notified">
+                                事前案内メール
+                            </label>
+                        </div>
+                        <div class="form-group checkbox-group">
+                            <label>
+                                <input type="checkbox" id="edit_is_checked_in" name="is_checked_in">
+                                Check-In
+                            </label>
+                        </div>
+                        <div class="form-group checkbox-group">
+                            <label>
+                                <input type="checkbox" id="edit_is_post_mailed" name="is_post_mailed">
+                                開催後メール
+                            </label>
+                        </div>
+                        <div class="form-group full-width">
+                            <label for="edit_note">備考欄（同伴者氏名など）</label>
+                            <textarea id="edit_note" name="note" rows="3"></textarea>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn-secondary" id="cancelEditBtn">キャンセル</button>
+                    <button type="submit" class="btn-primary" id="saveEditBtn">保存</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 削除確認ダイアログ -->
+    <div id="deleteDialog" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>削除確認</h3>
+                <button type="button" class="modal-close" id="closeDeleteDialog">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p>以下の関係者チケットを削除しますか？</p>
+                <p class="delete-target-info">
+                    <strong>代表者氏名:</strong> <span id="deleteTargetName"></span><br>
+                    <strong>団体名:</strong> <span id="deleteTargetCompany"></span>
+                </p>
+                <p class="warning-text">この操作は取り消せません。</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn-secondary" id="cancelDeleteBtn">キャンセル</button>
+                <button type="button" class="btn-danger" id="confirmDeleteBtn">削除</button>
+            </div>
+        </div>
     </div>
 
     <script src="guests-script.js"></script>

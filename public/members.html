@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FWJ会員情報 - スプレッドシートDB</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <div id="authHeader" class="auth-header" style="display: none;">
+            <div class="user-info-display">
+                <div class="user-avatar" id="userAvatar"></div>
+                <div class="user-details-display">
+                    <div class="name" id="userName"></div>
+                    <div class="role" id="userRole"></div>
+                </div>
+            </div>
+            <div class="auth-actions">
+                <nav class="page-nav">
+                    <a href="/users" class="nav-link">ユーザー</a>
+                    <a href="/scores" class="nav-link">大会成績</a>
+                    <a href="/registrations" class="nav-link">出場登録</a>
+                    <a href="/notes" class="nav-link">特記事項</a>
+                    <a href="/guests" class="nav-link">関係者チケット</a>
+                    <a href="/contests" class="nav-link">大会情報</a>
+                    <a href="/members" class="nav-link active">FWJ会員情報</a>
+                    <a href="/subjects" class="nav-link admin-only">違反認定者</a>
+                </nav>
+                <button id="logoutBtn" class="logout-btn">ログアウト</button>
+            </div>
+        </div>
+
+        <main class="members-main">
+            <section class="members-section">
+                <h2>FWJ会員情報（Shopify連携）</h2>
+                <div class="section-controls">
+                    <div class="controls">
+                        <div class="search-container">
+                            <div class="search-input-wrapper">
+                                <input type="text" id="searchInput" placeholder="メールアドレス、氏名で検索..." class="search-input">
+                                <button type="button" id="clearSearchBtn" class="clear-btn hidden" title="検索をクリア">×</button>
+                            </div>
+                            <button type="button" id="searchBtn" class="search-btn" title="検索">検索</button>
+                        </div>
+                        <button type="button" id="syncBtn" class="action-btn primary admin-only">Shopifyから同期</button>
+                    </div>
+                </div>
+
+                <div class="info-message">
+                    <p>※ この画面は読み取り専用です。編集はShopify管理画面から行ってください。</p>
+                    <p>※ 「FWJカード会員」タグが付いている会員のみ表示されます。</p>
+                </div>
+
+                <div id="membersTableContainer" class="table-scroll-container">
+                    <div class="loading">読み込み中...</div>
+                </div>
+
+                <div id="pagination" class="pagination hidden">
+                    <button id="prevPageBtn" class="pagination-btn">前へ</button>
+                    <span id="pageInfo" class="page-info">ページ 1 / 1 (全 0 件)</span>
+                    <button id="nextPageBtn" class="pagination-btn">次へ</button>
+                </div>
+            </section>
+        </main>
+
+        <div id="notification" class="notification hidden"></div>
+    </div>
+
+    <script src="members-script.js"></script>
+</body>
+</html>

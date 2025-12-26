@@ -1,9 +1,8 @@
 const SheetsService = require('../config/sheets');
 
 class BaseModel {
-  constructor(sheetName, spreadsheetType = 'contest') {
+  constructor(sheetName) {
     this.sheetName = sheetName;
-    this.spreadsheetType = spreadsheetType; // 'contest' または 'guest'
     this.sheetsService = null;
     this.headers = [];
     this._initialized = false;
@@ -11,7 +10,7 @@ class BaseModel {
 
   getSheetsService() {
     if (!this.sheetsService) {
-      this.sheetsService = new SheetsService(this.spreadsheetType);
+      this.sheetsService = new SheetsService();
     }
     return this.sheetsService;
   }
@@ -32,12 +31,12 @@ class BaseModel {
   async findAll() {
     try {
       await this.ensureInitialized();
-      const values = await this.getSheetsService().getValues(`${this.sheetName}!A:AD`);
+      const values = await this.getSheetsService().getValues(`${this.sheetName}!A:AH`);
       if (values.length === 0) return [];
-      
+
       const headers = values[0];
       const data = values.slice(1);
-      
+
       const allItems = data.map((row, index) => {
         const obj = { _rowIndex: index + 2 };
         headers.forEach((header, i) => {
@@ -55,7 +54,7 @@ class BaseModel {
 
   async findWithPaging(page = 1, limit = 50, filters = {}, sortBy = 'contest_date', sortOrder = 'desc') {
     try {
-      const values = await this.getSheetsService().getValues(`${this.sheetName}!A:AD`);
+      const values = await this.getSheetsService().getValues(`${this.sheetName}!A:AH`);
       if (values.length === 0) {
         return { data: [], total: 0, page, limit, totalPages: 0 };
       }
@@ -90,11 +89,13 @@ class BaseModel {
           item.category_name && item.category_name.toLowerCase().includes(filters.category_name.toLowerCase())
         );
       }
-      if (filters.class_name || filters.class) {
-        const className = filters.class_name || filters.class;
-        allItems = allItems.filter(item => 
-          item.class && item.class.toLowerCase().includes(className.toLowerCase())
-        );
+      if (filters.class_name) {
+        const className = filters.class_name;
+        allItems = allItems.filter(item => {
+          const itemClassName = item.class_name || '';
+          // 前方一致でフィルタリング
+          return itemClassName.toLowerCase().includes(className.toLowerCase());
+        });
       }
       if (filters.country) {
         allItems = allItems.filter(item =>
@@ -198,12 +199,12 @@ class BaseModel {
 
   async findAllIncludingDeleted() {
     try {
-      const values = await this.getSheetsService().getValues(`${this.sheetName}!A:AD`);
+      const values = await this.getSheetsService().getValues(`${this.sheetName}!A:AH`);
       if (values.length === 0) return [];
-      
+
       const headers = values[0];
       const data = values.slice(1);
-      
+
       return data.map((row, index) => {
         const obj = { _rowIndex: index + 2 };
         headers.forEach((header, i) => {

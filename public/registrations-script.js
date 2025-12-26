@@ -486,7 +486,7 @@ class RegistrationsManager {
         const contestDate = document.getElementById('modalContestDate').value;
         const contestName = document.getElementById('modalContestName').value;
         const importBtn = document.getElementById('modalImportBtn');
-        
+
         const shouldEnable = !!(file && contestDate && contestName);
         importBtn.disabled = !shouldEnable;
     }
@@ -499,6 +499,7 @@ class RegistrationsManager {
 
         const contestDate = document.getElementById('modalContestDate').value;
         const contestName = document.getElementById('modalContestName').value;
+        const fileFormat = 'muscleware'; // Muscleware形式固定
 
         if (!contestDate || !contestName) {
             this.showNotification('大会開催日と大会名を入力してください', 'error');
@@ -507,38 +508,30 @@ class RegistrationsManager {
 
         try {
             const fileName = this.selectedModalFile.name.toLowerCase();
-            const isXlsx = fileName.endsWith('.xlsx');
             const isCsv = fileName.endsWith('.csv') || this.selectedModalFile.type === 'text/csv';
+
+            if (!isCsv) {
+                this.showNotification('CSV形式のファイルを選択してください', 'error');
+                return;
+            }
 
             document.getElementById('modalImportBtn').disabled = true;
             document.getElementById('modalImportStatus').className = 'import-status';
             document.getElementById('modalImportStatus').textContent = 'インポート中...';
 
-            let fileData;
-            let fileType;
+            const fileData = await this.readFileAsText(this.selectedModalFile);
 
-            if (isXlsx) {
-                fileData = await this.readFileAsBase64(this.selectedModalFile);
-                fileType = 'xlsx';
-            } else if (isCsv) {
-                const csvText = await this.readFileAsText(this.selectedModalFile);
-                fileData = this.parseCSV(csvText);
-                fileType = 'csv';
-                
-                if (fileData.length === 0) {
-                    this.showNotification('CSVデータが空です', 'error');
-                    return;
-                }
-            } else {
-                this.showNotification('サポートされていないファイル形式です', 'error');
+            if (!fileData || fileData.trim().length === 0) {
+                this.showNotification('CSVデータが空です', 'error');
                 return;
             }
 
-            const requestData = { 
-                fileData, 
-                fileType,
-                contestDate, 
-                contestName 
+            const requestData = {
+                fileData,
+                fileType: 'csv',
+                fileFormat,
+                contestDate,
+                contestName
             };
 
             const response = await authFetch(`${this.apiUrl}/import`, {
@@ -550,14 +543,17 @@ class RegistrationsManager {
 
             if (result.success) {
                 const { total, imported, message, contestDate: importedDate, contestName: importedName } = result.data;
-                
+
                 this.showNotification(message || `${imported}件の登録データをインポートしました`, 'success');
-                document.getElementById('modalImportStatus').textContent = 
-                    `インポート完了: ${importedName} (${importedDate}) - ${imported}件`;
-                
+
+                const statusElement = document.getElementById('modalImportStatus');
+                statusElement.className = 'import-status success';
+                statusElement.style.display = 'block';
+                statusElement.textContent = `インポート完了: ${importedName} (${importedDate}) - ${imported}件`;
+
                 await this.loadFilterOptions();
                 this.loadRegistrations();
-                
+
                 // モーダルを閉じる
                 setTimeout(() => {
                     this.closeImportModal();
@@ -567,16 +563,24 @@ class RegistrationsManager {
                 const errorLines = result.error.split('\n');
                 const mainError = errorLines[0];
                 const detailError = errorLines.slice(1).join('\n');
-                
+
                 this.showNotification(mainError, 'error');
-                document.getElementById('modalImportStatus').innerHTML = 
-                    detailError ? 
-                    `インポートに失敗しました<br><small style="font-size: 0.9em; line-height: 1.3;">${detailError.replace(/\n/g, '<br>')}</small>` :
-                    'インポートに失敗しました';
+
+                const statusElement = document.getElementById('modalImportStatus');
+                statusElement.className = 'import-status error'; // hiddenを削除してerrorクラスを設定
+                statusElement.style.display = 'block';
+                statusElement.innerHTML =
+                    detailError ?
+                    `<strong>インポートに失敗しました</strong><br><small style="font-size: 0.9em; line-height: 1.3; white-space: pre-wrap;">${detailError.replace(/\n/g, '<br>')}</small>` :
+                    '<strong>インポートに失敗しました</strong>';
             }
         } catch (error) {
             this.showNotification('エラーが発生しました: ' + error.message, 'error');
-            document.getElementById('modalImportStatus').textContent = 'エラーが発生しました';
+
+            const statusElement = document.getElementById('modalImportStatus');
+            statusElement.className = 'import-status error';
+            statusElement.style.display = 'block';
+            statusElement.innerHTML = `<strong>エラーが発生しました</strong><br><small>${error.message}</small>`;
         } finally {
             document.getElementById('modalImportBtn').disabled = false;
         }
@@ -588,19 +592,6 @@ class RegistrationsManager {
             reader.onload = (e) => resolve(e.target.result);
             reader.onerror = reject;
             reader.readAsText(file, 'UTF-8');
-        });
-    }
-
-    readFileAsBase64(file) {
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                // Base64文字列からdata:URLプレフィックスを削除
-                const base64 = e.target.result.split(',')[1];
-                resolve(base64);
-            };
-            reader.onerror = reject;
-            reader.readAsDataURL(file);
         });
     }
 
@@ -657,16 +648,6 @@ class RegistrationsManager {
 
                 this.populateFilterSelect('contestFilter', contestNames);
                 this.populateFilterSelect('classFilter', classNames);
-
-                // 今日以降で最も近い大会をフィルターの初期値として設定
-                if (this.defaultContest) {
-                    const contestFilter = document.getElementById('contestFilter');
-                    if (contestFilter) {
-                        contestFilter.value = this.defaultContest.contest_name;
-                        // フィルターを適用
-                        this.currentFilters.contest_name = this.defaultContest.contest_name;
-                    }
-                }
             }
         } catch (error) {
             console.error('Filter options loading failed:', error);
@@ -730,20 +711,34 @@ class RegistrationsManager {
         // ヘッダー作成
         const headerRow = document.createElement('tr');
         const headers = [
+            { key: 'register_date', label: '登録日' },
+            { key: 'register_time', label: '登録時刻' },
             { key: 'contest_date', label: '開催日' },
             { key: 'contest_name', label: '大会名' },
             { key: 'player_no', label: 'ゼッケン番号' },
             { key: 'name_ja', label: '氏名' },
+            { key: 'name_ja_kana', label: 'フリガナ' },
             { key: 'first_name', label: 'First Name' },
             { key: 'last_name', label: 'Last Name' },
-            { key: 'fwj_card_no', label: 'FWJカード' },
-            { key: 'npc_member_no', label: 'NPC Worldwide番号' },
+            { key: 'date_of_birth', label: '生年月日' },
+            { key: 'email', label: 'Email' },
+            { key: 'phone', label: '電話番号' },
+            { key: 'fwj_card_no', label: 'FWJ card #' },
+            { key: 'npc_member_no', label: 'NPC member #' },
+            { key: 'country', label: '国' },
+            { key: 'age', label: '年齢' },
+            { key: 'class_name', label: 'クラス' },
+            { key: 'class_code', label: 'クラスコード' },
+            { key: 'sort_index', label: 'ソート順' },
             { key: 'npc_member_status', label: 'NPC会員状態' },
-            { key: 'class', label: 'クラス' },
             { key: 'score_card', label: 'スコアカード' },
             { key: 'contest_order', label: '開催順' },
-            { key: 'backstage_pass', label: 'バックステージパス' },
-            { key: 'country', label: '国' }
+            { key: 'backstage_pass', label: 'BSP' },
+            { key: 'height', label: '身長' },
+            { key: 'weight', label: '体重' },
+            { key: 'occupation', label: '職業' },
+            { key: 'instagram', label: 'Instagram' },
+            { key: 'biography', label: '自己紹介' }
         ];
 
         headers.forEach(header => {
@@ -874,9 +869,7 @@ class RegistrationsManager {
             contest_name: document.getElementById('contestFilter').value,
             class_name: document.getElementById('classFilter').value,
             violation_only: document.getElementById('violationFilter').checked ? 'true' : '',
-            note_exists: document.getElementById('noteExistsFilter').checked ? 'true' : '',
-            startDate: document.getElementById('startDate').value,
-            endDate: document.getElementById('endDate').value
+            note_exists: document.getElementById('noteExistsFilter').checked ? 'true' : ''
         };
 
         // 空の値を削除
@@ -896,8 +889,6 @@ class RegistrationsManager {
         document.getElementById('classFilter').value = '';
         document.getElementById('violationFilter').checked = false;
         document.getElementById('noteExistsFilter').checked = false;
-        document.getElementById('startDate').value = '';
-        document.getElementById('endDate').value = '';
         document.getElementById('searchInput').value = '';
 
         // クリアボタンも隠す
@@ -952,7 +943,7 @@ class RegistrationsManager {
     //     document.getElementById('editAthleteNumber').value = registration.athlete_number || '';
     //     document.getElementById('editName').value = registration.name || '';
     //     document.getElementById('editFwjCard').value = registration.fwj_card_no || '';
-    //     document.getElementById('editClass').value = registration.class || '';
+    //     document.getElementById('editClass').value = registration.class_name || '';
     //     document.getElementById('editCountry').value = registration.country || '';
     //     document.getElementById('editEmail').value = registration.email || '';
     // }

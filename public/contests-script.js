@@ -33,9 +33,9 @@ async function authFetch(url, options = {}) {
     return fetch(url, mergedOptions);
 }
 
-class GuestsManager {
+class ContestsManager {
     constructor() {
-        this.apiUrl = '/api/guests';
+        this.apiUrl = '/api/contests';
         this.currentUser = null;
         this.isAdmin = false;
         this.currentPage = 1;
@@ -44,11 +44,11 @@ class GuestsManager {
         this.total = 0;
         this.currentFilters = {};
         this.currentSort = {
-            column: 'contest_name',
-            direction: 'asc'
+            column: 'contest_date',
+            direction: 'desc'
         };
-        this.editingGuest = null;
-        this.deletingGuest = null;
+        this.editingContest = null;
+        this.deletingContest = null;
         this.init();
     }
 
@@ -58,7 +58,7 @@ class GuestsManager {
         if (this.currentUser) {
             setTimeout(async () => {
                 await this.loadFilterOptions();
-                await this.loadGuests();
+                await this.loadContests();
             }, 100);
         }
     }
@@ -139,14 +139,14 @@ class GuestsManager {
         document.getElementById('prevPageBtn').addEventListener('click', () => {
             if (this.currentPage > 1) {
                 this.currentPage--;
-                this.loadGuests();
+                this.loadContests();
             }
         });
 
         document.getElementById('nextPageBtn').addEventListener('click', () => {
             if (this.currentPage < this.totalPages) {
                 this.currentPage++;
-                this.loadGuests();
+                this.loadContests();
             }
         });
 
@@ -168,8 +168,10 @@ class GuestsManager {
             this.closeEditDialog();
         });
         document.getElementById('editForm').addEventListener('submit', (e) => {
+            console.log('=== Form submit event triggered ===');
             e.preventDefault();
-            this.saveGuest();
+            console.log('Form default action prevented');
+            this.saveContest();
         });
 
         // 削除ダイアログ関連
@@ -180,7 +182,7 @@ class GuestsManager {
             this.closeDeleteDialog();
         });
         document.getElementById('confirmDeleteBtn').addEventListener('click', () => {
-            this.deleteGuest();
+            this.deleteContest();
         });
 
         // モーダル外クリックで閉じる
@@ -198,26 +200,11 @@ class GuestsManager {
 
     async loadFilterOptions() {
         try {
-            const response = await authFetch(`${this.apiUrl}/filter-options`);
+            const response = await authFetch(`${this.apiUrl}/places`);
             const result = await response.json();
 
             if (result.success) {
-                const { contestNames, organizationTypes, passTypes } = result.data;
-
-                // 大会名を保存（編集ダイアログで使用）
-                this.contestNames = contestNames;
-
-                this.populateFilterSelect('contestFilter', contestNames);
-                this.populateFilterSelect('organizationTypeFilter', organizationTypes);
-                this.populateFilterSelect('passTypeFilter', passTypes);
-
-                // 大会名フィルタの初期値を一番下の要素に設定
-                if (contestNames.length > 0) {
-                    const contestFilter = document.getElementById('contestFilter');
-                    const lastContest = contestNames[contestNames.length - 1];
-                    contestFilter.value = lastContest;
-                    this.currentFilters.contest_name = lastContest;
-                }
+                this.populateFilterSelect('placeFilter', result.data);
             }
         } catch (error) {
             console.error('Filter options loading failed:', error);
@@ -242,7 +229,7 @@ class GuestsManager {
         }
     }
 
-    async loadGuests() {
+    async loadContests() {
         try {
             const params = new URLSearchParams({
                 page: this.currentPage,
@@ -256,22 +243,22 @@ class GuestsManager {
             const result = await response.json();
 
             if (result.success) {
-                this.displayGuests(result.data);
+                this.displayContests(result.data);
                 this.updatePagination(result);
             } else {
                 this.showNotification('データの読み込みに失敗しました', 'error');
             }
         } catch (error) {
-            console.error('Guests loading failed:', error);
+            console.error('Contests loading failed:', error);
             this.showNotification('エラーが発生しました', 'error');
         }
     }
 
-    displayGuests(guests) {
-        const container = document.getElementById('guestsTableContainer');
+    displayContests(contests) {
+        const container = document.getElementById('contestsTableContainer');
 
-        if (guests.length === 0) {
-            container.innerHTML = '<div class="no-data">関係者チケットが見つかりません</div>';
+        if (contests.length === 0) {
+            container.innerHTML = '<div class="no-data">大会情報が見つかりません</div>';
             return;
         }
 
@@ -282,19 +269,8 @@ class GuestsManager {
         const headerRow = document.createElement('tr');
         const headers = [
             { key: 'contest_name', label: '大会名' },
-            { key: 'group_type', label: '団体/個人' },
-            { key: 'pass_type', label: '付与パス' },
-            { key: 'name_ja', label: '代表者氏名' },
-            { key: 'company_ja', label: '団体名（企業名）' },
-            { key: 'email', label: '連絡先メールアドレス' },
-            { key: 'phone', label: '緊急電話番号' },
-            { key: 'contact_person', label: '社内担当者名' },
-            { key: 'request_type', label: '申請種別' },
-            { key: 'ticket_count', label: '合計付与枚数' },
-            { key: 'is_pre_notified', label: '事前案内メール' },
-            { key: 'is_checked_in', label: 'Check-In' },
-            { key: 'is_post_mailed', label: '開催後メール' },
-            { key: 'note', label: '備考欄' },
+            { key: 'contest_date', label: '開催日' },
+            { key: 'contest_place', label: '開催地' },
             { key: '_actions', label: '操作' }
         ];
 
@@ -315,7 +291,7 @@ class GuestsManager {
         table.appendChild(headerRow);
 
         // データ行作成
-        guests.forEach(guest => {
+        contests.forEach(contest => {
             const row = document.createElement('tr');
 
             headers.forEach(header => {
@@ -329,42 +305,27 @@ class GuestsManager {
                     const editBtn = document.createElement('button');
                     editBtn.className = 'btn-small btn-edit';
                     editBtn.textContent = '編集';
-                    editBtn.addEventListener('click', () => this.openEditDialog(guest));
+                    editBtn.addEventListener('click', () => this.openEditDialog(contest));
 
                     const deleteBtn = document.createElement('button');
                     deleteBtn.className = 'btn-small btn-delete';
                     deleteBtn.textContent = '削除';
-                    deleteBtn.addEventListener('click', () => this.openDeleteDialog(guest));
+                    deleteBtn.addEventListener('click', () => this.openDeleteDialog(contest));
 
                     actionsDiv.appendChild(editBtn);
                     actionsDiv.appendChild(deleteBtn);
                     td.appendChild(actionsDiv);
-                } else {
-                    let value = guest[header.key] || '';
-
-                    // Boolean型フィールドはチェックボックスとして表示
-                    if (header.key === 'is_pre_notified' || header.key === 'is_checked_in' || header.key === 'is_post_mailed') {
-                        const checkbox = document.createElement('input');
-                        checkbox.type = 'checkbox';
-                        checkbox.checked = value === 'TRUE' || value === true || value === '○';
-
-                        // is_checked_inのみ編集可能
-                        if (header.key === 'is_checked_in') {
-                            checkbox.style.cursor = 'pointer';
-                            checkbox.addEventListener('change', async (e) => {
-                                await this.updateBooleanField(guest, header.key, e.target.checked);
-                            });
-                        } else {
-                            // is_pre_notifiedとis_post_mailedは読み取り専用（グレーアウト）
-                            checkbox.disabled = true;
-                            checkbox.style.cursor = 'default';
-                        }
-
-                        td.appendChild(checkbox);
-                        td.style.textAlign = 'center';
+                } else if (header.key === 'contest_date') {
+                    // 日付のフォーマット
+                    const dateValue = contest[header.key];
+                    if (dateValue) {
+                        const date = new Date(dateValue);
+                        td.textContent = date.toLocaleDateString('ja-JP');
                     } else {
-                        td.textContent = value;
+                        td.textContent = '';
                     }
+                } else {
+                    td.textContent = contest[header.key] || '';
                 }
                 row.appendChild(td);
             });
@@ -391,7 +352,7 @@ class GuestsManager {
             this.currentSort.direction = 'asc';
         }
         this.currentPage = 1;
-        this.loadGuests();
+        this.loadContests();
     }
 
     updatePagination(result) {
@@ -410,9 +371,9 @@ class GuestsManager {
 
     applyFilters() {
         this.currentFilters = {
-            contest_name: document.getElementById('contestFilter').value,
-            organization_type: document.getElementById('organizationTypeFilter').value,
-            pass_type: document.getElementById('passTypeFilter').value
+            contest_place: document.getElementById('placeFilter').value,
+            startDate: document.getElementById('startDate').value,
+            endDate: document.getElementById('endDate').value
         };
 
         // 空の値を削除
@@ -422,20 +383,28 @@ class GuestsManager {
             }
         });
 
+        // 日付範囲は両方必要
+        if (this.currentFilters.startDate && !this.currentFilters.endDate) {
+            delete this.currentFilters.startDate;
+        }
+        if (!this.currentFilters.startDate && this.currentFilters.endDate) {
+            delete this.currentFilters.endDate;
+        }
+
         this.currentPage = 1;
-        this.loadGuests();
+        this.loadContests();
     }
 
     clearFilters() {
-        document.getElementById('contestFilter').value = '';
-        document.getElementById('organizationTypeFilter').value = '';
-        document.getElementById('passTypeFilter').value = '';
+        document.getElementById('placeFilter').value = '';
+        document.getElementById('startDate').value = '';
+        document.getElementById('endDate').value = '';
         document.getElementById('searchInput').value = '';
         document.getElementById('clearSearchBtn').classList.add('hidden');
 
         this.currentFilters = {};
         this.currentPage = 1;
-        this.loadGuests();
+        this.loadContests();
     }
 
     handleSearch(searchTerm) {
@@ -445,66 +414,43 @@ class GuestsManager {
             delete this.currentFilters.search;
         }
         this.currentPage = 1;
-        this.loadGuests();
-    }
-
-    // 編集ダイアログの大会名セレクトを更新
-    populateEditContestSelect(selectedValue = '') {
-        const select = document.getElementById('edit_contest_name');
-
-        // 既存のオプションをクリア（最初のデフォルトオプション以外）
-        select.innerHTML = '<option value="">大会名を選択</option>';
-
-        // 大会名オプションを追加
-        if (this.contestNames && this.contestNames.length > 0) {
-            this.contestNames.forEach(contestName => {
-                const option = document.createElement('option');
-                option.value = contestName;
-                option.textContent = contestName;
-                select.appendChild(option);
-            });
-        }
-
-        // 選択値を設定
-        if (selectedValue) {
-            select.value = selectedValue;
-        }
+        this.loadContests();
     }
 
     // 新規追加ダイアログを開く
     openAddDialog() {
-        this.editingGuest = null;
-        document.getElementById('editDialogTitle').textContent = '関係者チケットを新規追加';
+        this.editingContest = null;
+        document.getElementById('editDialogTitle').textContent = '大会情報を新規追加';
         document.getElementById('editForm').reset();
-
-        // 大会名セレクトを更新
-        this.populateEditContestSelect();
-
         document.getElementById('editDialog').classList.remove('hidden');
     }
 
     // 編集ダイアログを開く
-    openEditDialog(guest) {
-        this.editingGuest = guest;
-        document.getElementById('editDialogTitle').textContent = '関係者チケットを編集';
-
-        // 大会名セレクトを更新
-        this.populateEditContestSelect(guest.contest_name || '');
+    openEditDialog(contest) {
+        this.editingContest = contest;
+        document.getElementById('editDialogTitle').textContent = '大会情報を編集';
 
         // フォームにデータを設定
-        document.getElementById('edit_group_type').value = guest.group_type || '';
-        document.getElementById('edit_pass_type').value = guest.pass_type || '';
-        document.getElementById('edit_name_ja').value = guest.name_ja || '';
-        document.getElementById('edit_company_ja').value = guest.company_ja || '';
-        document.getElementById('edit_email').value = guest.email || '';
-        document.getElementById('edit_phone').value = guest.phone || '';
-        document.getElementById('edit_contact_person').value = guest.contact_person || '';
-        document.getElementById('edit_request_type').value = guest.request_type || '';
-        document.getElementById('edit_ticket_count').value = guest.ticket_count || '';
-        document.getElementById('edit_is_pre_notified').checked = guest.is_pre_notified === 'TRUE' || guest.is_pre_notified === true;
-        document.getElementById('edit_is_checked_in').checked = guest.is_checked_in === 'TRUE' || guest.is_checked_in === true;
-        document.getElementById('edit_is_post_mailed').checked = guest.is_post_mailed === 'TRUE' || guest.is_post_mailed === true;
-        document.getElementById('edit_note').value = guest.note || '';
+        document.getElementById('edit_contest_name').value = contest.contest_name || '';
+        
+        // 日付を正しいフォーマットに変換（タイムゾーンの影響を受けないように）
+        if (contest.contest_date) {
+            // 既にYYYY-MM-DD形式の場合はそのまま使用
+            if (/^\d{4}-\d{2}-\d{2}$/.test(contest.contest_date)) {
+                document.getElementById('edit_contest_date').value = contest.contest_date;
+            } else {
+                // それ以外の場合は、ローカルタイムゾーンで解析
+                const date = new Date(contest.contest_date);
+                const year = date.getFullYear();
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const day = String(date.getDate()).padStart(2, '0');
+                document.getElementById('edit_contest_date').value = `${year}-${month}-${day}`;
+            }
+        } else {
+            document.getElementById('edit_contest_date').value = '';
+        }
+        
+        document.getElementById('edit_contest_place').value = contest.contest_place || '';
 
         document.getElementById('editDialog').classList.remove('hidden');
     }
@@ -512,80 +458,100 @@ class GuestsManager {
     // 編集ダイアログを閉じる
     closeEditDialog() {
         document.getElementById('editDialog').classList.add('hidden');
-        this.editingGuest = null;
+        this.editingContest = null;
     }
 
-    // ゲストを保存（新規追加または更新）
-    async saveGuest() {
-        const guestData = {
+    // 大会を保存（新規追加または更新）
+    async saveContest() {
+        console.log('=== saveContest called ===');
+        
+        const contestData = {
             contest_name: document.getElementById('edit_contest_name').value,
-            group_type: document.getElementById('edit_group_type').value,
-            pass_type: document.getElementById('edit_pass_type').value,
-            name_ja: document.getElementById('edit_name_ja').value,
-            company_ja: document.getElementById('edit_company_ja').value,
-            email: document.getElementById('edit_email').value,
-            phone: document.getElementById('edit_phone').value,
-            contact_person: document.getElementById('edit_contact_person').value,
-            request_type: document.getElementById('edit_request_type').value,
-            ticket_count: document.getElementById('edit_ticket_count').value,
-            is_pre_notified: document.getElementById('edit_is_pre_notified').checked ? 'TRUE' : 'FALSE',
-            is_checked_in: document.getElementById('edit_is_checked_in').checked ? 'TRUE' : 'FALSE',
-            is_post_mailed: document.getElementById('edit_is_post_mailed').checked ? 'TRUE' : 'FALSE',
-            note: document.getElementById('edit_note').value
+            contest_date: document.getElementById('edit_contest_date').value,
+            contest_place: document.getElementById('edit_contest_place').value
         };
+        
+        console.log('Contest data to save:', contestData);
+        console.log('Editing contest:', this.editingContest);
 
         try {
             let response;
-            if (this.editingGuest) {
+            if (this.editingContest) {
                 // 更新
-                response = await authFetch(`${this.apiUrl}/${this.editingGuest._rowIndex}`, {
+                const url = `${this.apiUrl}/${this.editingContest._rowIndex}`;
+                console.log('Updating contest - URL:', url);
+                console.log('Method: PUT');
+                
+                response = await authFetch(url, {
                     method: 'PUT',
-                    body: JSON.stringify(guestData)
+                    body: JSON.stringify(contestData)
                 });
             } else {
                 // 新規追加
+                console.log('Creating new contest - URL:', this.apiUrl);
+                console.log('Method: POST');
+                
                 response = await authFetch(this.apiUrl, {
                     method: 'POST',
-                    body: JSON.stringify(guestData)
+                    body: JSON.stringify(contestData)
                 });
             }
 
+            console.log('Response status:', response.status);
+            console.log('Response ok:', response.ok);
+
             const result = await response.json();
+            console.log('Response data:', result);
 
             if (result.success) {
-                this.showNotification(this.editingGuest ? '更新しました' : '追加しました', 'success');
+                console.log('Save successful');
+                this.showNotification(this.editingContest ? '更新しました' : '追加しました', 'success');
                 this.closeEditDialog();
-                await this.loadGuests();
+                await this.loadContests();
                 await this.loadFilterOptions();
             } else {
+                console.error('Save failed:', result.error);
                 this.showNotification(result.error || '保存に失敗しました', 'error');
             }
         } catch (error) {
-            console.error('Save guest failed:', error);
-            this.showNotification('エラーが発生しました', 'error');
+            console.error('=== Save contest error ===');
+            console.error('Error type:', error.name);
+            console.error('Error message:', error.message);
+            console.error('Error stack:', error.stack);
+            console.error('Full error:', error);
+            this.showNotification('エラーが発生しました: ' + error.message, 'error');
         }
     }
 
     // 削除確認ダイアログを開く
-    openDeleteDialog(guest) {
-        this.deletingGuest = guest;
-        document.getElementById('deleteTargetName').textContent = guest.name_ja || '';
-        document.getElementById('deleteTargetCompany').textContent = guest.company_ja || '(なし)';
+    openDeleteDialog(contest) {
+        this.deletingContest = contest;
+        document.getElementById('deleteTargetName').textContent = contest.contest_name || '';
+
+        // 日付のフォーマット
+        if (contest.contest_date) {
+            const date = new Date(contest.contest_date);
+            document.getElementById('deleteTargetDate').textContent = date.toLocaleDateString('ja-JP');
+        } else {
+            document.getElementById('deleteTargetDate').textContent = '(未設定)';
+        }
+
+        document.getElementById('deleteTargetPlace').textContent = contest.contest_place || '(未設定)';
         document.getElementById('deleteDialog').classList.remove('hidden');
     }
 
     // 削除確認ダイアログを閉じる
     closeDeleteDialog() {
         document.getElementById('deleteDialog').classList.add('hidden');
-        this.deletingGuest = null;
+        this.deletingContest = null;
     }
 
-    // ゲストを削除
-    async deleteGuest() {
-        if (!this.deletingGuest) return;
+    // 大会を削除
+    async deleteContest() {
+        if (!this.deletingContest) return;
 
         try {
-            const response = await authFetch(`${this.apiUrl}/${this.deletingGuest._rowIndex}`, {
+            const response = await authFetch(`${this.apiUrl}/${this.deletingContest._rowIndex}`, {
                 method: 'DELETE'
             });
 
@@ -594,13 +560,13 @@ class GuestsManager {
             if (result.success) {
                 this.showNotification('削除しました', 'success');
                 this.closeDeleteDialog();
-                await this.loadGuests();
+                await this.loadContests();
                 await this.loadFilterOptions();
             } else {
                 this.showNotification(result.error || '削除に失敗しました', 'error');
             }
         } catch (error) {
-            console.error('Delete guest failed:', error);
+            console.error('Delete contest failed:', error);
             this.showNotification('エラーが発生しました', 'error');
         }
     }
@@ -630,58 +596,7 @@ class GuestsManager {
             window.location.href = '/';
         }
     }
-
-    // Boolean型フィールドを更新（is_checked_inのみ）
-    async updateBooleanField(guest, fieldName, newValue) {
-        try {
-            // 元の値を保存（エラー時に復元するため）
-            const originalValue = guest[fieldName];
-
-            // UIを即座に更新
-            guest[fieldName] = newValue ? 'TRUE' : 'FALSE';
-
-            // サーバーに更新リクエストを送信
-            const guestData = {
-                'contest_name': guest['contest_name'],
-                'group_type': guest['group_type'],
-                'pass_type': guest['pass_type'],
-                'name_ja': guest['name_ja'],
-                'company_ja': guest['company_ja'],
-                'email': guest['email'],
-                'phone': guest['phone'],
-                'contact_person': guest['contact_person'],
-                'request_type': guest['request_type'],
-                'ticket_count': guest['ticket_count'],
-                'is_pre_notified': guest['is_pre_notified'],
-                'is_checked_in': guest['is_checked_in'],
-                'is_post_mailed': guest['is_post_mailed'],
-                'note': guest['note']
-            };
-
-            const response = await authFetch(`${this.apiUrl}/${guest._rowIndex}`, {
-                method: 'PUT',
-                body: JSON.stringify(guestData)
-            });
-
-            const result = await response.json();
-
-            if (!result.success) {
-                // エラーの場合、元の値に戻す
-                guest[fieldName] = originalValue;
-                this.showNotification(result.error || '更新に失敗しました', 'error');
-                // 表示を再読み込み
-                await this.loadGuests();
-            } else {
-                this.showNotification(`Check-Inを更新しました`, 'success');
-            }
-        } catch (error) {
-            console.error('Update boolean field failed:', error);
-            this.showNotification('エラーが発生しました', 'error');
-            // エラーが発生した場合、表示を再読み込み
-            await this.loadGuests();
-        }
-    }
 }
 
 // 初期化
-const guestsManager = new GuestsManager();
+const contestsManager = new ContestsManager();

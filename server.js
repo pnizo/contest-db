@@ -12,6 +12,7 @@ const subjectRoutes = require('./routes/subjects');
 const noteRoutes = require('./routes/notes');
 const contestRoutes = require('./routes/contests');
 const guestRoutes = require('./routes/guests');
+const memberRoutes = require('./routes/members');
 const { checkAuth, requireIpRestriction } = require('./middleware/auth');
 const { sessionCompatibility } = require('./middleware/jwt');
 
@@ -50,6 +51,7 @@ app.use('/api/subjects', requireIpRestriction);
 app.use('/api/notes', requireIpRestriction);
 app.use('/api/contests', requireIpRestriction);
 app.use('/api/guests', requireIpRestriction);
+app.use('/api/members', requireIpRestriction);
 
 // セッション互換性ミドルウェア（JWT対応）
 app.use(sessionCompatibility);
@@ -87,6 +89,14 @@ app.get('/guests', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'guests.html'));
 });
 
+app.get('/contests', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'contests.html'));
+});
+
+app.get('/members', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'members.html'));
+});
+
 // 静的ファイルを設定
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -99,6 +109,7 @@ app.use('/api/subjects', subjectRoutes);
 app.use('/api/notes', noteRoutes);
 app.use('/api/contests', contestRoutes);
 app.use('/api/guests', guestRoutes);
+app.use('/api/members', memberRoutes);
 
 app.use((err, req, res, next) => {
   console.error(err.stack);

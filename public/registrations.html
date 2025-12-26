@@ -23,6 +23,8 @@
                     <a href="/registrations" class="nav-link active">出場登録</a>
                     <a href="/notes" class="nav-link">特記事項</a>
                     <a href="/guests" class="nav-link">関係者チケット</a>
+                    <a href="/contests" class="nav-link">大会情報</a>
+                    <a href="/members" class="nav-link"></a>
                     <a href="/subjects" class="nav-link admin-only">違反認定者</a>
                 </nav>
                 <button id="logoutBtn" class="logout-btn">ログアウト</button>
@@ -63,13 +65,6 @@
                         <div class="filter-checkbox">
                             <input type="checkbox" id="noteExistsFilter" name="noteExistsFilter">
                             <label for="noteExistsFilter">特記事項あり</label>
-                        </div>
-                    </div>
-                    <div class="filter-row">
-                        <div class="date-range">
-                            <input type="date" id="startDate" class="filter-input">
-                            <span class="date-separator">〜</span>
-                            <input type="date" id="endDate" class="filter-input">
                         </div>
                         <div class="filter-actions">
                             <button id="applyFiltersBtn" class="filter-btn">絞り込み</button>
@@ -116,8 +111,8 @@
                 </div>
                 <div class="form-group">
                     <label for="modalCsvFile">ファイルを選択:</label>
-                    <input type="file" id="modalCsvFile" name="csvFile" accept=".csv,.xlsx" required>
-                    <small>※CSV形式またはXLSX形式のファイルを選択してください</small>
+                    <input type="file" id="modalCsvFile" name="csvFile" accept=".csv" required>
+                    <small>※Muscleware形式のCSVファイルを選択してください</small>
                 </div>
                 <div class="form-actions">
                     <button type="button" onclick="registrationsManager.closeImportModal()" class="btn btn-secondary">キャンセル</button>
