@@ -201,11 +201,10 @@ class MembersManager {
             { key: 'fwj_card_no', label: 'FWJカード番号' },
             { key: 'fwj_firstname', label: 'FWJ名' },
             { key: 'fwj_lastname', label: 'FWJ姓' },
-            { key: 'fwj_firstname_kana', label: 'FWJ名カナ' },
-            { key: 'fwj_lastname_kana', label: 'FWJ姓カナ' },
+            { key: 'fwj_kanafirstname', label: 'FWJ名カナ' },
+            { key: 'fwj_kanalastname', label: 'FWJ姓カナ' },
             { key: 'fwj_birthday', label: '生年月日' },
             { key: 'fwj_sex', label: '性別' },
-            { key: 'fwj_height', label: '身長' },
             { key: 'fwj_nationality', label: '国籍' },
             { key: 'fwj_effectivedate', label: '有効期限' },
             { key: 'created_at', label: '登録日' }

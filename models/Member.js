@@ -176,10 +176,8 @@ class Member extends BaseModel {
       // シート全体をクリア（ヘッダー以外）
       const allData = await this.getSheetsService().getValues(`${this.sheetName}!A:Z`);
       if (allData.length > 1) {
-        await this.getSheetsService().updateValues(
-          `${this.sheetName}!A2:Z${allData.length}`,
-          [[]] // 空の配列でクリア
-        );
+        // Google Sheets APIのclearメソッドを使用してデータをクリア
+        await this.getSheetsService().clearValues(`${this.sheetName}!A2:Z${allData.length}`);
       }
 
       // 新しいデータを追加

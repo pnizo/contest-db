@@ -99,6 +99,19 @@ class SheetsService {
       throw error;
     }
   }
+
+  async clearValues(range) {
+    try {
+      const response = await this.sheets.spreadsheets.values.clear({
+        spreadsheetId: this.spreadsheetId,
+        range,
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error clearing values:', error);
+      throw error;
+    }
+  }
 }
 
 module.exports = SheetsService;

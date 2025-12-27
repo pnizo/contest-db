@@ -168,12 +168,11 @@ class ShopifyService {
       fwj_birthday: metafields['custom.fwj_birthday'] || '',
       fwj_card_no: metafields['custom.fwj_card_no'] || '',
       fwj_nationality: metafields['custom.fwj_nationality'] || '',
-      fwj_height: metafields['custom.fwj_height'] || '',
       fwj_sex: metafields['custom.fwj_sex'] || '',
       fwj_firstname: metafields['custom.fwj_firstname'] || '',
       fwj_lastname: metafields['custom.fwj_lastname'] || '',
-      fwj_firstname_kana: metafields['custom.fwj_firstname_kana'] || '',
-      fwj_lastname_kana: metafields['custom.fwj_lastname_kana'] || ''
+      fwj_kanafirstname: metafields['custom.fwj_kanafirstname'] || '',
+      fwj_kanalastname: metafields['custom.fwj_kanalastname'] || ''
     };
   }
 }

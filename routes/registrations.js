@@ -4,6 +4,7 @@ const Subject = require('../models/Subject');
 const Note = require('../models/Note');
 const Member = require('../models/Member');
 const { requireAuth, requireAdmin, checkAuth } = require('../middleware/auth');
+const { parseFlexibleDate, formatToISODate, calculateAge } = require('../utils/dateUtils');
 const wanakana = require('wanakana');
 const router = express.Router();
 
@@ -602,6 +603,24 @@ router.post('/import', requireAuth, async (req, res) => {
           row['backstage_pass'] = '';
         }
 
+        // DOBのパースと年齢計算
+        const dobRaw = row.date_of_birth || row.dob || '';
+        if (dobRaw && dobRaw.trim()) {
+          const dobDate = parseFlexibleDate(dobRaw);
+          if (dobDate) {
+            // DOBを標準形式(YYYY-MM-DD)に変換
+            row['date_of_birth'] = formatToISODate(dobDate);
+
+            // 年齢を計算
+            const age = calculateAge(dobDate, contestDate);
+            if (age !== null && age >= 0) {
+              row['age'] = age.toString();
+            }
+          } else {
+            console.warn(`Invalid DOB format for row ${index + 2}: ${dobRaw}`);
+          }
+        }
+
         return row;
       });
 
@@ -656,9 +675,9 @@ router.post('/import', requireAuth, async (req, res) => {
               record.name_ja = `${memberFwjLastName} ${memberFwjFirstName}`.trim();
             }
 
-            // Membersのfwj_lastname_kanaとfwj_firstname_kanaを連結してname_ja_kanaにセット
-            const memberFwjLastNameKana = member.fwj_lastname_kana ? member.fwj_lastname_kana.trim() : '';
-            const memberFwjFirstNameKana = member.fwj_firstname_kana ? member.fwj_firstname_kana.trim() : '';
+            // Membersのfwj_kanalastnameとfwj_kanafirstnameを連結してname_ja_kanaにセット
+            const memberFwjLastNameKana = member.fwj_kanalastname ? member.fwj_kanalastname.trim() : '';
+            const memberFwjFirstNameKana = member.fwj_kanafirstname ? member.fwj_kanafirstname.trim() : '';
             if (memberFwjLastNameKana || memberFwjFirstNameKana) {
               record.name_ja_kana = `${memberFwjLastNameKana} ${memberFwjFirstNameKana}`.trim();
             }
@@ -846,6 +865,10 @@ router.get('/export/athlete_numbers/:contestName', requireAuth, async (req, res)
           'Athlete #': reg.player_no,
           'First Name': reg.first_name || '',
           'Last Name': reg.last_name || '',
+          'Date of Birth': reg.date_of_birth || '',
+          'Age': reg.age || '',
+          'Height': reg.height || '',
+          'Weight': reg.weight || '',
           'Member Number': reg.npc_member_no || '',
           'payment': reg.npc_member_status || ''
         });
