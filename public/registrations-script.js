@@ -50,6 +50,12 @@ class RegistrationsManager {
             direction: 'desc'
         };
         this.contestsMap = new Map(); // 大会名と開催日のマップ
+        this.selectedFiles = {
+            registrations: null,
+            athleteList: null,
+            order: null,
+            exceptions: null
+        };
         console.log('REGISTRATIONS: About to call init()');
         this.init();
     }
@@ -180,8 +186,18 @@ class RegistrationsManager {
             this.openExportModal();
         });
 
-        document.getElementById('modalCsvFile').addEventListener('change', (e) => {
-            this.handleModalFileSelect(e);
+        // 4つのファイル入力イベントハンドラー
+        document.getElementById('modalRegistrationsFile').addEventListener('change', (e) => {
+            this.handleMultiFileSelect('registrations', e);
+        });
+        document.getElementById('modalAthleteListFile').addEventListener('change', (e) => {
+            this.handleMultiFileSelect('athleteList', e);
+        });
+        document.getElementById('modalOrderFile').addEventListener('change', (e) => {
+            this.handleMultiFileSelect('order', e);
+        });
+        document.getElementById('modalExceptionsFile').addEventListener('change', (e) => {
+            this.handleMultiFileSelect('exceptions', e);
         });
 
         document.getElementById('modalImportBtn').addEventListener('click', () => {
@@ -279,11 +295,19 @@ class RegistrationsManager {
             contestSelect.appendChild(option);
         });
 
-        // フォームをリセット
-        document.getElementById('modalCsvFile').value = '';
+        // フォームをリセット（4つのファイル入力）
+        document.getElementById('modalRegistrationsFile').value = '';
+        document.getElementById('modalAthleteListFile').value = '';
+        document.getElementById('modalOrderFile').value = '';
+        document.getElementById('modalExceptionsFile').value = '';
         document.getElementById('modalImportBtn').disabled = true;
         document.getElementById('modalImportStatus').className = 'import-status hidden';
-        this.selectedModalFile = null;
+        this.selectedFiles = {
+            registrations: null,
+            athleteList: null,
+            order: null,
+            exceptions: null
+        };
 
         // 今日以降で最も近い大会をデフォルト値として設定
         if (this.defaultContest) {
@@ -306,7 +330,7 @@ class RegistrationsManager {
             } else {
                 document.getElementById('modalContestDate').value = '';
             }
-            this.validateModalImportForm();
+            this.validateMultiFileImportForm();
         };
         contestSelect.addEventListener('change', this.contestSelectChangeBound);
     }
@@ -394,15 +418,10 @@ class RegistrationsManager {
             if (result.success) {
                 // CSVデータをダウンロード
                 this.downloadCSV(result.data, result.filename);
-                
+
                 this.showNotification(`${result.data.length}件のデータをエクスポートしました`, 'success');
-                document.getElementById('modalExportStatus').textContent = 
-                    `エクスポート完了: ${result.data.length}件`;
-                
-                // モーダルを閉じる
-                setTimeout(() => {
-                    this.closeExportModal();
-                }, 2000);
+                document.getElementById('modalExportStatus').textContent =
+                    `エクスポート完了: ${result.data.length}件 - 続けて別のエクスポートを実行できます`;
             } else {
                 this.showNotification(result.error, 'error');
                 document.getElementById('modalExportStatus').textContent = 'エクスポートに失敗しました';
@@ -451,55 +470,52 @@ class RegistrationsManager {
         URL.revokeObjectURL(url);
     }
 
-    handleModalFileSelect(e) {
+    handleMultiFileSelect(fileType, e) {
         const file = e.target.files[0];
-        const importBtn = document.getElementById('modalImportBtn');
-        const contestDate = document.getElementById('modalContestDate').value;
-        const contestName = document.getElementById('modalContestName').value;
-        
-        // CSVとXLSXファイルをサポート
-        const isSupportedFile = file && (
-            file.type === 'text/csv' || 
-            file.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
-            file.name.toLowerCase().endsWith('.csv') ||
-            file.name.toLowerCase().endsWith('.xlsx')
-        );
-        
-        if (isSupportedFile && contestDate && contestName) {
-            importBtn.disabled = false;
-            this.selectedModalFile = file;
+
+        if (file && file.name.toLowerCase().endsWith('.csv')) {
+            this.selectedFiles[fileType] = file;
         } else {
-            importBtn.disabled = true;
-            this.selectedModalFile = null;
-            if (file && (!contestDate || !contestName)) {
-                this.showNotification('大会開催日と大会名を入力してください', 'error');
-            } else if (file && !isSupportedFile) {
-                this.showNotification('CSVまたはXLSXファイルを選択してください', 'error');
+            this.selectedFiles[fileType] = null;
+            if (file) {
+                this.showNotification('CSVファイルを選択してください', 'error');
             }
         }
-        
-        this.validateModalImportForm();
+
+        this.validateMultiFileImportForm();
     }
 
-    validateModalImportForm() {
-        const file = this.selectedModalFile;
+    validateMultiFileImportForm() {
+        // 4つすべてのファイルが選択されているかチェック
+        const allFilesSelected =
+            this.selectedFiles.registrations &&
+            this.selectedFiles.athleteList &&
+            this.selectedFiles.order &&
+            this.selectedFiles.exceptions;
+
         const contestDate = document.getElementById('modalContestDate').value;
         const contestName = document.getElementById('modalContestName').value;
         const importBtn = document.getElementById('modalImportBtn');
 
-        const shouldEnable = !!(file && contestDate && contestName);
+        const shouldEnable = !!(allFilesSelected && contestDate && contestName);
         importBtn.disabled = !shouldEnable;
     }
 
     async handleModalImport() {
-        if (!this.selectedModalFile) {
-            this.showNotification('ファイルが選択されていません', 'error');
-            return;
-        }
-
         const contestDate = document.getElementById('modalContestDate').value;
         const contestName = document.getElementById('modalContestName').value;
-        const fileFormat = 'muscleware'; // Muscleware形式固定
+
+        // 最低1つのファイルが選択されているか確認
+        const anyFileSelected =
+            this.selectedFiles.registrations ||
+            this.selectedFiles.athleteList ||
+            this.selectedFiles.order ||
+            this.selectedFiles.exceptions;
+
+        if (!anyFileSelected) {
+            this.showNotification('最低1つのCSVファイルを選択してください', 'error');
+            return;
+        }
 
         if (!contestDate || !contestName) {
             this.showNotification('大会開催日と大会名を入力してください', 'error');
@@ -507,38 +523,58 @@ class RegistrationsManager {
         }
 
         try {
-            const fileName = this.selectedModalFile.name.toLowerCase();
-            const isCsv = fileName.endsWith('.csv') || this.selectedModalFile.type === 'text/csv';
-
-            if (!isCsv) {
-                this.showNotification('CSV形式のファイルを選択してください', 'error');
-                return;
-            }
-
             document.getElementById('modalImportBtn').disabled = true;
             document.getElementById('modalImportStatus').className = 'import-status';
-            document.getElementById('modalImportStatus').textContent = 'インポート中...';
+            document.getElementById('modalImportStatus').textContent = 'ファイル読み込み中...';
 
-            const fileData = await this.readFileAsText(this.selectedModalFile);
+            // 選択されたファイルのみを並列読み込み
+            const filesData = {};
+            const promises = [];
+            const fileKeys = [];
 
-            if (!fileData || fileData.trim().length === 0) {
-                this.showNotification('CSVデータが空です', 'error');
-                return;
+            if (this.selectedFiles.registrations) {
+                promises.push(this.readFileAsText(this.selectedFiles.registrations));
+                fileKeys.push('registrations');
+            }
+            if (this.selectedFiles.athleteList) {
+                promises.push(this.readFileAsText(this.selectedFiles.athleteList));
+                fileKeys.push('athleteList');
+            }
+            if (this.selectedFiles.order) {
+                promises.push(this.readFileAsText(this.selectedFiles.order));
+                fileKeys.push('order');
+            }
+            if (this.selectedFiles.exceptions) {
+                promises.push(this.readFileAsText(this.selectedFiles.exceptions));
+                fileKeys.push('exceptions');
             }
 
+            const fileContents = await Promise.all(promises);
+            fileKeys.forEach((key, index) => {
+                filesData[key] = fileContents[index];
+            });
+
+            // データ検証
+            for (const key in filesData) {
+                if (!filesData[key] || filesData[key].trim().length === 0) {
+                    this.showNotification(`${key}.csvのデータが空です`, 'error');
+                    return;
+                }
+            }
+
+            document.getElementById('modalImportStatus').textContent = 'インポート中...';
+
             const requestData = {
-                fileData,
-                fileType: 'csv',
-                fileFormat,
+                filesData,
                 contestDate,
                 contestName
             };
 
-            const response = await authFetch(`${this.apiUrl}/import`, {
+            const response = await authFetch(`${this.apiUrl}/import-multi`, {
                 method: 'POST',
                 body: JSON.stringify(requestData)
             });
-            
+
             const result = await response.json();
 
             if (result.success) {
@@ -567,7 +603,7 @@ class RegistrationsManager {
                 this.showNotification(mainError, 'error');
 
                 const statusElement = document.getElementById('modalImportStatus');
-                statusElement.className = 'import-status error'; // hiddenを削除してerrorクラスを設定
+                statusElement.className = 'import-status error';
                 statusElement.style.display = 'block';
                 statusElement.innerHTML =
                     detailError ?
@@ -711,8 +747,6 @@ class RegistrationsManager {
         // ヘッダー作成
         const headerRow = document.createElement('tr');
         const headers = [
-            { key: 'register_date', label: '登録日' },
-            { key: 'register_time', label: '登録時刻' },
             { key: 'contest_date', label: '開催日' },
             { key: 'contest_name', label: '大会名' },
             { key: 'player_no', label: 'ゼッケン番号' },
@@ -720,7 +754,6 @@ class RegistrationsManager {
             { key: 'name_ja_kana', label: 'フリガナ' },
             { key: 'first_name', label: 'First Name' },
             { key: 'last_name', label: 'Last Name' },
-            { key: 'date_of_birth', label: '生年月日' },
             { key: 'email', label: 'Email' },
             { key: 'phone', label: '電話番号' },
             { key: 'fwj_card_no', label: 'FWJ card #' },

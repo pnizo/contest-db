@@ -429,224 +429,256 @@ router.get('/fwj/:fwjCard', requireAuth, async (req, res) => {
   }
 });
 
-// ファイルインポート（Muscleware CSV専用、認証済みユーザー）
-router.post('/import', requireAuth, async (req, res) => {
+// 4ファイルCSVインポート（認証済みユーザー）
+router.post('/import-multi', requireAuth, async (req, res) => {
   try {
-    console.log('=== IMPORT REQUEST START ===');
-    const { fileData, fileType, fileFormat, contestDate, contestName } = req.body;
-    console.log('Import request:', {
-      fileType,
-      fileFormat,
-      contestDate,
-      contestName,
-      fileDataLength: fileData ? fileData.length : 0
-    });
-    
-    if (!fileData) {
-      console.log('ERROR: No file data provided');
-      return res.status(400).json({ success: false, error: 'ファイルデータが無効です' });
-    }
+    console.log('=== MULTI-FILE IMPORT REQUEST START ===');
+    const { filesData, contestDate, contestName } = req.body;
 
+    // バリデーション: contest情報
     if (!contestDate || !contestName) {
       console.log('ERROR: Missing contest date or name');
       return res.status(400).json({ success: false, error: '大会開催日と大会名は必須です' });
     }
 
-    let parsedData = [];
+    // バリデーション: 4つのファイルすべてが必須
+    if (!filesData || Object.keys(filesData).length === 0) {
+      console.log('ERROR: No files provided');
+      return res.status(400).json({ success: false, error: '4つのCSVファイルをすべて選択してください' });
+    }
 
-    // まずファイルを2D配列にパース
-    let rawData = [];
+    const requiredFiles = ['registrations', 'athleteList', 'order', 'exceptions'];
+    const missingFiles = requiredFiles.filter(file => !filesData[file]);
 
-    if (fileType === 'csv') {
-      console.log('Processing CSV file...');
-      // CSVファイルの処理
-      if (typeof fileData !== 'string') {
-        console.log('ERROR: CSV data is not a string');
-        return res.status(400).json({ success: false, error: 'CSVデータが無効です' });
-      }
-
-      // CSVテキストを行に分割
-      const lines = fileData.split(/\r?\n/).filter(line => line.trim());
-      if (lines.length < 2) {
-        console.log('ERROR: CSV has insufficient data');
-        return res.status(400).json({ success: false, error: 'CSVファイルにデータがありません' });
-      }
-
-      // CSVパース（簡易版 - 引用符対応）
-      const parseCSVLine = (line) => {
-        const values = [];
-        let current = '';
-        let inQuotes = false;
-
-        for (let i = 0; i < line.length; i++) {
-          const char = line[i];
-
-          if (char === '"') {
-            inQuotes = !inQuotes;
-          } else if (char === ',' && !inQuotes) {
-            values.push(current);
-            current = '';
-          } else {
-            current += char;
-          }
-        }
-        values.push(current);
-        return values;
+    if (missingFiles.length > 0) {
+      const fileNames = {
+        registrations: 'registrations.csv',
+        athleteList: 'athlete_list.csv',
+        order: 'order.csv',
+        exceptions: 'exceptions.csv'
       };
-
-      rawData = lines.map(line => parseCSVLine(line));
-      console.log('CSV parsed to 2D array, rows:', rawData.length);
-    } else {
-      console.log('ERROR: Unsupported file type');
-      return res.status(400).json({ success: false, error: 'CSV形式のみサポートしています' });
-    }
-
-    // CSVデータの処理
-    if (rawData.length === 0) {
-      console.log('ERROR: No data to process');
-      return res.status(400).json({ success: false, error: 'データがありません' });
-    }
-
-    let headers = rawData[0];
-    const rows = rawData.slice(1);
-    console.log('Original Headers:', headers);
-    console.log('Data rows:', rows.length);
-
-    // ヘッダーを正規化（小文字化）して、形式別の読み替えを行う
-    headers = headers.map(header => {
-      if (!header) return '';
-      const normalizedHeader = header.toString().toLowerCase().trim();
-
-      if (fileFormat === 'muscleware') {
-        // Muscleware形式のヘッダーマッピング
-        const musclewareMapping = {
-          // 基本情報
-          'register date': 'register_date',
-          'register time': 'register_time',
-          'first name': 'first_name',
-          'last name': 'last_name',
-          'dob': 'date_of_birth',
-          'email': 'email',
-          'phone': 'phone',
-          'member #': 'npc_member_no',
-          'country': 'country',
-
-          // クラス情報
-          'class name': 'class_name',
-          'class code': 'class_code',
-
-          // バックステージパス
-          '1 backstage pass (add-on)': 'backstage_pass_1',
-          '2 backstage passes (add-on)': 'backstage_pass_2',
-
-          // カスタムフィールド
-          'height (cm) (custom)': 'height',
-          'weight (kg) (custom)': 'weight',
-          'occupation (custom)': 'occupation',
-          'instagram (custom)': 'instagram',
-          'biography (custom)': 'biography'
-        };
-        return musclewareMapping[normalizedHeader] || normalizedHeader;
-      } else {
-        // Standard形式 - 既存のロジック
-        if (normalizedHeader === 'fwjカード') {
-          console.log('Mapping "FWJカード" to "npcj_no"');
-          return 'npcj_no';
-        }
-        return normalizedHeader;
-      }
-    });
-    console.log('Normalized Headers:', headers);
-
-    // オブジェクト形式に変換
-    parsedData = rows.map(row => {
-      const obj = {};
-      headers.forEach((header, index) => {
-        obj[header] = row[index] || '';
+      const missingFileNames = missingFiles.map(f => fileNames[f]).join(', ');
+      console.log('ERROR: Missing required files:', missingFileNames);
+      return res.status(400).json({
+        success: false,
+        error: `以下のファイルが不足しています: ${missingFileNames}`
       });
-      return obj;
-    }).filter(row => {
-      // 空行をフィルタリング
-      return Object.values(row).some(value => value && value.toString().trim() !== '');
-    });
+    }
 
-    console.log('Processed data rows:', parsedData.length);
-    console.log('Sample row:', parsedData[0]);
+    console.log('Files received:', Object.keys(filesData));
 
-    // Muscleware形式固有の変換処理
-    if (fileFormat === 'muscleware') {
-      console.log('Applying Muscleware-specific transformations...');
+    // CSV解析ヘルパー関数
+    const parseCSVLine = (line) => {
+      const values = [];
+      let current = '';
+      let inQuotes = false;
 
-      const errors = [];
-      parsedData = parsedData.map((row, index) => {
-        // Backstage Pass ロジック
-        const pass1 = row.backstage_pass_1 && row.backstage_pass_1.toString().trim().toUpperCase();
-        const pass2 = row.backstage_pass_2 && row.backstage_pass_2.toString().trim().toUpperCase();
-
-        const hasPass1 = pass1 === 'Y';
-        const hasPass2 = pass2 === 'Y';
-
-        if (hasPass1 && hasPass2) {
-          // 両方Yの場合はエラー
-          const errorMsg = `Row ${index + 2}: Both backstage passes are set to Y`;
-          console.error(errorMsg);
-          errors.push(errorMsg);
-          row['backstage_pass'] = '';
-        } else if (hasPass1) {
-          // 1 Backstage Pass のみYの場合
-          row['backstage_pass'] = '1';
-        } else if (hasPass2) {
-          // 2 Backstage Passes のみYの場合
-          row['backstage_pass'] = '2';
+      for (let i = 0; i < line.length; i++) {
+        const char = line[i];
+        if (char === '"') {
+          inQuotes = !inQuotes;
+        } else if (char === ',' && !inQuotes) {
+          values.push(current);
+          current = '';
         } else {
-          // 両方空白の場合
-          row['backstage_pass'] = '';
+          current += char;
         }
+      }
+      values.push(current);
+      return values;
+    };
 
-        // DOBのパースと年齢計算
-        const dobRaw = row.date_of_birth || row.dob || '';
-        if (dobRaw && dobRaw.trim()) {
-          const dobDate = parseFlexibleDate(dobRaw);
-          if (dobDate) {
-            // DOBを標準形式(YYYY-MM-DD)に変換
-            row['date_of_birth'] = formatToISODate(dobDate);
+    const parseCSVString = (csvString) => {
+      const lines = csvString.split(/\r?\n/).filter(line => line.trim());
+      if (lines.length < 2) {
+        throw new Error('CSVファイルにデータがありません');
+      }
+      return lines.map(line => parseCSVLine(line));
+    };
 
-            // 年齢を計算
-            const age = calculateAge(dobDate, contestDate);
-            if (age !== null && age >= 0) {
-              row['age'] = age.toString();
-            }
-          } else {
-            console.warn(`Invalid DOB format for row ${index + 2}: ${dobRaw}`);
-          }
-        }
-
-        return row;
-      });
-
-      if (errors.length > 0) {
-        console.error('Backstage pass validation errors:', errors);
-        return res.status(400).json({
-          success: false,
-          error: 'Backstage Passのエラーがあります:\n' + errors.join('\n')
+    const csvToObjects = (rawData) => {
+      const headers = rawData[0].map(h => h.toString().toLowerCase().trim());
+      const rows = rawData.slice(1);
+      return rows.map(row => {
+        const obj = {};
+        headers.forEach((header, index) => {
+          obj[header] = row[index] || '';
         });
+        return obj;
+      }).filter(row => Object.values(row).some(v => v && v.toString().trim() !== ''));
+    };
+
+    // 各CSVをパース
+    let registrationsData = [];
+    let athleteListData = [];
+    let orderData = [];
+    let exceptionsData = [];
+
+    try {
+      if (filesData.registrations) {
+        const rawData = parseCSVString(filesData.registrations);
+        registrationsData = csvToObjects(rawData);
+        console.log(`Parsed Registrations.csv: ${registrationsData.length} rows`);
       }
 
-      console.log('Muscleware transformations applied');
+      if (filesData.athleteList) {
+        const rawData = parseCSVString(filesData.athleteList);
+        athleteListData = csvToObjects(rawData);
+        console.log(`Parsed athlete_list.csv: ${athleteListData.length} rows`);
+      }
+
+      if (filesData.order) {
+        const rawData = parseCSVString(filesData.order);
+        orderData = csvToObjects(rawData);
+        console.log(`Parsed order.csv: ${orderData.length} rows`);
+      }
+
+      if (filesData.exceptions) {
+        const rawData = parseCSVString(filesData.exceptions);
+        exceptionsData = csvToObjects(rawData);
+        console.log(`Parsed exceptions.csv: ${exceptionsData.length} rows`);
+      }
+    } catch (parseError) {
+      console.error('CSV parsing error:', parseError);
+      return res.status(400).json({ success: false, error: `CSV解析エラー: ${parseError.message}` });
     }
 
-    if (parsedData.length === 0) {
-      console.log('ERROR: Parsed data is empty');
-      return res.status(400).json({ success: false, error: 'データが空です' });
+    // データマージ処理
+    console.log('Merging CSV data...');
+    console.log(`DEBUG: registrationsData.length = ${registrationsData.length}`);
+    console.log(`DEBUG: athleteListData.length = ${athleteListData.length}`);
+    const athleteMap = new Map();
+    const errors = [];
+
+    // Step 1: Registrations.csvから基本レコード作成（必須）
+    console.log('Creating base records from Registrations.csv...');
+    registrationsData.forEach((reg, index) => {
+      const athleteNo = reg['athlete #'];
+      if (!athleteNo) {
+        console.warn(`Registrations.csv row ${index + 2}: Missing Athlete #`);
+        return;
+      }
+
+      athleteMap.set(athleteNo, {
+        player_no: athleteNo, // Athlete #をそのままplayer_noに使用
+        first_name: reg['first name'] || '',
+        last_name: reg['last name'] || '',
+        email: reg['email address'] || '',
+        npc_member_no: reg['member number'] || '',
+        country: reg['country'] || '',
+        age: reg['age'] || '',
+        class_name: reg['class'] || '',
+        class_code: reg['class code'] || '',
+        sort_index: reg['sort index'] || '',
+        phone: '',
+        backstage_pass: '',
+        height: '',
+        weight: '',
+        occupation: '',
+        instagram: '',
+        biography: '',
+        npc_member_status: '',
+        score_card: '',
+        contest_order: ''
+      });
+    });
+
+    // Step 2: athlete_list.csvから詳細情報をマージ（既存レコードを更新、なければスキップ）
+    athleteListData.forEach((athlete, index) => {
+      const athleteNo = athlete['athlete #'];
+      if (!athleteNo) {
+        console.warn(`athlete_list.csv row ${index + 2}: Missing Athlete #`);
+        return;
+      }
+
+      let record = athleteMap.get(athleteNo);
+
+      // レコードが存在しない場合
+      if (!record) {
+        console.warn(`Warning: Athlete ${athleteNo} not found in existing registrations, skipping`);
+        return; // 既存レコードがない場合はスキップ
+      }
+
+      // Backstage Pass処理
+      const pass1 = athlete['1 backstage pass']?.toUpperCase() === 'Y';
+      const pass2 = athlete['2 backstage passes']?.toUpperCase() === 'Y';
+
+      if (pass1 && pass2) {
+        const errorMsg = `選手 ${athleteNo}: バックステージパスが両方Yになっています`;
+        console.error(errorMsg);
+        errors.push(errorMsg);
+      } else if (pass1) {
+        record.backstage_pass = '1';
+      } else if (pass2) {
+        record.backstage_pass = '2';
+      }
+
+      // 既存の値がある場合は上書きしない、空の場合のみ更新
+      if (athlete['phone number']) record.phone = athlete['phone number'];
+      if (athlete['height']) record.height = athlete['height'];
+      if (athlete['weight']) record.weight = athlete['weight'];
+      if (athlete['occupation']) record.occupation = athlete['occupation'];
+      if (athlete['instagram']) record.instagram = athlete['instagram'];
+      if (athlete['biography']) record.biography = athlete['biography'];
+    });
+
+    // Backstage Passエラーがあれば中断
+    if (errors.length > 0) {
+      return res.status(400).json({ success: false, error: errors.join('\n') });
     }
 
-    // Membersシートからデータを取得してemailで補完
+    // Step 3: order.csvからscore_cardとcontest_orderをマージ
+    const orderMap = new Map();
+    orderData.forEach(o => {
+      orderMap.set(o['class_code'], {
+        score_card: o['score_card'] || '',
+        contest_order: o['contest_order'] || ''
+      });
+    });
+
+    athleteMap.forEach((record) => {
+      const orderInfo = orderMap.get(record.class_code);
+      if (orderInfo) {
+        record.score_card = orderInfo.score_card;
+        record.contest_order = orderInfo.contest_order;
+      }
+    });
+
+    // Step 4: exceptions.csvからmember_numberとstatusを優先上書き（既存レコードのみ更新）
+    exceptionsData.forEach((exc) => {
+      const athleteNo = exc['athlete #'];
+      if (!athleteNo) {
+        console.warn(`exceptions.csv: Missing Athlete #`);
+        return;
+      }
+
+      let record = athleteMap.get(athleteNo);
+
+      // レコードが存在しない場合
+      if (!record) {
+        console.warn(`Warning: Athlete ${athleteNo} not found in existing registrations, skipping`);
+        return; // 既存レコードがない場合はスキップ
+      }
+
+      // 既存レコードを優先上書き
+      if (exc['member number']) {
+        record.npc_member_no = exc['member number'];
+      }
+      if (exc['membership status']) {
+        record.npc_member_status = exc['membership status'];
+      }
+
+      // オプション上書き
+      if (exc['country']) record.country = exc['country'];
+      if (exc['phone number']) record.phone = exc['phone number'];
+    });
+
+    // Step 5: Membersシートから日本語名を補完
     console.log('Fetching Members data for enrichment...');
     try {
       const allMembers = await memberModel.findAll();
       console.log(`Found ${allMembers.length} members in Members sheet`);
 
-      // emailをキーにしたMapを作成（高速検索用）
       const membersByEmail = new Map();
       allMembers.forEach(member => {
         if (member.email && member.email.trim()) {
@@ -655,27 +687,23 @@ router.post('/import', requireAuth, async (req, res) => {
         }
       });
 
-      // 各レコードをMembersデータで補完
       let enrichedCount = 0;
-      parsedData.forEach(record => {
+      athleteMap.forEach(record => {
         if (record.email && record.email.trim()) {
           const emailKey = record.email.toLowerCase().trim();
           const member = membersByEmail.get(emailKey);
 
           if (member) {
-            // Membersのshopify_idをfwj_card_noにセット
             if (member.shopify_id && member.shopify_id.trim()) {
               record.fwj_card_no = member.shopify_id.trim();
             }
 
-            // Membersのfwj_lastnameとfwj_firstnameを連結してname_jaにセット
             const memberFwjLastName = member.fwj_lastname ? member.fwj_lastname.trim() : '';
             const memberFwjFirstName = member.fwj_firstname ? member.fwj_firstname.trim() : '';
             if (memberFwjLastName || memberFwjFirstName) {
               record.name_ja = `${memberFwjLastName} ${memberFwjFirstName}`.trim();
             }
 
-            // Membersのfwj_kanalastnameとfwj_kanafirstnameを連結してname_ja_kanaにセット
             const memberFwjLastNameKana = member.fwj_kanalastname ? member.fwj_kanalastname.trim() : '';
             const memberFwjFirstNameKana = member.fwj_kanafirstname ? member.fwj_kanafirstname.trim() : '';
             if (memberFwjLastNameKana || memberFwjFirstNameKana) {
@@ -686,12 +714,11 @@ router.post('/import', requireAuth, async (req, res) => {
           }
         }
 
-        // name_ja_kanaが未設定の場合、MusclewareのCSVのfirst_nameとlast_nameからWanaKanaで生成
+        // name_ja_kanaが未設定の場合、WanaKanaで生成
         if (!record.name_ja_kana || record.name_ja_kana.trim() === '') {
           const csvLastName = record.last_name ? record.last_name.trim() : '';
           const csvFirstName = record.first_name ? record.first_name.trim() : '';
           if (csvLastName || csvFirstName) {
-            // WanaKanaを使ってローマ字からカタカナに変換
             const lastNameKana = csvLastName ? wanakana.toKatakana(csvLastName) : '';
             const firstNameKana = csvFirstName ? wanakana.toKatakana(csvFirstName) : '';
             if (lastNameKana || firstNameKana) {
@@ -704,68 +731,22 @@ router.post('/import', requireAuth, async (req, res) => {
       console.log(`Enriched ${enrichedCount} records with Members data`);
     } catch (memberError) {
       console.error('Error fetching Members data:', memberError);
-      // Members取得エラーは警告のみで処理を続行
       console.log('Continuing import without Members enrichment');
     }
 
-    // ゼッケン番号(player_no)を自動採番
-    console.log('Assigning player numbers...');
-    try {
-      // 1. register_dateとregister_timeでソート
-      const sortedData = [...parsedData].sort((a, b) => {
-        const dateA = a.register_date || '';
-        const dateB = b.register_date || '';
-        if (dateA !== dateB) {
-          return dateA.localeCompare(dateB);
-        }
-        const timeA = a.register_time || '';
-        const timeB = b.register_time || '';
-        return timeA.localeCompare(timeB);
-      });
+    // Map → Array変換
+    const mergedData = Array.from(athleteMap.values());
+    console.log(`Total merged records: ${mergedData.length}`);
 
-      // 2. emailごとに最も早い登録順で番号を割り当て
-      const emailToPlayerNo = new Map();
-      let nextPlayerNo = 1;
-
-      sortedData.forEach(record => {
-        const email = record.email ? record.email.toLowerCase().trim() : '';
-
-        if (email) {
-          // emailがある場合：同じemailには同じ番号を割り当て
-          if (!emailToPlayerNo.has(email)) {
-            emailToPlayerNo.set(email, nextPlayerNo);
-            nextPlayerNo++;
-          }
-        }
-        // emailが無い場合は後で個別に処理
-      });
-
-      // 3. 元のparsedDataの各レコードにplayer_noを設定
-      parsedData.forEach(record => {
-        const email = record.email ? record.email.toLowerCase().trim() : '';
-
-        if (email && emailToPlayerNo.has(email)) {
-          // emailがあり、既に番号が割り当てられている
-          record.player_no = String(emailToPlayerNo.get(email));
-        } else {
-          // emailが無いレコードには個別に新しい番号を割り当て
-          record.player_no = String(nextPlayerNo);
-          nextPlayerNo++;
-        }
-      });
-
-      console.log(`Assigned player numbers to ${parsedData.length} records (unique players: ${emailToPlayerNo.size})`);
-    } catch (playerNoError) {
-      console.error('Error assigning player numbers:', playerNoError);
-      // エラーが発生しても処理を続行（player_noは空のまま）
-      console.log('Continuing import without player number assignment');
+    if (mergedData.length === 0) {
+      return res.status(400).json({ success: false, error: 'インポート可能なデータがありません' });
     }
 
+    // バッチインポート実行
     console.log('Starting batch import...');
-    // バッチインポートを実行
-    const result = await registrationModel.batchImport(parsedData, contestDate, contestName, fileFormat);
+    const result = await registrationModel.batchImport(mergedData, contestDate, contestName, 'multi');
     console.log('Batch import result:', result.success ? 'SUCCESS' : 'FAILED');
-    
+
     if (result.success) {
       console.log('Import completed successfully:', result.data);
       res.json({
@@ -865,7 +846,6 @@ router.get('/export/athlete_numbers/:contestName', requireAuth, async (req, res)
           'Athlete #': reg.player_no,
           'First Name': reg.first_name || '',
           'Last Name': reg.last_name || '',
-          'Date of Birth': reg.date_of_birth || '',
           'Age': reg.age || '',
           'Height': reg.height || '',
           'Weight': reg.weight || '',

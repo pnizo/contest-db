@@ -165,24 +165,27 @@ class Registration extends BaseModel {
       console.log('Starting batch import with sheet name:', this.sheetName);
       await this.ensureInitialized();
 
-      // ヘッダー検証
-      const headerValidation = this.validateHeaders(csvData, fileFormat);
-      if (!headerValidation.isValid) {
-        return {
-          success: false,
-          error: headerValidation.error
-        };
-      }
+      // ヘッダー検証（multiフォーマットの場合はスキップ）
+      if (fileFormat !== 'multi') {
+        const headerValidation = this.validateHeaders(csvData, fileFormat);
+        if (!headerValidation.isValid) {
+          return {
+            success: false,
+            error: headerValidation.error
+          };
+        }
 
-      // 警告がある場合はログに出力
-      if (headerValidation.warnings && headerValidation.warnings.length > 0) {
-        console.log('Header warnings:', headerValidation.warnings);
+        // 警告がある場合はログに出力
+        if (headerValidation.warnings && headerValidation.warnings.length > 0) {
+          console.log('Header warnings:', headerValidation.warnings);
+        }
       }
 
       // CSVデータをスプレッドシート行形式に変換（バッチ処理でAPIリクエスト数を削減）
       const rows = csvData.map(row => {
         const now = new Date().toISOString();
-        const id = Date.now().toString() + Math.random().toString(36).substr(2, 9);
+        // 既存IDがあればそれを使用、なければ新規生成
+        const id = row.id || (Date.now().toString() + Math.random().toString(36).substr(2, 9));
 
         // ヘッダーを小文字に変換してアクセス
         const normalizedRow = {};
@@ -192,39 +195,36 @@ class Registration extends BaseModel {
 
         return [
           id, // id (A列)
-          normalizedRow['register_date'] || '', // register_date (B列)
-          normalizedRow['register_time'] || '', // register_time (C列)
-          contestDate, // contest_date (D列)
-          contestName, // contest_name (E列)
-          normalizedRow['player_no'] || '', // player_no (F列)
-          normalizedRow['name_ja'] || '', // name_ja (G列)
-          normalizedRow['name_ja_kana'] || '', // name_ja_kana (H列)
-          normalizedRow['fwj_card_no'] || '', // fwj_card_no (I列)
-          normalizedRow['first_name']?.trim() || '', // first_name (J列)
-          normalizedRow['last_name']?.trim() || '', // last_name (K列)
-          normalizedRow['date_of_birth'] || normalizedRow['dob'] || '', // date_of_birth (L列)
-          normalizedRow['email'] || '', // email (M列)
-          normalizedRow['phone'] || '', // phone (N列)
-          normalizedRow['npc_member_no'] || '', // npc_member_no (O列)
-          normalizedRow['country'] || '', // country (P列)
-          normalizedRow['age'] || '', // age (Q列)
-          normalizedRow['class_name'] || '', // class_name (R列)
-          normalizedRow['class_code'] || '', // class_code (S列)
-          normalizedRow['sort_index'] || '', // sort_index (T列)
-          normalizedRow['membership_status'] || '', // npc_member_status (U列)
-          normalizedRow['score_card'] || '', // score_card (V列)
-          normalizedRow['contest_order'] || '', // contest_order (W列)
-          normalizedRow['backstage_pass'] || '', // backstage_pass (X列)
-          normalizedRow['height'] || '', // height (Y列)
-          normalizedRow['weight'] || '', // weight (Z列)
-          normalizedRow['occupation'] || '', // occupation (AA列)
-          normalizedRow['instagram'] || '', // instagram (AB列)
-          normalizedRow['biography'] || '', // biography (AC列)
-          now, // createdAt (AD列)
-          'TRUE', // isValid (AE列)
-          '', // deletedAt (AF列)
-          now, // updatedAt (AG列)
-          '' // restoredAt (AH列)
+          contestDate, // contest_date (B列)
+          contestName, // contest_name (C列)
+          normalizedRow['player_no'] || '', // player_no (D列)
+          normalizedRow['name_ja'] || '', // name_ja (E列)
+          normalizedRow['name_ja_kana'] || '', // name_ja_kana (F列)
+          normalizedRow['fwj_card_no'] || '', // fwj_card_no (G列)
+          normalizedRow['first_name']?.trim() || '', // first_name (H列)
+          normalizedRow['last_name']?.trim() || '', // last_name (I列)
+          normalizedRow['email'] || '', // email (J列)
+          normalizedRow['phone'] || '', // phone (K列)
+          normalizedRow['npc_member_no'] || '', // npc_member_no (L列)
+          normalizedRow['country'] || '', // country (M列)
+          normalizedRow['age'] || '', // age (N列)
+          normalizedRow['class_name'] || '', // class_name (O列)
+          normalizedRow['class_code'] || '', // class_code (P列)
+          normalizedRow['sort_index'] || '', // sort_index (Q列)
+          normalizedRow['npc_member_status'] || normalizedRow['membership_status'] || '', // npc_member_status (R列)
+          normalizedRow['score_card'] || '', // score_card (S列)
+          normalizedRow['contest_order'] || '', // contest_order (T列)
+          normalizedRow['backstage_pass'] || '', // backstage_pass (U列)
+          normalizedRow['height'] || '', // height (V列)
+          normalizedRow['weight'] || '', // weight (W列)
+          normalizedRow['occupation'] || '', // occupation (X列)
+          normalizedRow['instagram'] || '', // instagram (Y列)
+          normalizedRow['biography'] || '', // biography (Z列)
+          now, // createdAt (AA列)
+          'TRUE', // isValid (AB列)
+          '', // deletedAt (AC列)
+          now, // updatedAt (AD列)
+          '' // restoredAt (AE列)
         ];
       });
 
@@ -232,30 +232,31 @@ class Registration extends BaseModel {
         return { success: false, error: 'インポートするデータがありません' };
       }
 
+      console.log(`Appending ${rows.length} new records to sheet`);
+
       // バッチサイズを制限してAPI制限を回避
-      const batchSize = 100; // 一度に処理する行数を制限
+      const batchSize = 100;
       let imported = 0;
       const errors = [];
 
+      // 全レコードを新規追加
       for (let i = 0; i < rows.length; i += batchSize) {
         const batch = rows.slice(i, i + batchSize);
-        
+
         try {
-          // レート制限を避けるため、バッチ間に遅延を追加
           if (i > 0) {
             console.log(`Waiting 2 seconds before next batch (processed ${i} rows)...`);
             await new Promise(resolve => setTimeout(resolve, 2000));
           }
-          
+
           console.log(`Processing batch ${Math.floor(i/batchSize) + 1}, rows ${i + 1}-${Math.min(i + batchSize, rows.length)}`);
-          await this.getSheetsService().appendValues(`${this.sheetName}!A:AH`, batch);
+          await this.getSheetsService().appendValues(`${this.sheetName}!A:AE`, batch);
           imported += batch.length;
-          
+
         } catch (batchError) {
           console.error(`Error in batch ${Math.floor(i/batchSize) + 1}:`, batchError);
           errors.push(`Batch ${Math.floor(i/batchSize) + 1}: ${batchError.message}`);
-          
-          // レート制限エラーの場合はより長く待機
+
           if (batchError.status === 429) {
             console.log('Rate limit hit, waiting 10 seconds...');
             await new Promise(resolve => setTimeout(resolve, 10000));
