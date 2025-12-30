@@ -140,3 +140,4 @@ credentials.json
 # テストデータ
 *.csv
 customer.json
+npcww_sampledata/
