@@ -49,6 +49,7 @@ class GuestsManager {
         };
         this.editingGuest = null;
         this.deletingGuest = null;
+        this.contestsMap = new Map(); // 大会名 -> 開催日のマッピング
         this.init();
     }
 
@@ -183,6 +184,11 @@ class GuestsManager {
             this.deleteGuest();
         });
 
+        // 大会名選択時に開催日を自動設定
+        document.getElementById('edit_contest_name').addEventListener('change', (e) => {
+            this.updateContestDate(e.target.value);
+        });
+
         // モーダル外クリックで閉じる
         document.getElementById('editDialog').addEventListener('click', (e) => {
             if (e.target.id === 'editDialog') {
@@ -207,20 +213,51 @@ class GuestsManager {
                 // 大会名を保存（編集ダイアログで使用）
                 this.contestNames = contestNames;
 
+                // Contestsテーブルから大会情報を取得してマッピングを作成
+                await this.loadContests();
+
                 this.populateFilterSelect('contestFilter', contestNames);
                 this.populateFilterSelect('organizationTypeFilter', organizationTypes);
                 this.populateFilterSelect('passTypeFilter', passTypes);
 
-                // 大会名フィルタの初期値を一番下の要素に設定
-                if (contestNames.length > 0) {
-                    const contestFilter = document.getElementById('contestFilter');
-                    const lastContest = contestNames[contestNames.length - 1];
-                    contestFilter.value = lastContest;
-                    this.currentFilters.contest_name = lastContest;
-                }
+                // 絞り込み条件は初期値では何もセットしない
             }
         } catch (error) {
             console.error('Filter options loading failed:', error);
+        }
+    }
+
+    // Contestsテーブルから大会情報を取得
+    async loadContests() {
+        try {
+            const response = await authFetch('/api/contests');
+            const result = await response.json();
+
+            if (result.success && result.data) {
+                // 大会名 -> 開催日のマッピングを作成
+                this.contestsMap.clear();
+                result.data.forEach(contest => {
+                    if (contest.contest_name && contest.contest_date) {
+                        // 同じ大会名で複数の開催日がある場合、最新を保持
+                        if (!this.contestsMap.has(contest.contest_name) ||
+                            new Date(contest.contest_date) > new Date(this.contestsMap.get(contest.contest_name))) {
+                            this.contestsMap.set(contest.contest_name, contest.contest_date);
+                        }
+                    }
+                });
+            }
+        } catch (error) {
+            console.error('Contests loading failed:', error);
+        }
+    }
+
+    // 大会名選択時に開催日を自動設定
+    updateContestDate(contestName) {
+        const contestDateInput = document.getElementById('edit_contest_date');
+        if (contestName && this.contestsMap.has(contestName)) {
+            contestDateInput.value = this.contestsMap.get(contestName);
+        } else {
+            contestDateInput.value = '';
         }
     }
 
@@ -281,20 +318,22 @@ class GuestsManager {
         // ヘッダー作成
         const headerRow = document.createElement('tr');
         const headers = [
+            { key: 'contest_date', label: '開催日' },
             { key: 'contest_name', label: '大会名' },
+            { key: 'ticket_type', label: 'チケット種別' },
             { key: 'group_type', label: '団体/個人' },
-            { key: 'pass_type', label: '付与パス' },
             { key: 'name_ja', label: '代表者氏名' },
+            { key: 'pass_type', label: '付与パス' },
             { key: 'company_ja', label: '団体名（企業名）' },
+            { key: 'request_type', label: '申請種別' },
+            { key: 'ticket_count', label: '合計付与枚数' },
+            { key: 'is_checked_in', label: 'Check-In' },
+            { key: 'note', label: '備考欄' },
             { key: 'email', label: '連絡先メールアドレス' },
             { key: 'phone', label: '緊急電話番号' },
             { key: 'contact_person', label: '社内担当者名' },
-            { key: 'request_type', label: '申請種別' },
-            { key: 'ticket_count', label: '合計付与枚数' },
             { key: 'is_pre_notified', label: '事前案内メール' },
-            { key: 'is_checked_in', label: 'Check-In' },
             { key: 'is_post_mailed', label: '開催後メール' },
-            { key: 'note', label: '備考欄' },
             { key: '_actions', label: '操作' }
         ];
 
@@ -492,6 +531,8 @@ class GuestsManager {
         this.populateEditContestSelect(guest.contest_name || '');
 
         // フォームにデータを設定
+        document.getElementById('edit_contest_date').value = guest.contest_date || '';
+        document.getElementById('edit_ticket_type').value = guest.ticket_type || '';
         document.getElementById('edit_group_type').value = guest.group_type || '';
         document.getElementById('edit_pass_type').value = guest.pass_type || '';
         document.getElementById('edit_name_ja').value = guest.name_ja || '';
@@ -518,7 +559,9 @@ class GuestsManager {
     // ゲストを保存（新規追加または更新）
     async saveGuest() {
         const guestData = {
+            contest_date: document.getElementById('edit_contest_date').value,
             contest_name: document.getElementById('edit_contest_name').value,
+            ticket_type: document.getElementById('edit_ticket_type').value,
             group_type: document.getElementById('edit_group_type').value,
             pass_type: document.getElementById('edit_pass_type').value,
             name_ja: document.getElementById('edit_name_ja').value,

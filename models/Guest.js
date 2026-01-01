@@ -3,6 +3,16 @@ const BaseModel = require('./BaseModel');
 class Guest extends BaseModel {
   constructor() {
     super('Guests');
+    this.contestModel = null;
+  }
+
+  // Contest モデルの遅延初期化
+  getContestModel() {
+    if (!this.contestModel) {
+      const Contest = require('./Contest');
+      this.contestModel = new Contest();
+    }
+    return this.contestModel;
   }
 
   // 有効なフィールドのみを取得（name_jaが必須）
@@ -18,8 +28,9 @@ class Guest extends BaseModel {
       // 有効なフィールドのマッピング
       const validFields = [
         'id',
-        'ticket_type',
+        'contest_date',
         'contest_name',
+        'ticket_type',
         'group_type',
         'name_ja',
         'pass_type',
@@ -32,7 +43,12 @@ class Guest extends BaseModel {
         'phone',
         'contact_person',
         'is_pre_notified',
-        'is_post_mailed'
+        'is_post_mailed',
+        'createdAt',
+        'isValid',
+        'deletedAt',
+        'updatedAt',
+        'restoredAt'
       ];
 
       const allItems = data.map((row, index) => {
@@ -47,7 +63,12 @@ class Guest extends BaseModel {
       });
 
       // name_jaが必須：空白のレコードは除外
-      return allItems.filter(item => item['name_ja'] && item['name_ja'].trim() !== '');
+      // isValidがFALSEのレコードも除外
+      return allItems.filter(item => 
+        item['name_ja'] && 
+        item['name_ja'].trim() !== '' &&
+        item['isValid'] !== 'FALSE'
+      );
     } catch (error) {
       console.error('Error in Guest.findAll:', error);
       return [];
@@ -68,8 +89,9 @@ class Guest extends BaseModel {
       // 有効なフィールドのマッピング
       const validFields = [
         'id',
-        'ticket_type',
+        'contest_date',
         'contest_name',
+        'ticket_type',
         'group_type',
         'name_ja',
         'pass_type',
@@ -82,7 +104,12 @@ class Guest extends BaseModel {
         'phone',
         'contact_person',
         'is_pre_notified',
-        'is_post_mailed'
+        'is_post_mailed',
+        'createdAt',
+        'isValid',
+        'deletedAt',
+        'updatedAt',
+        'restoredAt'
       ];
 
       let allItems = data.map((row, index) => {
@@ -96,7 +123,12 @@ class Guest extends BaseModel {
       });
 
       // name_jaが必須：空白のレコードは除外
-      allItems = allItems.filter(item => item['name_ja'] && item['name_ja'].trim() !== '');
+      // isValidがFALSEのレコードも除外
+      allItems = allItems.filter(item => 
+        item['name_ja'] && 
+        item['name_ja'].trim() !== '' &&
+        item['isValid'] !== 'FALSE'
+      );
 
       // フィルタリング適用
       if (filters.contest_name) {
@@ -188,7 +220,30 @@ class Guest extends BaseModel {
     try {
       const allGuests = await this.findAll();
 
-      const contestNames = [...new Set(allGuests.map(g => g['contest_name']).filter(Boolean))];
+      // Contestsテーブルから大会名を取得（開催日の降順）
+      const contestModel = this.getContestModel();
+      const allContests = await contestModel.findAll();
+      
+      const contestNamesWithDates = allContests
+        .filter(contest => contest.contest_name && contest.contest_name.trim() !== '' && contest.contest_date)
+        .map(contest => ({
+          name: contest.contest_name,
+          date: contest.contest_date
+        }));
+      
+      // 大会名でグループ化し、各大会の最新の開催日を取得
+      const contestMap = new Map();
+      contestNamesWithDates.forEach(item => {
+        if (!contestMap.has(item.name) || new Date(item.date) > new Date(contestMap.get(item.name))) {
+          contestMap.set(item.name, item.date);
+        }
+      });
+      
+      // 開催日の降順で並び替え
+      const contestNames = Array.from(contestMap.entries())
+        .sort((a, b) => new Date(b[1]) - new Date(a[1]))
+        .map(entry => entry[0]);
+
       const organizationTypes = [...new Set(allGuests.map(g => g['group_type']).filter(Boolean))];
       const passTypes = [...new Set(allGuests.map(g => g['pass_type']).filter(Boolean))];
 

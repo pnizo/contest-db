@@ -92,18 +92,46 @@
                 <div class="modal-body">
                     <div class="form-grid">
                         <div class="form-group">
+                            <label for="edit_contest_date">開催日</label>
+                            <input type="date" id="edit_contest_date" name="contest_date" readonly style="background-color: #f0f0f0; cursor: not-allowed;">
+                        </div>
+                        <div class="form-group">
                             <label for="edit_contest_name">大会名</label>
                             <select id="edit_contest_name" name="contest_name" class="filter-select">
                                 <option value="">大会名を選択</option>
                             </select>
                         </div>
                         <div class="form-group">
+                            <label for="edit_ticket_type">チケット種別</label>
+                            <select id="edit_ticket_type" name="ticket_type" class="filter-select">
+                                <option value="">選択してください</option>
+                                <option value="関係者席">関係者席</option>
+                                <option value="前売VVIP席">前売VVIP席</option>
+                                <option value="前売VIP席">前売VIP席</option>
+                                <option value="前売S席">前売S席</option>
+                                <option value="前売A席">前売A席</option>
+                                <option value="前売B席">前売B席</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
                             <label for="edit_group_type">団体/個人</label>
-                            <input type="text" id="edit_group_type" name="group_type">
+                            <select id="edit_group_type" name="group_type" class="filter-select">
+                                <option value="">選択してください</option>
+                                <option value="IFBB PRO">IFBB PRO</option>
+                                <option value="団体">団体</option>
+                                <option value="個人">個人</option>
+                            </select>
                         </div>
                         <div class="form-group">
                             <label for="edit_pass_type">付与パス</label>
-                            <input type="text" id="edit_pass_type" name="pass_type">
+                            <select id="edit_pass_type" name="pass_type" class="filter-select">
+                                <option value="">選択してください</option>
+                                <option value="関係者パス">関係者パス</option>
+                                <option value="IFBB Proパス">IFBB Proパス</option>
+                                <option value="撮影者パス">撮影者パス</option>
+                                <option value="出展者パス">出展者パス</option>
+                                <option value="GUESTパス">GUESTパス</option>
+                            </select>
                         </div>
                         <div class="form-group">
                             <label for="edit_name_ja">代表者氏名 <span class="required">*</span></label>
@@ -127,7 +155,14 @@
                         </div>
                         <div class="form-group">
                             <label for="edit_request_type">申請種別</label>
-                            <input type="text" id="edit_request_type" name="request_type">
+                            <select id="edit_request_type" name="request_type" class="filter-select">
+                                <option value="">選択してください</option>
+                                <option value="IFBB Pro">IFBB Pro</option>
+                                <option value="メディア">メディア</option>
+                                <option value="出展者">出展者</option>
+                                <option value="招待">招待</option>
+                                <option value="その他">その他</option>
+                            </select>
                         </div>
                         <div class="form-group">
                             <label for="edit_ticket_count">合計付与枚数</label>
