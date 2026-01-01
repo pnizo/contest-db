@@ -317,6 +317,7 @@ router.post('/import', requireAuth, async (req, res) => {
     console.log('Using selected contest:', contestName, contest_date);
 
     const scores = [];
+    const missingRegistrations = []; // マッチしないレコードを記録
     let currentCategory = '';
     let inDataSection = false;
     let lineNumber = 0;
@@ -371,7 +372,15 @@ router.post('/import', requireAuth, async (req, res) => {
         const regData = registrationMap.get(regKey);
 
         if (!regData) {
-          console.warn(`Warning: No registration found for player_no=${player_no}, class_name=${currentCategory}`);
+          // マッチしないレコードを記録
+          const errorInfo = {
+            player_no: player_no,
+            class_name: currentCategory,
+            line: lineNumber,
+            name: `${first_name} ${last_name}`.trim()
+          };
+          missingRegistrations.push(errorInfo);
+          console.error(`Error: No registration found for player_no=${player_no}, class_name=${currentCategory}, name=${errorInfo.name}`);
         } else {
           console.log(`Matched: player_no=${player_no}, class_name=${currentCategory} -> fwj_card_no=${regData.fwj_card_no}, player_name=${regData.player_name}`);
         }
@@ -392,6 +401,18 @@ router.post('/import', requireAuth, async (req, res) => {
     }
 
     console.log(`Parsed ${scores.length} scores from CSV`);
+
+    // マッチしないレコードがある場合はエラーを返す
+    if (missingRegistrations.length > 0) {
+      const errorDetails = missingRegistrations.map(item => 
+        `  - ゼッケン番号: ${item.player_no}, カテゴリー: ${item.class_name}, 選手名: ${item.name}`
+      ).join('\n');
+      
+      return res.status(400).json({ 
+        success: false, 
+        error: `以下の${missingRegistrations.length}件の成績データに対応するRegistrationsレコードが見つかりません：\n${errorDetails}\n\n※ Registrationsテーブルに該当する選手のエントリー（ゼッケン番号とカテゴリーが一致）が存在することを確認してください。`
+      });
+    }
 
     if (scores.length === 0) {
       return res.status(400).json({ 
