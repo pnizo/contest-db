@@ -1,9 +1,34 @@
 const express = require('express');
 const Score = require('../models/Score');
+const Contest = require('../models/Contest');
+const Registration = require('../models/Registration');
 const { requireAuth, requireAdmin, checkAuth } = require('../middleware/auth');
 const router = express.Router();
 
 const scoreModel = new Score();
+const contestModel = new Contest();
+const registrationModel = new Registration();
+
+// CSVをパースするヘルパー関数
+function parseCSVLine(line) {
+  const values = [];
+  let current = '';
+  let inQuotes = false;
+
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i];
+    if (char === '"') {
+      inQuotes = !inQuotes;
+    } else if (char === ',' && !inQuotes) {
+      values.push(current);
+      current = '';
+    } else {
+      current += char;
+    }
+  }
+  values.push(current);
+  return values;
+}
 
 // フィルター用の一意値取得（特定のルートを先に定義）
 router.get('/filter-options', requireAuth, async (req, res) => {
@@ -234,18 +259,151 @@ router.get('/composite/:fwjNo/:contestDate/:contestName/:categoryName', requireA
 // 高速CSVインポート（認証済みユーザー）
 router.post('/import', requireAuth, async (req, res) => {
   try {
-    const { csvData } = req.body;
+    console.log('=== SCORES IMPORT REQUEST START ===');
+    const { csvText, contestName } = req.body;
     
-    if (!csvData || !Array.isArray(csvData)) {
+    if (!csvText || typeof csvText !== 'string') {
       return res.status(400).json({ success: false, error: 'CSVデータが無効です' });
     }
 
-    if (csvData.length === 0) {
-      return res.status(400).json({ success: false, error: 'CSVデータが空です' });
+    if (!contestName || typeof contestName !== 'string') {
+      return res.status(400).json({ success: false, error: '大会名が指定されていません' });
+    }
+
+    console.log('Selected contest:', contestName);
+
+    // Contestsからcontest_dateとcontest_placeを取得
+    const allContests = await contestModel.findAll();
+    const contest = allContests.find(c => c.contest_name === contestName);
+
+    if (!contest) {
+      return res.status(400).json({ 
+        success: false, 
+        error: `大会「${contestName}」がContestsテーブルに見つかりません` 
+      });
+    }
+
+    const contest_date = contest.contest_date;
+    const contest_place = contest.contest_place || '';
+
+    console.log('Contest date:', contest_date);
+    console.log('Contest place:', contest_place);
+
+    // Registrationsから該当する大会のデータを取得
+    const allRegistrations = await registrationModel.findAll();
+    const contestRegistrations = allRegistrations.filter(
+      reg => reg.contest_date === contest_date
+    );
+
+    console.log(`Found ${contestRegistrations.length} registrations for contest date ${contest_date}`);
+
+    // player_no + class_name をキーとするマップを作成
+    const registrationMap = new Map();
+    contestRegistrations.forEach(reg => {
+      const key = `${reg.player_no}|${reg.class_name}`;
+      registrationMap.set(key, {
+        fwj_card_no: reg.fwj_card_no || '',
+        player_name: reg.name_ja || ''
+      });
+    });
+
+    console.log(`Created registration map with ${registrationMap.size} entries`);
+
+    // CSVをパース（新しいフォーマット対応）
+    // CSVの1行目に記載されている大会名は無視し、選択された大会情報を使用
+    const lines = csvText.split(/\r?\n/);
+    
+    console.log(`Processing CSV with ${lines.length} lines`);
+    console.log('Using selected contest:', contestName, contest_date);
+
+    const scores = [];
+    let currentCategory = '';
+    let inDataSection = false;
+    let lineNumber = 0;
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+      lineNumber = i + 1;
+      
+      // 最初の2行はスキップ（大会名の行と空行）
+      if (i < 2) {
+        continue;
+      }
+      
+      // 空行をスキップ
+      if (!line) {
+        inDataSection = false;
+        continue;
+      }
+
+      // CSVをパース
+      const values = parseCSVLine(line);
+
+      // カテゴリー行を検出（最初のセルにデータがあり、他が空）
+      if (values[0] && values[0].trim() && 
+          (!values[1] || !values[1].trim()) && 
+          (!values[4] || !values[4].trim())) {
+        currentCategory = values[0].trim();
+        inDataSection = false;
+        console.log('Found category:', currentCategory);
+        continue;
+      }
+
+      // ヘッダー行を検出（#, First Name, Last Name, Country, Score, Placing）
+      if (values[0] === '#' && values[1] && values[1].toLowerCase().includes('first')) {
+        inDataSection = true;
+        console.log('Found header for category:', currentCategory);
+        continue;
+      }
+
+      // データ行を処理
+      // CSVのA列（"#"列）がplayer_noです
+      if (inDataSection && currentCategory && values[0] && values[0].trim()) {
+        const player_no = values[0].trim();  // A列の"#"から取得
+        const first_name = values[1] ? values[1].trim() : '';  // B列
+        const last_name = values[2] ? values[2].trim() : '';   // C列
+        const country = values[3] ? values[3].trim() : '';     // D列
+        const score = values[4] ? values[4].trim() : '';       // E列
+        const placing = values[5] ? values[5].trim() : '';     // F列
+
+        // player_no（A列の"#"）とcategory（class_name）でRegistrationsから情報を取得
+        const regKey = `${player_no}|${currentCategory}`;
+        const regData = registrationMap.get(regKey);
+
+        if (!regData) {
+          console.warn(`Warning: No registration found for player_no=${player_no}, class_name=${currentCategory}`);
+        } else {
+          console.log(`Matched: player_no=${player_no}, class_name=${currentCategory} -> fwj_card_no=${regData.fwj_card_no}, player_name=${regData.player_name}`);
+        }
+
+        const scoreData = {
+          contest_date: contest_date,
+          contest_name: contestName,
+          contest_place: contest_place,
+          category_name: currentCategory,
+          player_no: player_no,
+          placing: placing || '',
+          fwj_card_no: regData ? regData.fwj_card_no : '',
+          player_name: regData ? regData.player_name : ''
+        };
+
+        scores.push(scoreData);
+      }
+    }
+
+    console.log(`Parsed ${scores.length} scores from CSV`);
+
+    if (scores.length === 0) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'インポート可能な成績データが見つかりませんでした' 
+      });
     }
 
     // バッチインポートを実行
-    const result = await scoreModel.batchImport(csvData);
+    console.log('Starting batch import...');
+    const result = await scoreModel.batchImport(scores);
+    console.log('Batch import result:', result.success ? 'SUCCESS' : 'FAILED');
     
     if (result.success) {
       res.json({
@@ -260,6 +418,7 @@ router.post('/import', requireAuth, async (req, res) => {
       res.status(500).json({ success: false, error: result.error });
     }
   } catch (error) {
+    console.error('Import error:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });

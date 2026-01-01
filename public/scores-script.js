@@ -55,6 +55,7 @@ class ScoresManager {
             column: 'contest_date',
             direction: 'desc'
         };
+        this.contestsMap = new Map();
         this.init();
     }
 
@@ -62,8 +63,9 @@ class ScoresManager {
         await this.checkAuthStatus();
         this.bindEvents();
         if (this.currentUser) {
-            // セクション展開後にフィルターオプションを読み込み
+            // セクション展開後にフィルターオプションとContestsを読み込み
             setTimeout(async () => {
+                await this.loadContests();
                 await this.loadFilterOptions();
                 await this.loadScores();
             }, 100);
@@ -203,6 +205,10 @@ class ScoresManager {
             this.openImportModal();
         });
 
+        document.getElementById('modalContestName').addEventListener('change', () => {
+            this.updateImportButtonState();
+        });
+
         document.getElementById('modalCsvFile').addEventListener('change', (e) => {
             this.handleModalFileSelect(e);
         });
@@ -293,9 +299,46 @@ class ScoresManager {
         });
     }
 
+    // Contestsデータを読み込み
+    async loadContests() {
+        try {
+            const response = await authFetch('/api/contests');
+            const result = await response.json();
+
+            if (result.success && result.data) {
+                result.data.forEach(contest => {
+                    if (contest.contest_name && contest.contest_date) {
+                        this.contestsMap.set(contest.contest_name, {
+                            date: contest.contest_date,
+                            place: contest.contest_place || ''
+                        });
+                    }
+                });
+            }
+        } catch (error) {
+            console.error('Contests loading failed:', error);
+        }
+    }
+
     // モーダル関連のメソッド
     openImportModal() {
         document.getElementById('importModal').classList.remove('hidden');
+        
+        // 大会選択肢を設定
+        const contestSelect = document.getElementById('modalContestName');
+        contestSelect.innerHTML = '<option value="">大会を選択してください</option>';
+
+        // 開催日順（降順）にソートしてオプションを追加
+        const contests = Array.from(this.contestsMap.entries())
+            .sort((a, b) => new Date(b[1].date) - new Date(a[1].date));
+
+        contests.forEach(([name, data]) => {
+            const option = document.createElement('option');
+            option.value = name;
+            option.textContent = `${name} (${data.date})`;
+            contestSelect.appendChild(option);
+        });
+        
         // フォームをリセット
         document.getElementById('modalCsvFile').value = '';
         document.getElementById('modalImportBtn').disabled = true;
@@ -310,21 +353,37 @@ class ScoresManager {
 
     handleModalFileSelect(e) {
         const file = e.target.files[0];
-        const importBtn = document.getElementById('modalImportBtn');
         
         if (file && file.type === 'text/csv') {
-            importBtn.disabled = false;
             this.selectedModalFile = file;
         } else {
-            importBtn.disabled = true;
             this.selectedModalFile = null;
             if (file) {
                 this.showNotification('CSVファイルを選択してください', 'error');
             }
         }
+        this.updateImportButtonState();
+    }
+
+    updateImportButtonState() {
+        const contestName = document.getElementById('modalContestName').value;
+        const importBtn = document.getElementById('modalImportBtn');
+        
+        if (contestName && this.selectedModalFile) {
+            importBtn.disabled = false;
+        } else {
+            importBtn.disabled = true;
+        }
     }
 
     async handleModalImport() {
+        const contestName = document.getElementById('modalContestName').value;
+
+        if (!contestName) {
+            this.showNotification('大会を選択してください', 'error');
+            return;
+        }
+
         if (!this.selectedModalFile) {
             this.showNotification('CSVファイルを選択してください', 'error');
             return;
@@ -332,12 +391,6 @@ class ScoresManager {
 
         try {
             const csvText = await this.readFileAsText(this.selectedModalFile);
-            const csvData = this.parseCSV(csvText);
-            
-            if (csvData.length === 0) {
-                this.showNotification('CSVデータが空です', 'error');
-                return;
-            }
 
             document.getElementById('modalImportBtn').disabled = true;
             document.getElementById('modalImportStatus').className = 'import-status';
@@ -345,7 +398,10 @@ class ScoresManager {
 
             const response = await authFetch(`${this.apiUrl}/import`, {
                 method: 'POST',
-                body: JSON.stringify({ csvData })
+                body: JSON.stringify({ 
+                    csvText,
+                    contestName
+                })
             });
 
             const result = await response.json();
@@ -505,6 +561,7 @@ class ScoresManager {
                         <th class="sortable" data-column="contest_date">開催日${getSortIcon('contest_date')}</th>
                         <th class="sortable" data-column="contest_name">大会名${getSortIcon('contest_name')}</th>
                         <th class="sortable" data-column="category_name">カテゴリー${getSortIcon('category_name')}</th>
+                        <th class="sortable" data-column="player_no">ゼッケン番号${getSortIcon('player_no')}</th>
                         <th class="sortable" data-column="placing">順位${getSortIcon('placing')}</th>
                         <th class="sortable" data-column="player_name">選手名${getSortIcon('player_name')}</th>
                         <th class="sortable" data-column="contest_place">開催地${getSortIcon('contest_place')}</th>
@@ -532,6 +589,7 @@ class ScoresManager {
                     <td>${score.contest_date || ''}</td>
                     <td>${this.escapeHtml(score.contest_name || '')}</td>
                     <td>${this.escapeHtml(score.category_name || '')}</td>
+                    <td>${this.escapeHtml(score.player_no || '')}</td>
                     <td>${score.placing || ''}</td>
                     <td>${this.escapeHtml(score.player_name || '')}</td>
                     <td>${this.escapeHtml(score.contest_place || '')}</td>

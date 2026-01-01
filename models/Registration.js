@@ -203,28 +203,31 @@ class Registration extends BaseModel {
           normalizedRow['fwj_card_no'] || '', // fwj_card_no (G列)
           normalizedRow['first_name']?.trim() || '', // first_name (H列)
           normalizedRow['last_name']?.trim() || '', // last_name (I列)
-          normalizedRow['email'] || '', // email (J列)
-          normalizedRow['phone'] || '', // phone (K列)
-          normalizedRow['npc_member_no'] || '', // npc_member_no (L列)
-          normalizedRow['country'] || '', // country (M列)
-          normalizedRow['age'] || '', // age (N列)
-          normalizedRow['class_name'] || '', // class_name (O列)
-          normalizedRow['class_code'] || '', // class_code (P列)
-          normalizedRow['sort_index'] || '', // sort_index (Q列)
-          normalizedRow['npc_member_status'] || normalizedRow['membership_status'] || '', // npc_member_status (R列)
-          normalizedRow['score_card'] || '', // score_card (S列)
-          normalizedRow['contest_order'] || '', // contest_order (T列)
-          normalizedRow['backstage_pass'] || '', // backstage_pass (U列)
-          normalizedRow['height'] || '', // height (V列)
-          normalizedRow['weight'] || '', // weight (W列)
-          normalizedRow['occupation'] || '', // occupation (X列)
-          normalizedRow['instagram'] || '', // instagram (Y列)
-          normalizedRow['biography'] || '', // biography (Z列)
-          now, // createdAt (AA列)
-          'TRUE', // isValid (AB列)
-          '', // deletedAt (AC列)
-          now, // updatedAt (AD列)
-          '' // restoredAt (AE列)
+          normalizedRow['fixed_first_name']?.trim() || '', // fixed_first_name (J列)
+          normalizedRow['fixed_last_name']?.trim() || '', // fixed_last_name (K列)
+          normalizedRow['email'] || '', // email (L列)
+          normalizedRow['phone'] || '', // phone (M列)
+          normalizedRow['npc_member_no'] || '', // npc_member_no (N列)
+          normalizedRow['country'] || '', // country (O列)
+          normalizedRow['age'] || '', // age (P列)
+          normalizedRow['class_name'] || '', // class_name (Q列)
+          normalizedRow['class_regulation'] || '', // class_regulation (R列)
+          normalizedRow['class_code'] || '', // class_code (S列)
+          normalizedRow['sort_index'] || '', // sort_index (T列)
+          normalizedRow['npc_member_status'] || normalizedRow['membership_status'] || '', // npc_member_status (U列)
+          normalizedRow['score_card'] || '', // score_card (V列)
+          normalizedRow['contest_order'] || '', // contest_order (W列)
+          normalizedRow['backstage_pass'] || '', // backstage_pass (X列)
+          normalizedRow['height'] || '', // height (Y列)
+          normalizedRow['weight'] || '', // weight (Z列)
+          normalizedRow['occupation'] || '', // occupation (AA列)
+          normalizedRow['instagram'] || '', // instagram (AB列)
+          normalizedRow['biography'] || '', // biography (AC列)
+          now, // createdAt (AD列)
+          'TRUE', // isValid (AE列)
+          '', // deletedAt (AF列)
+          now, // updatedAt (AG列)
+          '' // restoredAt (AH列)
         ];
       });
 
@@ -250,7 +253,7 @@ class Registration extends BaseModel {
           }
 
           console.log(`Processing batch ${Math.floor(i/batchSize) + 1}, rows ${i + 1}-${Math.min(i + batchSize, rows.length)}`);
-          await this.getSheetsService().appendValues(`${this.sheetName}!A:AE`, batch);
+          await this.getSheetsService().appendValues(`${this.sheetName}!A:AH`, batch);
           imported += batch.length;
 
         } catch (batchError) {
@@ -277,6 +280,105 @@ class Registration extends BaseModel {
 
     } catch (error) {
       console.error('Registration batch import error:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  async getById(id) {
+    try {
+      const allRecords = await this.findAll();
+      const record = allRecords.find(r => r.id === id);
+
+      if (!record) {
+        return { success: false, error: 'レコードが見つかりません' };
+      }
+
+      return { success: true, data: record };
+    } catch (error) {
+      console.error('Get by ID error:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  async update(id, updateData) {
+    try {
+      const allRecords = await this.findAll();
+      const recordIndex = allRecords.findIndex(r => r.id === id);
+
+      if (recordIndex === -1) {
+        return { success: false, error: 'レコードが見つかりません' };
+      }
+
+      const record = allRecords[recordIndex];
+
+      // 更新可能なフィールド
+      const updatableFields = [
+        'player_no', 'name_ja', 'name_ja_kana', 'fwj_card_no',
+        'first_name', 'last_name', 'fixed_first_name', 'fixed_last_name',
+        'email', 'phone', 'npc_member_no', 'country', 'age',
+        'class_name', 'class_code', 'class_regulation', 'sort_index',
+        'npc_member_status', 'score_card', 'contest_order',
+        'backstage_pass', 'height', 'weight', 'occupation',
+        'instagram', 'biography'
+      ];
+
+      // フィールドを更新
+      updatableFields.forEach(field => {
+        if (updateData.hasOwnProperty(field)) {
+          record[field] = updateData[field];
+        }
+      });
+
+      // updatedAtを更新
+      record.updatedAt = new Date().toISOString();
+
+      // Google Sheetsに書き込み
+      const rowNumber = recordIndex + 2; // ヘッダー行を考慮
+      const values = [[
+        record.id,
+        record.contest_date,
+        record.contest_name,
+        record.player_no || '',
+        record.name_ja || '',
+        record.name_ja_kana || '',
+        record.fwj_card_no || '',
+        record.first_name || '',
+        record.last_name || '',
+        record.fixed_first_name || '',
+        record.fixed_last_name || '',
+        record.email || '',
+        record.phone || '',
+        record.npc_member_no || '',
+        record.country || '',
+        record.age || '',
+        record.class_name || '',
+        record.class_regulation || '',
+        record.class_code || '',
+        record.sort_index || '',
+        record.npc_member_status || '',
+        record.score_card || '',
+        record.contest_order || '',
+        record.backstage_pass || '',
+        record.height || '',
+        record.weight || '',
+        record.occupation || '',
+        record.instagram || '',
+        record.biography || '',
+        record.createdAt,
+        record.isValid,
+        record.deletedAt || '',
+        record.updatedAt,
+        record.restoredAt || ''
+      ]];
+
+      await this.getSheetsService().updateValues(
+        `${this.sheetName}!A${rowNumber}:AH${rowNumber}`,
+        values
+      );
+
+      return { success: true, data: record };
+    } catch (error) {
+      console.error('Update error:', error);
       return { success: false, error: error.message };
     }
   }

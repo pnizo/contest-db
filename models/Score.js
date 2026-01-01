@@ -214,49 +214,94 @@ class Score extends BaseModel {
 
   async batchImport(csvData) {
     try {
-      // ヘッダー検証
-      const headerValidation = this.validateHeaders(csvData);
-      if (!headerValidation.isValid) {
-        return {
-          success: false,
-          error: headerValidation.error
-        };
+      console.log(`Starting batch import with ${csvData.length} records`);
+      
+      // データが配列でない、または空の場合はエラー
+      if (!Array.isArray(csvData) || csvData.length === 0) {
+        return { success: false, error: 'インポートするデータがありません' };
       }
 
-      // CSVデータをスプレッドシート行形式に変換
-      const rows = csvData.map(row => {
-        const now = new Date().toISOString();
+      // Google Sheets APIを初期化
+      await this.ensureInitialized();
 
-        // ヘッダーを小文字に変換してアクセス
-        const normalizedRow = {};
-        for (const key in row) {
-          normalizedRow[key.toLowerCase()] = row[key];
+      // データがすでに構造化されている場合（オブジェクトの配列）はそのまま使用
+      // データの形式を確認
+      const firstItem = csvData[0];
+      const isStructured = typeof firstItem === 'object' && 
+                          !Array.isArray(firstItem) &&
+                          ('contest_date' in firstItem || 'fwj_card_no' in firstItem);
+
+      let rows;
+
+      if (isStructured) {
+        // 構造化されたデータ（routes/scores.jsから渡される形式）
+        console.log('Processing structured data');
+        rows = csvData.map(row => {
+          const now = new Date().toISOString();
+          return [
+            Date.now().toString() + Math.random().toString(36).substr(2, 9), // id (unique)
+            row.fwj_card_no || '',
+            row.contest_date || '',
+            row.contest_name || '',
+            row.contest_place || '',
+            row.category_name || '',
+            row.placing || '',
+            row.player_no || '',
+            row.player_name || '',
+            now, // createdAt
+            'TRUE', // isValid
+            '', // deletedAt
+            now, // updatedAt
+            '' // restoredAt
+          ];
+        });
+      } else {
+        // 従来のCSV形式（ヘッダー検証あり）
+        console.log('Processing CSV-style data with header validation');
+        const headerValidation = this.validateHeaders(csvData);
+        if (!headerValidation.isValid) {
+          return {
+            success: false,
+            error: headerValidation.error
+          };
         }
 
-        // CSVのnpcj_noをfwj_card_noにマッピング
-        const fwjNo = normalizedRow.fwj_card_no || normalizedRow.npcj_no || '';
+        rows = csvData.map(row => {
+          const now = new Date().toISOString();
 
-        return [
-          Date.now().toString() + Math.random().toString(36).substr(2, 9), // id (unique)
-          fwjNo,
-          normalizedRow.contest_date || '',
-          normalizedRow.contest_name || '',
-          normalizedRow.contest_place || '',
-          normalizedRow.category_name || '',
-          normalizedRow.placing || '',
-          normalizedRow.player_no || '',
-          normalizedRow.player_name || '',
-          now, // createdAt
-          'TRUE', // isValid
-          '', // deletedAt
-          now, // updatedAt
-          '' // restoredAt
-        ];
-      });
+          // ヘッダーを小文字に変換してアクセス
+          const normalizedRow = {};
+          for (const key in row) {
+            normalizedRow[key.toLowerCase()] = row[key];
+          }
+
+          // CSVのnpcj_noをfwj_card_noにマッピング
+          const fwjNo = normalizedRow.fwj_card_no || normalizedRow.npcj_no || '';
+
+          return [
+            Date.now().toString() + Math.random().toString(36).substr(2, 9), // id (unique)
+            fwjNo,
+            normalizedRow.contest_date || '',
+            normalizedRow.contest_name || '',
+            normalizedRow.contest_place || '',
+            normalizedRow.category_name || '',
+            normalizedRow.placing || '',
+            normalizedRow.player_no || '',
+            normalizedRow.player_name || '',
+            now, // createdAt
+            'TRUE', // isValid
+            '', // deletedAt
+            now, // updatedAt
+            '' // restoredAt
+          ];
+        });
+      }
 
       if (rows.length === 0) {
         return { success: false, error: 'インポートするデータがありません' };
       }
+
+      console.log(`Appending ${rows.length} rows to Google Sheets`);
 
       // Google Sheets APIを使用してバッチ追記
       const sheets = this.sheetsService.sheets;
@@ -269,6 +314,8 @@ class Score extends BaseModel {
           values: rows
         }
       });
+
+      console.log('Import completed successfully');
 
       return {
         success: true,

@@ -208,6 +208,14 @@ class RegistrationsManager {
             this.handleModalExport();
         });
 
+        document.getElementById('saveEditBtn').addEventListener('click', () => {
+            this.saveEdit();
+        });
+
+        document.getElementById('swapNamesBtn').addEventListener('click', () => {
+            this.swapNames();
+        });
+
         // 削除済み表示機能を削除
         // document.getElementById('toggleDeletedBtn').addEventListener('click', () => {
         //     this.toggleDeletedRecords();
@@ -754,6 +762,7 @@ class RegistrationsManager {
             { key: 'name_ja_kana', label: 'フリガナ' },
             { key: 'first_name', label: 'First Name' },
             { key: 'last_name', label: 'Last Name' },
+            { key: 'edit_action', label: '操作', isAction: true }, // 編集ボタン列
             { key: 'email', label: 'Email' },
             { key: 'phone', label: '電話番号' },
             { key: 'fwj_card_no', label: 'FWJ card #' },
@@ -762,6 +771,7 @@ class RegistrationsManager {
             { key: 'age', label: '年齢' },
             { key: 'class_name', label: 'クラス' },
             { key: 'class_code', label: 'クラスコード' },
+            { key: 'class_regulation', label: 'クラス規定' },
             { key: 'sort_index', label: 'ソート順' },
             { key: 'npc_member_status', label: 'NPC会員状態' },
             { key: 'score_card', label: 'スコアカード' },
@@ -776,19 +786,23 @@ class RegistrationsManager {
 
         headers.forEach(header => {
             const th = document.createElement('th');
+
+            // 操作列の場合
+            if (header.isAction) {
+                if (this.isAdmin) {
+                    th.textContent = header.label;
+                    th.style.textAlign = 'center';
+                    headerRow.appendChild(th);
+                }
+                return;
+            }
+
             th.className = 'sortable';
             th.setAttribute('data-column', header.key);
             th.innerHTML = `${header.label}${this.getSortIcon(header.key)}`;
             th.addEventListener('click', () => this.sortBy(header.key));
             headerRow.appendChild(th);
         });
-
-        // 操作列を削除
-        // if (this.isAdmin) {
-        //     const actionTh = document.createElement('th');
-        //     actionTh.textContent = '操作';
-        //     headerRow.appendChild(actionTh);
-        // }
 
         table.appendChild(headerRow);
 
@@ -810,23 +824,47 @@ class RegistrationsManager {
             }
 
             headers.forEach(header => {
+                // 操作列の場合
+                if (header.isAction) {
+                    if (this.isAdmin) {
+                        const actionTd = document.createElement('td');
+                        actionTd.style.textAlign = 'center';
+                        actionTd.innerHTML = this.createActionButtons(registration);
+                        row.appendChild(actionTd);
+                    }
+                    return;
+                }
+
                 const td = document.createElement('td');
                 let value = registration[header.key] || '';
-                
+
                 if (header.key === 'contest_date' && value) {
                     value = new Date(value).toLocaleDateString('ja-JP');
                 }
-                
-                td.textContent = value;
+
+                // First Name/Last Nameの表示ロジック
+                if (header.key === 'first_name') {
+                    const fixedValue = registration['fixed_first_name'] || '';
+                    if (fixedValue !== '') {
+                        td.textContent = fixedValue;
+                        td.style.color = '#dc2626'; // 赤色
+                    } else {
+                        td.textContent = value;
+                    }
+                } else if (header.key === 'last_name') {
+                    const fixedValue = registration['fixed_last_name'] || '';
+                    if (fixedValue !== '') {
+                        td.textContent = fixedValue;
+                        td.style.color = '#dc2626'; // 赤色
+                    } else {
+                        td.textContent = value;
+                    }
+                } else {
+                    td.textContent = value;
+                }
+
                 row.appendChild(td);
             });
-
-            // 操作列を削除
-            // if (this.isAdmin) {
-            //     const actionTd = document.createElement('td');
-            //     actionTd.innerHTML = this.createActionButtons(registration);
-            //     row.appendChild(actionTd);
-            // }
 
             table.appendChild(row);
         });
@@ -836,16 +874,7 @@ class RegistrationsManager {
     }
 
     createActionButtons(registration) {
-        let buttons = '';
-        
-        // 管理者向けの復元・完全削除機能も削除
-        // if (registration.isValid === 'FALSE') {
-        //     buttons += `<button class="btn btn-sm btn-success" onclick="registrationsManager.restoreRegistration('${registration.id}')">復元</button>`;
-        //     buttons += `<button class="btn btn-sm btn-danger" onclick="registrationsManager.permanentDeleteRegistration('${registration.id}')">完全削除</button>`;
-        // } else {
-        //     // 編集・削除ボタンを削除
-        // }
-        
+        const buttons = `<button class="btn btn-sm btn-edit" onclick="registrationsManager.openEditModal('${registration.id}')">編集</button>`;
         return buttons;
     }
 
@@ -1079,6 +1108,104 @@ class RegistrationsManager {
     //         this.showNotification('エラーが発生しました', 'error');
     //     }
     // }
+
+    async openEditModal(id) {
+        try {
+            // レコード詳細を取得
+            const response = await authFetch(`${this.apiUrl}/${id}`);
+            const result = await response.json();
+
+            if (!result.success) {
+                this.showNotification('レコードの取得に失敗しました', 'error');
+                return;
+            }
+
+            const registration = result.data;
+
+            // モーダルのフィールドに値をセット
+            document.getElementById('editRegistrationId').value = registration.id;
+            document.getElementById('editContestDate').value = registration.contest_date || '';
+            document.getElementById('editContestName').value = registration.contest_name || '';
+            document.getElementById('editPlayerNo').value = registration.player_no || '';
+            document.getElementById('editFwjCardNo').value = registration.fwj_card_no || '';
+            document.getElementById('editNameJa').value = registration.name_ja || '';
+            document.getElementById('editNameJaKana').value = registration.name_ja_kana || '';
+            document.getElementById('editFirstName').value = registration.first_name || '';
+            document.getElementById('editLastName').value = registration.last_name || '';
+            document.getElementById('editFixedFirstName').value = registration.fixed_first_name || '';
+            document.getElementById('editFixedLastName').value = registration.fixed_last_name || '';
+            document.getElementById('editEmail').value = registration.email || '';
+            document.getElementById('editPhone').value = registration.phone || '';
+            document.getElementById('editNpcMemberNo').value = registration.npc_member_no || '';
+            document.getElementById('editNpcMemberStatus').value = registration.npc_member_status || '';
+            document.getElementById('editCountry').value = registration.country || '';
+            document.getElementById('editAge').value = registration.age || '';
+            document.getElementById('editClassName').value = registration.class_name || '';
+            document.getElementById('editClassCode').value = registration.class_code || '';
+            document.getElementById('editClassRegulation').value = registration.class_regulation || '';
+            document.getElementById('editSortIndex').value = registration.sort_index || '';
+            document.getElementById('editScoreCard').value = registration.score_card || '';
+            document.getElementById('editContestOrder').value = registration.contest_order || '';
+            document.getElementById('editBackstagePass').value = registration.backstage_pass || '';
+            document.getElementById('editHeight').value = registration.height || '';
+            document.getElementById('editWeight').value = registration.weight || '';
+            document.getElementById('editOccupation').value = registration.occupation || '';
+            document.getElementById('editInstagram').value = registration.instagram || '';
+            document.getElementById('editBiography').value = registration.biography || '';
+
+            // モーダル表示
+            document.getElementById('editModal').classList.remove('hidden');
+        } catch (error) {
+            console.error('Edit modal error:', error);
+            this.showNotification('エラーが発生しました', 'error');
+        }
+    }
+
+    closeEditModal() {
+        document.getElementById('editModal').classList.add('hidden');
+    }
+
+    async saveEdit() {
+        try {
+            const id = document.getElementById('editRegistrationId').value;
+            // 編集可能なフィールドのみを送信
+            const updateData = {
+                name_ja: document.getElementById('editNameJa').value,
+                name_ja_kana: document.getElementById('editNameJaKana').value,
+                fixed_first_name: document.getElementById('editFixedFirstName').value,
+                fixed_last_name: document.getElementById('editFixedLastName').value,
+                fwj_card_no: document.getElementById('editFwjCardNo').value
+            };
+
+            const response = await authFetch(`${this.apiUrl}/${id}`, {
+                method: 'PUT',
+                body: JSON.stringify(updateData)
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                this.showNotification('更新しました', 'success');
+                this.closeEditModal();
+                await this.loadRegistrations();
+            } else {
+                this.showNotification(result.error || '更新に失敗しました', 'error');
+            }
+        } catch (error) {
+            console.error('Save edit error:', error);
+            this.showNotification('エラーが発生しました', 'error');
+        }
+    }
+
+    swapNames() {
+        // Last Name → Fixed First Name
+        const lastName = document.getElementById('editLastName').value;
+        document.getElementById('editFixedFirstName').value = lastName;
+
+        // First Name → Fixed Last Name
+        const firstName = document.getElementById('editFirstName').value;
+        document.getElementById('editFixedLastName').value = firstName;
+    }
 
     showNotification(message, type = 'info') {
         const notification = document.getElementById('notification');

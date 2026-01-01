@@ -110,24 +110,24 @@
                     </div>
                 </div>
                 <div class="form-group">
-                    <label for="modalRegistrationsFile">1. Registrations.csv <span style="color: red;">*必須</span>:</label>
+                    <label for="modalRegistrationsFile">1. registrations.csv <span style="color: red;">*必須</span>:</label>
                     <input type="file" id="modalRegistrationsFile" name="registrationsFile" accept=".csv" required>
-                    <small>※選手情報の基本データ</small>
+                    <small>※出場登録の基本データ</small>
                 </div>
                 <div class="form-group">
                     <label for="modalAthleteListFile">2. athlete_list.csv <span style="color: red;">*必須</span>:</label>
                     <input type="file" id="modalAthleteListFile" name="athleteListFile" accept=".csv" required>
-                    <small>※詳細情報（電話、身長、体重等）</small>
+                    <small>※選手詳細情報（電話、身長、体重等）</small>
                 </div>
                 <div class="form-group">
                     <label for="modalOrderFile">3. order.csv <span style="color: red;">*必須</span>:</label>
                     <input type="file" id="modalOrderFile" name="orderFile" accept=".csv" required>
-                    <small>※クラス別の出場順とスコアカード</small>
+                    <small>※クラス分け、出場順とスコアカード</small>
                 </div>
                 <div class="form-group">
                     <label for="modalExceptionsFile">4. exceptions.csv <span style="color: red;">*必須</span>:</label>
                     <input type="file" id="modalExceptionsFile" name="exceptionsFile" accept=".csv" required>
-                    <small>※会員番号とステータスの上書き</small>
+                    <small>※NPC Worldwide Membership 失効情報</small>
                 </div>
                 <div class="form-actions">
                     <button type="button" onclick="registrationsManager.closeImportModal()" class="btn btn-secondary">キャンセル</button>
@@ -153,11 +153,12 @@
                     </select>
                 </div>
                 <div class="form-group">
-                    <label for="exportType">出力リスト:</label>
+                    <label for="exportType">リスト:</label>
                     <select id="exportType" required>
                         <option value="">種類を選択</option>
                         <option value="membership">メール配信用リスト</option>
                         <option value="athlete_numbers">ゼッケン表示用リスト</option>
+                        <option value="all_fields">全項目</option>
                     </select>
                 </div>
                 <div class="form-actions">
@@ -165,6 +166,168 @@
                     <button type="button" id="modalExportBtn" disabled class="btn btn-primary">CSVをダウンロード</button>
                 </div>
                 <div id="modalExportStatus" class="import-status hidden"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Modal -->
+    <div id="editModal" class="modal hidden">
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <h2>出場登録編集</h2>
+                <div style="display: flex; gap: 10px;">
+                    <button type="button" onclick="registrationsManager.closeEditModal()" class="btn btn-secondary">キャンセル</button>
+                    <button type="button" id="saveEditBtn" class="btn btn-primary">保存</button>
+                    <button class="modal-close" onclick="registrationsManager.closeEditModal()">&times;</button>
+                </div>
+            </div>
+            <div class="modal-form">
+                <input type="hidden" id="editRegistrationId">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="editContestDate">大会開催日:</label>
+                        <input type="date" id="editContestDate" readonly style="background-color: #f0f0f0;">
+                    </div>
+                    <div class="form-group">
+                        <label for="editContestName">大会名:</label>
+                        <input type="text" id="editContestName" readonly style="background-color: #f0f0f0;">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="editPlayerNo">ゼッケン番号:</label>
+                        <input type="text" id="editPlayerNo" readonly style="background-color: #f0f0f0;">
+                    </div>
+                    <div class="form-group">
+                        <label for="editFwjCardNo">FWJカード番号:</label>
+                        <input type="text" id="editFwjCardNo">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="editNameJa">氏名:</label>
+                        <input type="text" id="editNameJa">
+                    </div>
+                    <div class="form-group">
+                        <label for="editNameJaKana">フリガナ:</label>
+                        <input type="text" id="editNameJaKana">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="editFirstName">First Name:</label>
+                        <input type="text" id="editFirstName" readonly style="background-color: #f0f0f0;">
+                    </div>
+                    <div class="form-group">
+                        <label for="editLastName">Last Name:</label>
+                        <input type="text" id="editLastName" readonly style="background-color: #f0f0f0;">
+                    </div>
+                    <div class="form-group" style="display: flex; align-items: flex-end;">
+                        <button type="button" id="swapNamesBtn" class="btn btn-secondary" style="white-space: nowrap;">姓名入換</button>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="editFixedFirstName">Fixed First Name:</label>
+                        <input type="text" id="editFixedFirstName">
+                    </div>
+                    <div class="form-group">
+                        <label for="editFixedLastName">Fixed Last Name:</label>
+                        <input type="text" id="editFixedLastName">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="editEmail">Email:</label>
+                        <input type="email" id="editEmail" readonly style="background-color: #f0f0f0;">
+                    </div>
+                    <div class="form-group">
+                        <label for="editPhone">電話番号:</label>
+                        <input type="text" id="editPhone" readonly style="background-color: #f0f0f0;">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="editNpcMemberNo">NPC会員番号:</label>
+                        <input type="text" id="editNpcMemberNo" readonly style="background-color: #f0f0f0;">
+                    </div>
+                    <div class="form-group">
+                        <label for="editNpcMemberStatus">NPC会員状態:</label>
+                        <input type="text" id="editNpcMemberStatus" readonly style="background-color: #f0f0f0;">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="editCountry">国:</label>
+                        <input type="text" id="editCountry" readonly style="background-color: #f0f0f0;">
+                    </div>
+                    <div class="form-group">
+                        <label for="editAge">年齢:</label>
+                        <input type="number" id="editAge" readonly style="background-color: #f0f0f0;">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="editClassName">クラス名:</label>
+                        <input type="text" id="editClassName" readonly style="background-color: #f0f0f0;">
+                    </div>
+                    <div class="form-group">
+                        <label for="editClassCode">クラスコード:</label>
+                        <input type="text" id="editClassCode" readonly style="background-color: #f0f0f0;">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="editClassRegulation">クラス規定:</label>
+                        <input type="text" id="editClassRegulation" readonly style="background-color: #f0f0f0;">
+                    </div>
+                    <div class="form-group">
+                        <label for="editSortIndex">ソート順:</label>
+                        <input type="text" id="editSortIndex" readonly style="background-color: #f0f0f0;">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="editScoreCard">スコアカード:</label>
+                        <input type="text" id="editScoreCard" readonly style="background-color: #f0f0f0;">
+                    </div>
+                    <div class="form-group">
+                        <label for="editContestOrder">開催順:</label>
+                        <input type="text" id="editContestOrder" readonly style="background-color: #f0f0f0;">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="editBackstagePass">バックステージパス:</label>
+                        <input type="text" id="editBackstagePass" readonly style="background-color: #f0f0f0;">
+                    </div>
+                    <div class="form-group">
+                        <label for="editHeight">身長:</label>
+                        <input type="text" id="editHeight" readonly style="background-color: #f0f0f0;">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="editWeight">体重:</label>
+                        <input type="text" id="editWeight" readonly style="background-color: #f0f0f0;">
+                    </div>
+                    <div class="form-group">
+                        <label for="editOccupation">職業:</label>
+                        <input type="text" id="editOccupation" readonly style="background-color: #f0f0f0;">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="editInstagram">Instagram:</label>
+                        <input type="text" id="editInstagram" readonly style="background-color: #f0f0f0;">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group full-width">
+                        <label for="editBiography">Biography:</label>
+                        <textarea id="editBiography" rows="3" readonly style="background-color: #f0f0f0;"></textarea>
+                    </div>
+                </div>
             </div>
         </div>
     </div>

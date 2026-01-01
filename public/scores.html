@@ -91,14 +91,21 @@
     <div id="importModal" class="modal hidden">
         <div class="modal-content">
             <div class="modal-header">
-                <h2>CSVインポート</h2>
+                <h2>成績CSVインポート</h2>
                 <button class="modal-close" onclick="scoresManager.closeImportModal()">&times;</button>
             </div>
             <div class="modal-form">
                 <div class="form-group">
-                    <label for="modalCsvFile">CSVファイルを選択:</label>
+                    <label for="modalContestName">大会を選択:</label>
+                    <select id="modalContestName" required>
+                        <option value="">大会を選択してください</option>
+                    </select>
+                    <small>※インポートする成績データの大会を選択してください</small>
+                </div>
+                <div class="form-group">
+                    <label for="modalCsvFile">成績CSVファイルを選択:</label>
                     <input type="file" id="modalCsvFile" name="csvFile" accept=".csv" required>
-                    <small>※CSV形式のファイルを選択してください</small>
+                    <small>※NPC Worldwide Results形式のCSVファイルを選択してください</small>
                 </div>
                 <div class="form-actions">
                     <button type="button" onclick="scoresManager.closeImportModal()" class="btn btn-secondary">キャンセル</button>
