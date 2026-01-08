@@ -317,8 +317,9 @@ router.post('/import', requireAuth, async (req, res) => {
     console.log('Using selected contest:', contestName, contest_date);
 
     const scores = [];
-    const missingRegistrations = []; // マッチしないレコードを記録
+    const missingRegistrations = []; // 完全に処理できないレコードを記録（現在は使用しない）
     const fallbackUsedCount = []; // フォールバックが使用されたレコードを記録
+    const csvNameUsedCount = []; // CSVの名前を使用したレコードを記録
     let currentCategory = '';
     let inDataSection = false;
     let lineNumber = 0;
@@ -372,6 +373,7 @@ router.post('/import', requireAuth, async (req, res) => {
         const regKey = `${player_no}|${currentCategory}`;
         let regData = registrationMap.get(regKey);
         let usedFallback = false;
+        let usedCSVName = false;
         let fallbackFromClass = null;
 
         // 完全一致するエントリーがない場合、同じゼッケン番号の他のクラスからフォールバック
@@ -397,25 +399,20 @@ router.post('/import', requireAuth, async (req, res) => {
             });
             console.warn(`Fallback used: player_no=${player_no}, class_name=${currentCategory} -> Using data from class=${fallbackReg.class_name} (fwj_card_no=${regData.fwj_card_no}, player_name=${regData.player_name})`);
           } else {
-            // フォールバックもできない場合のみエラーとして記録
-            const errorInfo = {
+            // フォールバックもできない場合、CSVの名前情報を使用
+            const csvName = `${first_name} ${last_name}`.trim();
+            regData = {
+              fwj_card_no: '', // 空欄
+              player_name: csvName // CSVの名前を使用
+            };
+            usedCSVName = true;
+            csvNameUsedCount.push({
               player_no: player_no,
               class_name: currentCategory,
-              line: lineNumber,
-              name: `${first_name} ${last_name}`.trim(),
-              country: country,
-              // デバッグ情報：Registrationsに同じゼッケン番号で別クラスがあるか確認
-              samePlayerNoOtherClasses: contestRegistrations
-                .filter(reg => reg.player_no === player_no && reg.class_name !== currentCategory)
-                .map(reg => reg.class_name),
-              // デバッグ情報：同じクラス名で別のゼッケン番号があるか確認
-              sameClassOtherPlayerNos: contestRegistrations
-                .filter(reg => reg.class_name === currentCategory && reg.player_no !== player_no)
-                .map(reg => reg.player_no)
-                .slice(0, 5) // 最大5件表示
-            };
-            missingRegistrations.push(errorInfo);
-            console.error(`Error: No registration found for player_no=${player_no}, class_name=${currentCategory}, name=${errorInfo.name}, and no fallback available`);
+              csv_name: csvName,
+              line: lineNumber
+            });
+            console.warn(`CSV name used: player_no=${player_no}, class_name=${currentCategory} -> No registration found, using CSV name="${csvName}", fwj_card_no=empty`);
           }
         } else {
           console.log(`Matched: player_no=${player_no}, class_name=${currentCategory} -> fwj_card_no=${regData.fwj_card_no}, player_name=${regData.player_name}`);
@@ -438,53 +435,7 @@ router.post('/import', requireAuth, async (req, res) => {
 
     console.log(`Parsed ${scores.length} scores from CSV`);
 
-    // マッチしないレコードがある場合はエラーを返す
-    if (missingRegistrations.length > 0) {
-      const errorDetails = missingRegistrations.map(item => {
-        let errorMsg = `  【ゼッケン番号: ${item.player_no}, カテゴリー: ${item.class_name}】\n    選手名: ${item.name}, 国: ${item.country}, CSV行: ${item.line}`;
-        
-        // 同じゼッケン番号で別クラスの登録がある場合
-        if (item.samePlayerNoOtherClasses && item.samePlayerNoOtherClasses.length > 0) {
-          errorMsg += `\n    ✗ このゼッケン番号(${item.player_no})の選手は以下のクラスにのみ登録されています:\n      ${item.samePlayerNoOtherClasses.join(', ')}`;
-          errorMsg += `\n    ⚠ 「${item.class_name}」クラスへのエントリーがRegistrationsに存在しません`;
-          errorMsg += `\n    💡 対処法: Registrationsテーブルにゼッケン番号${item.player_no}の「${item.class_name}」クラスのエントリーを追加してください`;
-        }
-        
-        // 同じクラス名で別のゼッケン番号がある場合（エントリーがない選手が別クラスから出場した場合）
-        else if (item.sameClassOtherPlayerNos && item.sameClassOtherPlayerNos.length > 0) {
-          errorMsg += `\n    ✗ 「${item.class_name}」クラスには以下のゼッケン番号が登録されています:\n      ${item.sameClassOtherPlayerNos.join(', ')}など`;
-          errorMsg += `\n    ⚠ ゼッケン番号${item.player_no}の「${item.class_name}」クラスへのエントリーがありません`;
-          errorMsg += `\n    💡 対処法: Registrationsテーブルにゼッケン番号${item.player_no}の「${item.class_name}」クラスのエントリーを追加してください`;
-        }
-        
-        // 両方とも見つからない場合（完全に登録がない選手）
-        else {
-          errorMsg += `\n    ✗ この選手のエントリーがRegistrationsテーブルに一切存在しません`;
-          errorMsg += `\n    💡 対処法: Registrationsテーブルにこの選手のエントリーを追加してください`;
-        }
-        
-        return errorMsg;
-      }).join('\n\n');
-      
-      console.error('Missing registrations details:', errorDetails);
-      
-      return res.status(400).json({ 
-        success: false, 
-        error: `【Registrationsマッチングエラー】\n\n` +
-               `${missingRegistrations.length}件の成績データに対応するRegistrationsレコードが見つかりません。\n` +
-               `※マッチングは「ゼッケン番号(player_no)」と「クラス名(class_name)」の両方が一致する必要があります。\n\n` +
-               `${errorDetails}\n\n` +
-               `【重要】選手が複数のクラスにエントリーする場合の注意点：\n` +
-               `・同じゼッケン番号の選手でも、出場する各クラスごとにRegistrationsに別々のエントリーが必要です\n` +
-               `・例：ゼッケン番号5の選手が「Novice」と「Open」に出場する場合\n` +
-               `  → player_no=5, class_name="Novice" のレコード\n` +
-               `  → player_no=5, class_name="Open" のレコード\n` +
-               `  の2つのエントリーがRegistrationsに必要です\n\n` +
-               `【確認事項】\n` +
-               `・大会日: ${contest_date}（この日付でRegistrationsをフィルタリングしています）\n` +
-               `・クラス名の完全一致（大文字小文字、スペース、ハイフンなどが完全に一致している必要があります）`
-      });
-    }
+    // missingRegistrationsはもはや使用しない（常に空）ため、エラーチェックを削除
 
     if (scores.length === 0) {
       return res.status(400).json({ 
@@ -501,22 +452,49 @@ router.post('/import', requireAuth, async (req, res) => {
     if (result.success) {
       let message = `${result.data.imported}件の成績を正常にインポートしました`;
       
-      // フォールバックが使用された場合は警告メッセージを追加
+      // フォールバックまたはCSV名が使用された場合は警告メッセージを追加
+      const hasWarnings = fallbackUsedCount.length > 0 || csvNameUsedCount.length > 0;
+      
+      if (hasWarnings) {
+        message += '\n\n【⚠ 警告】Registrationsに完全一致するエントリーがない成績がありました：';
+      }
+      
+      // フォールバックが使用された場合
       if (fallbackUsedCount.length > 0) {
-        message += `\n\n⚠ ${fallbackUsedCount.length}件の成績で、Registrationsに該当クラスのエントリーがなかったため、同じゼッケン番号の他のクラスから情報を取得しました（フォールバック機能）。`;
+        message += `\n\n🔄 フォールバック使用: ${fallbackUsedCount.length}件`;
+        message += `\n（同じゼッケン番号の他のクラスから情報を取得）`;
         
         // 詳細情報（最大5件まで表示）
         const fallbackDetails = fallbackUsedCount.slice(0, 5).map(item => 
           `  - ゼッケン番号${item.player_no}の「${item.class_name}」→「${item.fallback_class}」から取得`
         ).join('\n');
         
-        message += `\n\n【フォールバック使用詳細】（最大5件表示）\n${fallbackDetails}`;
+        message += `\n${fallbackDetails}`;
         
         if (fallbackUsedCount.length > 5) {
           message += `\n  ...他${fallbackUsedCount.length - 5}件`;
         }
+      }
+      
+      // CSV名が使用された場合
+      if (csvNameUsedCount.length > 0) {
+        message += `\n\n📝 CSV名使用: ${csvNameUsedCount.length}件`;
+        message += `\n（Registrationsにゼッケン番号が存在しないため、CSVの名前を使用、FWJ番号は空欄）`;
         
-        message += `\n\n※正確なデータ管理のため、該当クラスのRegistrationsエントリーの追加を推奨します。`;
+        // 詳細情報（最大5件まで表示）
+        const csvDetails = csvNameUsedCount.slice(0, 5).map(item => 
+          `  - ゼッケン番号${item.player_no}「${item.class_name}」→ CSV名「${item.csv_name}」を使用`
+        ).join('\n');
+        
+        message += `\n${csvDetails}`;
+        
+        if (csvNameUsedCount.length > 5) {
+          message += `\n  ...他${csvNameUsedCount.length - 5}件`;
+        }
+      }
+      
+      if (hasWarnings) {
+        message += `\n\n💡 推奨事項: データの正確性を確保するため、該当選手のRegistrationsエントリーを追加することをお勧めします。`;
       }
       
       res.json({
@@ -525,6 +503,7 @@ router.post('/import', requireAuth, async (req, res) => {
           total: result.data.total,
           imported: result.data.imported,
           fallbackUsed: fallbackUsedCount.length,
+          csvNameUsed: csvNameUsedCount.length,
           message: message
         }
       });
