@@ -318,6 +318,7 @@ router.post('/import', requireAuth, async (req, res) => {
 
     const scores = [];
     const missingRegistrations = []; // マッチしないレコードを記録
+    const fallbackUsedCount = []; // フォールバックが使用されたレコードを記録
     let currentCategory = '';
     let inDataSection = false;
     let lineNumber = 0;
@@ -369,18 +370,53 @@ router.post('/import', requireAuth, async (req, res) => {
 
         // player_no（A列の"#"）とcategory（class_name）でRegistrationsから情報を取得
         const regKey = `${player_no}|${currentCategory}`;
-        const regData = registrationMap.get(regKey);
+        let regData = registrationMap.get(regKey);
+        let usedFallback = false;
+        let fallbackFromClass = null;
 
+        // 完全一致するエントリーがない場合、同じゼッケン番号の他のクラスからフォールバック
         if (!regData) {
-          // マッチしないレコードを記録
-          const errorInfo = {
-            player_no: player_no,
-            class_name: currentCategory,
-            line: lineNumber,
-            name: `${first_name} ${last_name}`.trim()
-          };
-          missingRegistrations.push(errorInfo);
-          console.error(`Error: No registration found for player_no=${player_no}, class_name=${currentCategory}, name=${errorInfo.name}`);
+          const fallbackRegistrations = contestRegistrations.filter(
+            reg => reg.player_no === player_no && reg.class_name !== currentCategory
+          );
+          
+          if (fallbackRegistrations.length > 0) {
+            // 同じゼッケン番号の他のクラスから情報を取得（最初の1件を使用）
+            const fallbackReg = fallbackRegistrations[0];
+            regData = {
+              fwj_card_no: fallbackReg.fwj_card_no || '',
+              player_name: fallbackReg.name_ja || ''
+            };
+            usedFallback = true;
+            fallbackFromClass = fallbackReg.class_name;
+            fallbackUsedCount.push({
+              player_no: player_no,
+              class_name: currentCategory,
+              fallback_class: fallbackFromClass,
+              line: lineNumber
+            });
+            console.warn(`Fallback used: player_no=${player_no}, class_name=${currentCategory} -> Using data from class=${fallbackReg.class_name} (fwj_card_no=${regData.fwj_card_no}, player_name=${regData.player_name})`);
+          } else {
+            // フォールバックもできない場合のみエラーとして記録
+            const errorInfo = {
+              player_no: player_no,
+              class_name: currentCategory,
+              line: lineNumber,
+              name: `${first_name} ${last_name}`.trim(),
+              country: country,
+              // デバッグ情報：Registrationsに同じゼッケン番号で別クラスがあるか確認
+              samePlayerNoOtherClasses: contestRegistrations
+                .filter(reg => reg.player_no === player_no && reg.class_name !== currentCategory)
+                .map(reg => reg.class_name),
+              // デバッグ情報：同じクラス名で別のゼッケン番号があるか確認
+              sameClassOtherPlayerNos: contestRegistrations
+                .filter(reg => reg.class_name === currentCategory && reg.player_no !== player_no)
+                .map(reg => reg.player_no)
+                .slice(0, 5) // 最大5件表示
+            };
+            missingRegistrations.push(errorInfo);
+            console.error(`Error: No registration found for player_no=${player_no}, class_name=${currentCategory}, name=${errorInfo.name}, and no fallback available`);
+          }
         } else {
           console.log(`Matched: player_no=${player_no}, class_name=${currentCategory} -> fwj_card_no=${regData.fwj_card_no}, player_name=${regData.player_name}`);
         }
@@ -404,13 +440,49 @@ router.post('/import', requireAuth, async (req, res) => {
 
     // マッチしないレコードがある場合はエラーを返す
     if (missingRegistrations.length > 0) {
-      const errorDetails = missingRegistrations.map(item => 
-        `  - ゼッケン番号: ${item.player_no}, カテゴリー: ${item.class_name}, 選手名: ${item.name}`
-      ).join('\n');
+      const errorDetails = missingRegistrations.map(item => {
+        let errorMsg = `  【ゼッケン番号: ${item.player_no}, カテゴリー: ${item.class_name}】\n    選手名: ${item.name}, 国: ${item.country}, CSV行: ${item.line}`;
+        
+        // 同じゼッケン番号で別クラスの登録がある場合
+        if (item.samePlayerNoOtherClasses && item.samePlayerNoOtherClasses.length > 0) {
+          errorMsg += `\n    ✗ このゼッケン番号(${item.player_no})の選手は以下のクラスにのみ登録されています:\n      ${item.samePlayerNoOtherClasses.join(', ')}`;
+          errorMsg += `\n    ⚠ 「${item.class_name}」クラスへのエントリーがRegistrationsに存在しません`;
+          errorMsg += `\n    💡 対処法: Registrationsテーブルにゼッケン番号${item.player_no}の「${item.class_name}」クラスのエントリーを追加してください`;
+        }
+        
+        // 同じクラス名で別のゼッケン番号がある場合（エントリーがない選手が別クラスから出場した場合）
+        else if (item.sameClassOtherPlayerNos && item.sameClassOtherPlayerNos.length > 0) {
+          errorMsg += `\n    ✗ 「${item.class_name}」クラスには以下のゼッケン番号が登録されています:\n      ${item.sameClassOtherPlayerNos.join(', ')}など`;
+          errorMsg += `\n    ⚠ ゼッケン番号${item.player_no}の「${item.class_name}」クラスへのエントリーがありません`;
+          errorMsg += `\n    💡 対処法: Registrationsテーブルにゼッケン番号${item.player_no}の「${item.class_name}」クラスのエントリーを追加してください`;
+        }
+        
+        // 両方とも見つからない場合（完全に登録がない選手）
+        else {
+          errorMsg += `\n    ✗ この選手のエントリーがRegistrationsテーブルに一切存在しません`;
+          errorMsg += `\n    💡 対処法: Registrationsテーブルにこの選手のエントリーを追加してください`;
+        }
+        
+        return errorMsg;
+      }).join('\n\n');
+      
+      console.error('Missing registrations details:', errorDetails);
       
       return res.status(400).json({ 
         success: false, 
-        error: `以下の${missingRegistrations.length}件の成績データに対応するRegistrationsレコードが見つかりません：\n${errorDetails}\n\n※ Registrationsテーブルに該当する選手のエントリー（ゼッケン番号とカテゴリーが一致）が存在することを確認してください。`
+        error: `【Registrationsマッチングエラー】\n\n` +
+               `${missingRegistrations.length}件の成績データに対応するRegistrationsレコードが見つかりません。\n` +
+               `※マッチングは「ゼッケン番号(player_no)」と「クラス名(class_name)」の両方が一致する必要があります。\n\n` +
+               `${errorDetails}\n\n` +
+               `【重要】選手が複数のクラスにエントリーする場合の注意点：\n` +
+               `・同じゼッケン番号の選手でも、出場する各クラスごとにRegistrationsに別々のエントリーが必要です\n` +
+               `・例：ゼッケン番号5の選手が「Novice」と「Open」に出場する場合\n` +
+               `  → player_no=5, class_name="Novice" のレコード\n` +
+               `  → player_no=5, class_name="Open" のレコード\n` +
+               `  の2つのエントリーがRegistrationsに必要です\n\n` +
+               `【確認事項】\n` +
+               `・大会日: ${contest_date}（この日付でRegistrationsをフィルタリングしています）\n` +
+               `・クラス名の完全一致（大文字小文字、スペース、ハイフンなどが完全に一致している必要があります）`
       });
     }
 
@@ -427,12 +499,33 @@ router.post('/import', requireAuth, async (req, res) => {
     console.log('Batch import result:', result.success ? 'SUCCESS' : 'FAILED');
     
     if (result.success) {
+      let message = `${result.data.imported}件の成績を正常にインポートしました`;
+      
+      // フォールバックが使用された場合は警告メッセージを追加
+      if (fallbackUsedCount.length > 0) {
+        message += `\n\n⚠ ${fallbackUsedCount.length}件の成績で、Registrationsに該当クラスのエントリーがなかったため、同じゼッケン番号の他のクラスから情報を取得しました（フォールバック機能）。`;
+        
+        // 詳細情報（最大5件まで表示）
+        const fallbackDetails = fallbackUsedCount.slice(0, 5).map(item => 
+          `  - ゼッケン番号${item.player_no}の「${item.class_name}」→「${item.fallback_class}」から取得`
+        ).join('\n');
+        
+        message += `\n\n【フォールバック使用詳細】（最大5件表示）\n${fallbackDetails}`;
+        
+        if (fallbackUsedCount.length > 5) {
+          message += `\n  ...他${fallbackUsedCount.length - 5}件`;
+        }
+        
+        message += `\n\n※正確なデータ管理のため、該当クラスのRegistrationsエントリーの追加を推奨します。`;
+      }
+      
       res.json({
         success: true,
         data: {
           total: result.data.total,
           imported: result.data.imported,
-          message: `${result.data.imported}件の成績を正常にインポートしました`
+          fallbackUsed: fallbackUsedCount.length,
+          message: message
         }
       });
     } else {
