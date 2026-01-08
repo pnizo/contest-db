@@ -501,6 +501,21 @@ button:active {
     gap: 10px;
 }
 
+.manual-link {
+    padding: 8px 16px;
+    background: #3498db;
+    color: white;
+    text-decoration: none;
+    border-radius: 4px;
+    font-size: 14px;
+    display: inline-block;
+    transition: background 0.3s;
+}
+
+.manual-link:hover {
+    background: #2980b9;
+}
+
 .logout-btn {
     padding: 8px 16px;
     background: #95a5a6;

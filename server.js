@@ -97,6 +97,10 @@ app.get('/members', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'members.html'));
 });
 
+app.get('/manual.html', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'manual.html'));
+});
+
 // 静的ファイルを設定
 app.use(express.static(path.join(__dirname, 'public')));
 

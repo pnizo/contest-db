@@ -1,0 +1,938 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ユーザーマニュアル - Spreadsheet DB</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        .manual-container {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 40px 20px;
+            background: #fff;
+        }
+        .manual-header {
+            text-align: center;
+            margin-bottom: 40px;
+            padding-bottom: 20px;
+            border-bottom: 3px solid #4CAF50;
+        }
+        .manual-header h1 {
+            color: #333;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        .manual-toc {
+            background: #f8f9fa;
+            padding: 30px;
+            border-radius: 8px;
+            margin-bottom: 40px;
+        }
+        .manual-toc h2 {
+            color: #333;
+            margin-top: 0;
+            margin-bottom: 20px;
+        }
+        .manual-toc ol {
+            line-height: 1.8;
+        }
+        .manual-toc a {
+            color: #4CAF50;
+            text-decoration: none;
+        }
+        .manual-toc a:hover {
+            text-decoration: underline;
+        }
+        .manual-section {
+            margin-bottom: 50px;
+            padding: 30px;
+            border-left: 4px solid #4CAF50;
+            background: #fafafa;
+        }
+        .manual-section h2 {
+            color: #4CAF50;
+            font-size: 2em;
+            margin-top: 0;
+            margin-bottom: 20px;
+        }
+        .manual-section h3 {
+            color: #333;
+            font-size: 1.5em;
+            margin-top: 30px;
+            margin-bottom: 15px;
+        }
+        .manual-section h4 {
+            color: #555;
+            font-size: 1.2em;
+            margin-top: 20px;
+            margin-bottom: 10px;
+        }
+        .manual-section p, .manual-section li {
+            line-height: 1.8;
+            color: #555;
+        }
+        .manual-section ul, .manual-section ol {
+            margin: 15px 0;
+            padding-left: 30px;
+        }
+        .manual-section li {
+            margin: 8px 0;
+        }
+        .manual-section strong {
+            color: #333;
+        }
+        .manual-section code {
+            background: #e8e8e8;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+        }
+        .manual-section pre {
+            background: #2d2d2d;
+            color: #f8f8f8;
+            padding: 20px;
+            border-radius: 5px;
+            overflow-x: auto;
+            margin: 20px 0;
+        }
+        .manual-section pre code {
+            background: none;
+            padding: 0;
+            color: #f8f8f8;
+        }
+        .feature-badge {
+            display: inline-block;
+            background: #4CAF50;
+            color: white;
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-size: 0.85em;
+            margin-left: 10px;
+        }
+        .admin-badge {
+            background: #ff9800;
+        }
+        .checkmark {
+            color: #4CAF50;
+        }
+        .crossmark {
+            color: #f44336;
+        }
+        hr {
+            border: none;
+            border-top: 1px solid #ddd;
+            margin: 40px 0;
+        }
+        .back-to-top {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            background: #4CAF50;
+            color: white;
+            padding: 12px 20px;
+            border-radius: 25px;
+            text-decoration: none;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            transition: background 0.3s;
+        }
+        .back-to-top:hover {
+            background: #45a049;
+        }
+    </style>
+</head>
+<body>
+    <div class="manual-container">
+        <div class="manual-header">
+            <h1>📘 Spreadsheet DB ユーザーマニュアル</h1>
+            <p>コンテスト成績データベース管理システム</p>
+        </div>
+
+        <div class="manual-toc" id="toc">
+            <h2>目次</h2>
+            <ol>
+                <li><a href="#system-overview">システム概要</a></li>
+                <li><a href="#login">ログイン</a></li>
+                <li><a href="#users">ユーザー管理</a></li>
+                <li><a href="#scores">大会成績管理</a></li>
+                <li><a href="#registrations">出場登録管理</a></li>
+                <li><a href="#notes">特記事項管理</a></li>
+                <li><a href="#guests">関係者チケット管理</a></li>
+                <li><a href="#contests">大会情報管理</a></li>
+                <li><a href="#members">FWJ会員情報</a></li>
+                <li><a href="#subjects">違反認定者管理</a></li>
+                <li><a href="#permissions">権限について</a></li>
+                <li><a href="#faq">よくある質問</a></li>
+                <li><a href="#troubleshooting">トラブルシューティング</a></li>
+                <li><a href="#requirements">システム要件</a></li>
+            </ol>
+        </div>
+
+        <div class="manual-section" id="system-overview">
+            <h2>システム概要</h2>
+            
+            <h3>概要</h3>
+            <p>Spreadsheet DBは、Google Spreadsheetをデータベースとして使用するコンテスト成績管理システムです。フィットネス・ボディビル大会の選手情報、成績、出場登録、関係者情報などを一元管理できます。</p>
+            
+        </div>
+
+        <div class="manual-section" id="login">
+            <h2>ログイン</h2>
+            
+            <h3>ページ概要</h3>
+            <p>システムの入り口となるログインページです。メールアドレスとパスワードで認証を行います。</p>
+            
+            <h3>アクセス方法</h3>
+            <ul>
+                <li>URL: <code>/</code> （ルートパス）</li>
+            </ul>
+            
+            <h3>使い方</h3>
+            
+            <h4>1. ログイン手順</h4>
+            <ol>
+                <li>メールアドレスを入力</li>
+                <li>パスワードを入力</li>
+                <li>「ログイン」ボタンをクリック</li>
+            </ol>
+            
+            <h4>2. ログイン後の動作</h4>
+            <ul>
+                <li><strong>認証成功時</strong>：JWTトークンがローカルストレージに保存され、自動的にユーザー一覧ページにリダイレクト</li>
+                <li><strong>認証失敗時</strong>：エラーメッセージを表示</li>
+            </ul>
+            
+            <h3>セキュリティ機能</h3>
+            <ul>
+                <li>パスワードは bcrypt でハッシュ化されて保存</li>
+                <li>JWT トークンは24時間有効</li>
+                <li>IP制限機能（管理者が設定可能）</li>
+            </ul>
+        </div>
+
+        <div class="manual-section" id="users">
+            <h2>ユーザー管理</h2>
+            
+            <h3>ページ概要</h3>
+            <p>システムにアクセスするユーザーアカウントを管理するページです。管理者権限を持つユーザーのみが新規作成・編集・削除を実行できます。</p>
+            
+            <h3>アクセス方法</h3>
+            <ul>
+                <li>URL: <code>/users</code></li>
+                <li>ナビゲーションバー：「ユーザー」リンク</li>
+            </ul>
+            
+            <h3>主な機能</h3>
+            
+            <h4>1. ユーザー一覧表示</h4>
+            <p><strong>表示項目</strong>：</p>
+            <ul>
+                <li>ユーザー名</li>
+                <li>メールアドレス</li>
+                <li>権限（admin / user）</li>
+                <li>作成日時</li>
+                <li>更新日時</li>
+                <li>状態（有効 / 削除済み）</li>
+            </ul>
+            
+            <h4>2. 新規ユーザー追加<span class="feature-badge admin-badge">管理者のみ</span></h4>
+            <ol>
+                <li>「新規ユーザー追加」ボタンをクリック</li>
+                <li>以下の情報を入力：
+                    <ul>
+                        <li>ユーザー名</li>
+                        <li>メールアドレス（一意である必要があります）</li>
+                        <li>パスワード</li>
+                        <li>権限（admin / user）</li>
+                    </ul>
+                </li>
+                <li>「追加」ボタンをクリック</li>
+            </ol>
+            
+            <h4>3. ユーザー編集<span class="feature-badge admin-badge">管理者のみ</span></h4>
+            <ol>
+                <li>編集したいユーザーの「編集」ボタンをクリック</li>
+                <li>情報を修正</li>
+                <li>「更新」ボタンをクリック</li>
+            </ol>
+            
+            <h4>4. ユーザー削除<span class="feature-badge admin-badge">管理者のみ</span></h4>
+            <ol>
+                <li>削除したいユーザーの「削除」ボタンをクリック</li>
+                <li>確認ダイアログで「OK」をクリック</li>
+                <li>ユーザーは論理削除され、<code>isValid</code>フラグが<code>false</code>に設定されます</li>
+            </ol>
+            
+            <h4>5. 削除済みユーザーの管理</h4>
+            <ul>
+                <li><strong>削除済み表示</strong>: 「削除済みを表示」ボタンで削除済みユーザーの表示/非表示を切り替え</li>
+                <li><strong>復元</strong>: 削除済みユーザーの「復元」ボタンをクリック</li>
+                <li><strong>完全削除</strong>: 削除済みユーザーの「完全削除」ボタンで物理削除（復元不可）</li>
+            </ul>
+            
+            <h4>6. 自動復元機能</h4>
+            <p>削除済みユーザーと同じメールアドレスで新規ユーザーを作成すると、自動的に既存のユーザーが復元されます。</p>
+            
+            <h3>一般ユーザーの制限</h3>
+            <ul>
+                <li>ユーザー一覧の閲覧のみ可能</li>
+                <li>作成・編集・削除ボタンは非表示</li>
+            </ul>
+        </div>
+
+        <div class="manual-section" id="scores">
+            <h2>大会成績管理</h2>
+            
+            <h3>ページ概要</h3>
+            <p>フィットネス・ボディビル大会の選手成績を管理するページです。CSVファイルからの一括インポートに対応しています。</p>
+            
+            <h3>アクセス方法</h3>
+            <ul>
+                <li>URL: <code>/scores</code></li>
+                <li>ナビゲーションバー：「大会成績」リンク</li>
+            </ul>
+            
+            <h3>主な機能</h3>
+            
+            <h4>1. 成績一覧表示</h4>
+            <p><strong>表示項目</strong>：</p>
+            <ul>
+                <li>FWJカード番号</li>
+                <li>大会日</li>
+                <li>大会名</li>
+                <li>カテゴリー名</li>
+                <li>選手名</li>
+                <li>順位</li>
+                <li>エントリー数</li>
+                <li>ポイント</li>
+                <li>状態（有効 / 削除済み）</li>
+            </ul>
+            
+            <h4>2. CSVインポート<span class="feature-badge">認証済みユーザー</span></h4>
+            <ol>
+                <li>「インポート」ボタンをクリック</li>
+                <li>CSVファイルを選択（ドラッグ&ドロップも可）</li>
+                <li>プレビューでデータを確認</li>
+                <li>「インポート開始」ボタンをクリック</li>
+            </ol>
+            
+            <p><strong>CSVファイル形式</strong>：</p>
+            <pre><code>fwj_card_no,contest_date,contest_name,category,athlete_name,rank,entry_count,points
+12345,2025-01-15,サンプル大会,メンズフィジーク,山田太郎,1,10,100</code></pre>
+            
+            <h4>3. 検索機能</h4>
+            <ul>
+                <li>検索ボックスに選手名を入力</li>
+                <li>リアルタイムで結果を絞り込み</li>
+                <li>「検索をクリア」ボタンで検索条件をリセット</li>
+            </ul>
+            
+            <h4>4. フィルタリング機能</h4>
+            <ul>
+                <li><strong>FWJカード番号</strong>: 特定のカード番号で絞り込み</li>
+                <li><strong>大会名</strong>: ドロップダウンから選択</li>
+                <li><strong>カテゴリー名</strong>: ドロップダウンから選択</li>
+                <li><strong>期間指定</strong>: 開始日と終了日で絞り込み</li>
+            </ul>
+            
+            <h4>5. 成績削除<span class="feature-badge admin-badge">管理者のみ</span></h4>
+            <ul>
+                <li>論理削除方式で削除</li>
+                <li>削除済み成績の表示/非表示切り替え可能</li>
+                <li>削除済み成績の復元機能</li>
+            </ul>
+            
+            <h3>データ管理のポイント</h3>
+            <ul>
+                <li>大量データの場合は CSVインポートを推奨</li>
+                <li>Google Sheets APIの<code>spreadsheets.values.append</code>を使用した高速バッチ処理</li>
+                <li>インポート中は進行状況を表示</li>
+            </ul>
+        </div>
+
+        <div class="manual-section" id="registrations">
+            <h2>出場登録管理</h2>
+            
+            <h3>ページ概要</h3>
+            <p>大会への出場登録情報を管理するページです。選手のエントリー情報を一元管理できます。</p>
+            
+            <h3>アクセス方法</h3>
+            <ul>
+                <li>URL: <code>/registrations</code></li>
+                <li>ナビゲーションバー：「出場登録」リンク</li>
+            </ul>
+            
+            <h3>主な機能</h3>
+            
+            <h4>1. 登録一覧表示</h4>
+            <p><strong>表示項目</strong>：</p>
+            <ul>
+                <li>氏名（漢字・カナ・ローマ字）</li>
+                <li>大会名</li>
+                <li>カテゴリー</li>
+                <li>FWJカード番号</li>
+                <li>エントリー番号</li>
+                <li>出場順序</li>
+                <li>登録日時</li>
+                <li>状態</li>
+            </ul>
+            
+            <h4>2. CSVインポート</h4>
+            <ol>
+                <li>「インポート」ボタンをクリック</li>
+                <li>CSVファイルを選択</li>
+                <li>データプレビューで確認</li>
+                <li>インポート実行</li>
+            </ol>
+            
+            <h4>3. CSVエクスポート</h4>
+            <ol>
+                <li>「エクスポート」ボタンをクリック</li>
+                <li>エクスポート条件を指定（オプション）</li>
+                <li>CSVファイルとしてダウンロード</li>
+            </ol>
+            
+            <h4>4. 検索機能</h4>
+            <ul>
+                <li>氏名（漢字・カナ・ローマ字）で検索</li>
+                <li>リアルタイム検索対応</li>
+                <li>部分一致検索</li>
+            </ul>
+            
+            <h4>5. データ編集<span class="feature-badge admin-badge">管理者のみ</span></h4>
+            <ul>
+                <li>個別レコードの編集</li>
+                <li>一括更新</li>
+                <li>論理削除と復元</li>
+            </ul>
+            
+            <h3>入力項目詳細</h3>
+            <ul>
+                <li><strong>氏名</strong>: 漢字、カナ、ローマ字の3形式</li>
+                <li><strong>FWJカード番号</strong>: 選手識別番号</li>
+                <li><strong>大会情報</strong>: 大会名、カテゴリー</li>
+                <li><strong>エントリー情報</strong>: エントリー番号、出場順序</li>
+                <li><strong>連絡先</strong>: メールアドレス、電話番号（任意）</li>
+            </ul>
+        </div>
+
+        <div class="manual-section" id="notes">
+            <h2>特記事項管理</h2>
+            
+            <h3>ページ概要</h3>
+            <p>選手に関する特記事項や注意事項を記録・管理するページです。違反事項、健康状態、特別対応などの情報を管理できます。</p>
+            
+            <h3>アクセス方法</h3>
+            <ul>
+                <li>URL: <code>/notes</code></li>
+                <li>ナビゲーションバー：「特記事項」リンク</li>
+            </ul>
+            
+            <h3>主な機能</h3>
+            
+            <h4>1. 特記事項一覧表示</h4>
+            <p><strong>表示項目</strong>：</p>
+            <ul>
+                <li>氏名</li>
+                <li>FWJカード番号</li>
+                <li>特記事項の内容</li>
+                <li>カテゴリー（違反、健康、その他など）</li>
+                <li>記録日時</li>
+                <li>更新日時</li>
+            </ul>
+            
+            <h4>2. 新規追加</h4>
+            <ol>
+                <li>「新規追加」ボタンをクリック</li>
+                <li>以下の情報を入力：
+                    <ul>
+                        <li>氏名</li>
+                        <li>FWJカード番号</li>
+                        <li>特記事項の内容</li>
+                        <li>カテゴリー選択</li>
+                    </ul>
+                </li>
+                <li>「追加」ボタンをクリック</li>
+            </ol>
+            
+            <h4>3. 編集・削除<span class="feature-badge admin-badge">管理者のみ</span></h4>
+            <ul>
+                <li><strong>編集</strong>：該当レコードの「編集」ボタンから</li>
+                <li><strong>削除</strong>：論理削除方式</li>
+                <li><strong>復元</strong>：削除済み特記事項の復元可能</li>
+            </ul>
+            
+            <h4>4. 検索機能</h4>
+            <ul>
+                <li>氏名で検索</li>
+                <li>FWJカード番号で検索</li>
+                <li>特記事項の内容で検索</li>
+            </ul>
+            
+            <h3>利用シーン</h3>
+            <ul>
+                <li>アンチドーピング違反の記録</li>
+                <li>健康上の注意事項</li>
+                <li>特別な配慮が必要な事項</li>
+                <li>過去のトラブル記録</li>
+            </ul>
+        </div>
+
+        <div class="manual-section" id="guests">
+            <h2>関係者チケット管理</h2>
+            
+            <h3>ページ概要</h3>
+            <p>大会関係者のチケット配布・管理を行うページです。選手のサポート関係者、スタッフ、メディアなどのチケット情報を管理できます。</p>
+            
+            <h3>アクセス方法</h3>
+            <ul>
+                <li>URL: <code>/guests</code></li>
+                <li>ナビゲーションバー：「関係者チケット」リンク</li>
+            </ul>
+            
+            <h3>主な機能</h3>
+            
+            <h4>1. チケット一覧表示</h4>
+            <p><strong>表示項目</strong>：</p>
+            <ul>
+                <li>代表者氏名</li>
+                <li>団体名</li>
+                <li>関係種別（コーチ、家族、メディアなど）</li>
+                <li>チケット枚数</li>
+                <li>大会名</li>
+                <li>発行日</li>
+                <li>ステータス（発行済み、使用済み、キャンセルなど）</li>
+            </ul>
+            
+            <h4>2. 新規追加</h4>
+            <ol>
+                <li>「新規追加」ボタンをクリック</li>
+                <li>以下の情報を入力：
+                    <ul>
+                        <li>代表者氏名</li>
+                        <li>団体名（任意）</li>
+                        <li>関係種別</li>
+                        <li>チケット枚数</li>
+                        <li>対象大会</li>
+                        <li>備考（任意）</li>
+                    </ul>
+                </li>
+                <li>「追加」ボタンをクリック</li>
+            </ol>
+            
+            <h4>3. フィルタリング</h4>
+            <ul>
+                <li><strong>大会名</strong>: ドロップダウンから選択</li>
+                <li><strong>関係種別</strong>: コーチ、家族、メディア、スポンサーなど</li>
+                <li><strong>ステータス</strong>: 発行済み、使用済み、キャンセル</li>
+            </ul>
+            
+            <h4>4. 検索機能</h4>
+            <ul>
+                <li>代表者氏名で検索</li>
+                <li>団体名で検索</li>
+                <li>複合検索対応</li>
+            </ul>
+            
+            <h4>5. ステータス管理</h4>
+            <ul>
+                <li>チケット発行</li>
+                <li>使用済みに変更</li>
+                <li>キャンセル処理</li>
+                <li>再発行</li>
+            </ul>
+            
+            <h3>チケット種別</h3>
+            <ul>
+                <li><strong>選手サポート</strong>: コーチ、トレーナー、家族</li>
+                <li><strong>メディア</strong>: 取材関係者、撮影スタッフ</li>
+                <li><strong>スポンサー</strong>: 協賛企業関係者</li>
+                <li><strong>運営スタッフ</strong>: 大会運営メンバー</li>
+                <li><strong>VIP</strong>: 特別招待者</li>
+            </ul>
+        </div>
+
+        <div class="manual-section" id="contests">
+            <h2>大会情報管理</h2>
+            
+            <h3>ページ概要</h3>
+            <p>大会の基本情報を管理するページです。開催日程、会場、カテゴリーなどの情報を登録・管理できます。</p>
+            
+            <h3>アクセス方法</h3>
+            <ul>
+                <li>URL: <code>/contests</code></li>
+                <li>ナビゲーションバー：「大会情報」リンク</li>
+            </ul>
+            
+            <h3>主な機能</h3>
+            
+            <h4>1. 大会一覧表示</h4>
+            <p><strong>表示項目</strong>：</p>
+            <ul>
+                <li>大会名</li>
+                <li>開催日</li>
+                <li>開催地</li>
+                <li>会場名</li>
+                <li>カテゴリー</li>
+                <li>エントリー状況</li>
+                <li>ステータス（予定、開催中、終了）</li>
+            </ul>
+            
+            <h4>2. 新規大会追加<span class="feature-badge admin-badge">管理者のみ</span></h4>
+            <ol>
+                <li>「新規追加」ボタンをクリック</li>
+                <li>以下の情報を入力：
+                    <ul>
+                        <li>大会名</li>
+                        <li>開催日</li>
+                        <li>開催地（都道府県、市区町村）</li>
+                        <li>会場名</li>
+                        <li>カテゴリー情報</li>
+                        <li>エントリー期間</li>
+                        <li>大会詳細</li>
+                    </ul>
+                </li>
+                <li>「追加」ボタンをクリック</li>
+            </ol>
+            
+            <h4>3. 検索・フィルタリング</h4>
+            <ul>
+                <li><strong>検索</strong>: 大会名、開催地で検索</li>
+                <li><strong>期間フィルター</strong>: 開始日〜終了日で絞り込み</li>
+                <li><strong>ステータスフィルター</strong>: 予定、開催中、終了</li>
+                <li><strong>カテゴリーフィルター</strong>: メンズフィジーク、ビキニなど</li>
+            </ul>
+            
+            <h4>4. 大会情報編集<span class="feature-badge admin-badge">管理者のみ</span></h4>
+            <ul>
+                <li>基本情報の編集</li>
+                <li>カテゴリーの追加・削除</li>
+                <li>エントリー期間の変更</li>
+                <li>ステータスの更新</li>
+            </ul>
+            
+            <h4>5. 大会管理機能</h4>
+            <ul>
+                <li>エントリー状況の確認</li>
+                <li>関連する成績データへのリンク</li>
+                <li>出場登録データへのリンク</li>
+                <li>大会レポートのエクスポート</li>
+            </ul>
+            
+            <h3>大会ステータス</h3>
+            <ul>
+                <li><strong>予定</strong>: これから開催される大会</li>
+                <li><strong>エントリー受付中</strong>: 出場登録可能</li>
+                <li><strong>エントリー締切</strong>: 登録受付終了</li>
+                <li><strong>開催中</strong>: 現在進行中</li>
+                <li><strong>終了</strong>: 成績確定済み</li>
+            </ul>
+        </div>
+
+        <div class="manual-section" id="members">
+            <h2>FWJ会員情報</h2>
+            
+            <h3>ページ概要</h3>
+            <p>FWJ（Fitness World Japan）の会員情報を管理するページです。Shopifyと連携して会員データを同期できます。</p>
+            
+            <h3>アクセス方法</h3>
+            <ul>
+                <li>URL: <code>/members</code></li>
+                <li>ナビゲーションバー：「FWJ会員情報」リンク</li>
+            </ul>
+            
+            <h3>主な機能</h3>
+            
+            <h4>1. 会員一覧表示</h4>
+            <p><strong>表示項目</strong>：</p>
+            <ul>
+                <li>FWJカード番号</li>
+                <li>氏名（漢字・カナ）</li>
+                <li>メールアドレス</li>
+                <li>電話番号</li>
+                <li>会員種別（レギュラー、プロ、ライフタイムなど）</li>
+                <li>会員ステータス（有効、期限切れ）</li>
+                <li>登録日</li>
+                <li>有効期限</li>
+            </ul>
+            
+            <h4>2. Shopify同期<span class="feature-badge admin-badge">管理者のみ</span></h4>
+            <ol>
+                <li>「Shopifyから同期」ボタンをクリック</li>
+                <li>Shopify APIから最新の会員データを取得</li>
+                <li>差分を自動判定して更新</li>
+                <li>同期結果レポートを表示</li>
+            </ol>
+            
+            <p><strong>同期される情報</strong>：</p>
+            <ul>
+                <li>会員基本情報</li>
+                <li>購入履歴（会員資格）</li>
+                <li>有効期限</li>
+                <li>メタデータ</li>
+            </ul>
+            
+            <h4>3. 検索機能</h4>
+            <ul>
+                <li>メールアドレスで検索</li>
+                <li>氏名（漢字・カナ）で検索</li>
+                <li>FWJカード番号で検索</li>
+            </ul>
+            
+            <h4>4. フィルタリング</h4>
+            <ul>
+                <li><strong>会員種別</strong>: レギュラー、プロ、ライフタイムなど</li>
+                <li><strong>ステータス</strong>: 有効、期限切れ、停止中</li>
+                <li><strong>登録期間</strong>: 指定期間内の新規登録者</li>
+            </ul>
+            
+            <h4>5. 会員情報編集<span class="feature-badge admin-badge">管理者のみ</span></h4>
+            <ul>
+                <li>基本情報の修正</li>
+                <li>会員種別の変更</li>
+                <li>有効期限の延長</li>
+                <li>メモの追加</li>
+            </ul>
+            
+            <h3>Shopify連携について</h3>
+            <ul>
+                <li><strong>自動同期</strong>: 定期的な自動同期（管理者設定）</li>
+                <li><strong>手動同期</strong>: 必要に応じて即時同期</li>
+                <li><strong>データマッピング</strong>: Shopify商品とFWJ会員種別の対応</li>
+                <li><strong>エラーハンドリング</strong>: 同期エラーの記録と通知</li>
+            </ul>
+            
+            <h3>注意事項</h3>
+            <ul>
+                <li>Shopifyとの連携にはAPIキーの設定が必要</li>
+                <li>初回同期時は全データの取得に時間がかかる場合があります</li>
+                <li>会員データの直接編集はShopifyデータに上書きされる可能性があります</li>
+            </ul>
+        </div>
+
+        <div class="manual-section" id="subjects">
+            <h2>違反認定者管理</h2>
+            
+            <h3>ページ概要</h3>
+            <p>アンチドーピング違反やその他の規約違反を認定された選手を管理するページです。<strong>管理者のみがアクセスできる機密情報</strong>を扱います。</p>
+            
+            <h3>アクセス方法</h3>
+            <ul>
+                <li>URL: <code>/subjects</code></li>
+                <li>ナビゲーションバー：「違反認定者」リンク<span class="feature-badge admin-badge">管理者のみ表示</span></li>
+            </ul>
+            
+            <h3>主な機能</h3>
+            
+            <h4>1. 違反認定者一覧表示</h4>
+            <p><strong>表示項目</strong>：</p>
+            <ul>
+                <li>氏名</li>
+                <li>FWJカード番号</li>
+                <li>違反種別（ドーピング、不正行為など）</li>
+                <li>違反内容詳細</li>
+                <li>認定日</li>
+                <li>制裁期間</li>
+                <li>ステータス（制裁中、制裁終了）</li>
+                <li>関連資料</li>
+            </ul>
+            
+            <h4>2. 新規認定者追加<span class="feature-badge admin-badge">管理者のみ</span></h4>
+            <ol>
+                <li>「新規認定者追加」ボタンをクリック</li>
+                <li>以下の情報を入力：
+                    <ul>
+                        <li>氏名</li>
+                        <li>FWJカード番号</li>
+                        <li>違反種別</li>
+                        <li>違反内容の詳細</li>
+                        <li>認定日</li>
+                        <li>制裁内容</li>
+                        <li>制裁期間（開始日〜終了日）</li>
+                        <li>備考・関連情報</li>
+                    </ul>
+                </li>
+                <li>「追加」ボタンをクリック</li>
+            </ol>
+            
+            <h4>3. 検索機能</h4>
+            <ul>
+                <li>氏名で検索</li>
+                <li>FWJカード番号で検索</li>
+                <li>違反種別で絞り込み</li>
+            </ul>
+            
+            <h4>4. ステータス管理</h4>
+            <ul>
+                <li><strong>制裁中</strong>: 現在制裁期間中</li>
+                <li><strong>制裁終了</strong>: 制裁期間が終了</li>
+                <li><strong>審査中</strong>: 違反認定の審査中</li>
+                <li><strong>却下</strong>: 違反認定が却下された</li>
+            </ul>
+            
+            <h4>5. 削除と復元</h4>
+            <ul>
+                <li>論理削除方式</li>
+                <li>「削除済みを表示」で削除済みデータの確認</li>
+                <li>必要に応じて復元可能</li>
+            </ul>
+            
+            <h3>違反種別</h3>
+            <ul>
+                <li><strong>ドーピング違反</strong>: アンチドーピング規約違反</li>
+                <li><strong>不正行為</strong>: 審査における不正行為</li>
+                <li><strong>暴力行為</strong>: 暴力やハラスメント</li>
+                <li><strong>規約違反</strong>: その他の規約違反</li>
+                <li><strong>資格詐称</strong>: 虚偽の情報による登録</li>
+            </ul>
+            
+            <h3>セキュリティとプライバシー</h3>
+            <ul>
+                <li><strong>アクセス制限</strong>: 管理者のみアクセス可能</li>
+                <li><strong>機密情報</strong>: 個人情報保護法に基づいた厳重管理</li>
+                <li><strong>監査ログ</strong>: 全ての閲覧・編集操作を記録</li>
+                <li><strong>データ暗号化</strong>: 機密データの暗号化保存</li>
+            </ul>
+        </div>
+
+        <div class="manual-section" id="permissions">
+            <h2>権限について</h2>
+            
+            <h3>ユーザー権限の種類</h3>
+            
+            <h4>管理者（Admin）</h4>
+            <p><strong>全機能の利用が可能</strong>：</p>
+            <ul>
+                <li><span class="checkmark">✅</span> 全ページへのアクセス</li>
+                <li><span class="checkmark">✅</span> データの作成（Create）</li>
+                <li><span class="checkmark">✅</span> データの読み取り（Read）</li>
+                <li><span class="checkmark">✅</span> データの更新（Update）</li>
+                <li><span class="checkmark">✅</span> データの削除（Delete）</li>
+                <li><span class="checkmark">✅</span> CSVインポート/エクスポート</li>
+                <li><span class="checkmark">✅</span> 削除済みデータの復元・完全削除</li>
+                <li><span class="checkmark">✅</span> ユーザー管理</li>
+                <li><span class="checkmark">✅</span> 違反認定者情報へのアクセス</li>
+                <li><span class="checkmark">✅</span> Shopify同期機能</li>
+            </ul>
+            
+            <h4>一般ユーザー（User）</h4>
+            <p><strong>閲覧とCSVインポートのみ可能</strong>：</p>
+            <ul>
+                <li><span class="checkmark">✅</span> 全ページへのアクセス（違反認定者ページを除く）</li>
+                <li><span class="checkmark">✅</span> データの読み取り（Read）</li>
+                <li><span class="checkmark">✅</span> CSVインポート（大会成績、出場登録）</li>
+                <li><span class="checkmark">✅</span> 検索・フィルタリング</li>
+                <li><span class="crossmark">❌</span> データの作成・更新・削除</li>
+                <li><span class="crossmark">❌</span> ユーザー管理</li>
+                <li><span class="crossmark">❌</span> 削除済みデータの復元</li>
+                <li><span class="crossmark">❌</span> 違反認定者情報へのアクセス</li>
+                <li><span class="crossmark">❌</span> Shopify同期機能</li>
+            </ul>
+            
+            <h3>権限による表示制御</h3>
+            <ul>
+                <li>一般ユーザーがアクセスした場合、作成・編集・削除ボタンは自動的に非表示</li>
+                <li>「違反認定者」ナビゲーションリンクは管理者にのみ表示</li>
+                <li>管理者専用機能には <code>.admin-only</code> クラスが付与され、CSS で制御</li>
+            </ul>
+        </div>
+
+        <div class="manual-section" id="faq">
+            <h2>よくある質問（FAQ）</h2>
+            
+            <h3>Q1: パスワードを忘れた場合は？</h3>
+            <p>A: 現在、管理者に連絡してパスワードリセットを依頼してください。将来的にパスワードリセット機能の追加を予定しています。</p>
+            
+            <h3>Q2: CSVインポートでエラーが出る</h3>
+            <p>A: 以下を確認してください：</p>
+            <ul>
+                <li>CSVファイルの文字コードが UTF-8 であること</li>
+                <li>ヘッダー行が正しい形式であること</li>
+                <li>必須項目が全て入力されていること</li>
+                <li>日付形式が <code>YYYY-MM-DD</code> であること</li>
+            </ul>
+            
+            <h3>Q3: 削除したデータは復元できますか？</h3>
+            <p>A: はい。論理削除方式を採用しているため、管理者は削除済みデータを復元できます。ただし、「完全削除」を実行した場合は復元できません。</p>
+            
+            <h3>Q4: スマートフォンでも使えますか？</h3>
+            <p>A: はい。レスポンシブデザインを採用しており、スマートフォンやタブレットでも利用できます。</p>
+            
+            <h3>Q5: データのバックアップは？</h3>
+            <p>A: Google Spreadsheet上にデータが保存されているため、Google の自動バックアップ機能が有効です。また、定期的な CSV エクスポートをお勧めします。</p>
+            
+            <h3>Q6: 複数のユーザーが同時に編集できますか？</h3>
+            <p>A: はい。ただし、同じレコードを同時に編集した場合、最後に保存した内容が反映されます（Last Write Wins）。</p>
+        </div>
+
+        <div class="manual-section" id="troubleshooting">
+            <h2>トラブルシューティング</h2>
+            
+            <h3>ログインできない</h3>
+            <ul>
+                <li>メールアドレスとパスワードが正しいか確認</li>
+                <li>ブラウザのキャッシュをクリア</li>
+                <li>JWT トークンの有効期限切れの可能性（再ログイン）</li>
+            </ul>
+            
+            <h3>データが表示されない</h3>
+            <ul>
+                <li>インターネット接続を確認</li>
+                <li>Google Sheets API の接続状態を確認</li>
+                <li>ブラウザのコンソールでエラーログを確認</li>
+                <li>ページをリロード</li>
+            </ul>
+            
+            <h3>CSVインポートが失敗する</h3>
+            <ul>
+                <li>ファイルサイズが大きすぎる（50MB制限）</li>
+                <li>CSV形式が正しいか確認</li>
+                <li>ネットワークの安定性を確認</li>
+            </ul>
+            
+            <h3>権限エラーが表示される</h3>
+            <ul>
+                <li>自分のユーザー権限を確認</li>
+                <li>管理者のみの機能にアクセスしていないか確認</li>
+                <li>セッションの有効期限切れ（再ログイン）</li>
+            </ul>
+        </div>
+
+        <div class="manual-section" id="requirements">
+            <h2>システム要件</h2>
+            
+            <h3>ブラウザ</h3>
+            <ul>
+                <li>Google Chrome（推奨）</li>
+                <li>Firefox</li>
+                <li>Safari</li>
+                <li>Microsoft Edge</li>
+            </ul>
+            
+            <h3>ネットワーク</h3>
+            <ul>
+                <li>インターネット接続必須</li>
+                <li>Google Sheets API へのアクセス権限</li>
+            </ul>
+            
+            <h3>推奨環境</h3>
+            <ul>
+                <li>画面解像度: 1280x720 以上</li>
+                <li>安定したインターネット接続</li>
+                <li>最新版ブラウザの使用</li>
+            </ul>
+        </div>
+
+        <hr>
+
+        <div style="text-align: center; margin: 40px 0; color: #666;">
+            <p><strong>Document Version</strong>: 1.0</p>
+            <p><strong>Last Updated</strong>: 2026年1月9日</p>
+            <p style="margin-top: 20px;">本マニュアルに記載されていない内容や、使い方で不明な点がある場合は、<br>システム管理者にお問い合わせください。</p>
+        </div>
+    </div>
+
+    <a href="#toc" class="back-to-top">↑ トップへ</a>
+</body>
+</html>
