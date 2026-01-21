@@ -25,6 +25,7 @@
                     <a href="/guests" class="nav-link">関係者チケット</a>
                     <a href="/contests" class="nav-link">大会情報</a>
                     <a href="/members" class="nav-link">FWJ会員情報</a>
+                    <a href="/orders" class="nav-link">注文検索</a>
                     <a href="/subjects" class="nav-link admin-only">違反認定者</a>
                 </nav>
                 <a href="/manual.html" target="_blank" class="manual-link">📘 マニュアル</a>
@@ -45,8 +46,8 @@
                             <button type="button" id="searchBtn" class="search-btn" title="検索">検索</button>
                         </div>
                         <div class="control-buttons">
-                            <button id="importModalBtn">インポート</button>
-                            <button id="exportModalBtn">エクスポート</button>
+                            <button id="shopifyImportBtn">Shopifyインポート</button>
+                            <button id="exportModalBtn">CSVエクスポート</button>
                         </div>
                     </div>
                 </div>
@@ -89,56 +90,6 @@
         <div id="notification" class="notification hidden"></div>
     </div>
 
-    <!-- Import Modal -->
-    <div id="importModal" class="modal hidden">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2>ファイルインポート</h2>
-                <button class="modal-close" onclick="registrationsManager.closeImportModal()">&times;</button>
-            </div>
-            <div class="modal-form">
-                <div class="contest-info">
-                    <div class="form-group">
-                        <label for="modalContestName">大会名:</label>
-                        <select id="modalContestName" name="contestName" required>
-                            <option value="">大会を選択してください</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label for="modalContestDate">大会開催日:</label>
-                        <input type="date" id="modalContestDate" name="contestDate" readonly required>
-                        <small>※大会名を選択すると自動的に設定されます</small>
-                    </div>
-                </div>
-                <div class="form-group">
-                    <label for="modalRegistrationsFile">1. registrations.csv <span style="color: red;">*必須</span>:</label>
-                    <input type="file" id="modalRegistrationsFile" name="registrationsFile" accept=".csv" required>
-                    <small>※出場登録の基本データ</small>
-                </div>
-                <div class="form-group">
-                    <label for="modalAthleteListFile">2. athlete_list.csv <span style="color: red;">*必須</span>:</label>
-                    <input type="file" id="modalAthleteListFile" name="athleteListFile" accept=".csv" required>
-                    <small>※選手詳細情報（電話、身長、体重等）</small>
-                </div>
-                <div class="form-group">
-                    <label for="modalOrderFile">3. order.csv <span style="color: red;">*必須</span>:</label>
-                    <input type="file" id="modalOrderFile" name="orderFile" accept=".csv" required>
-                    <small>※クラス分け、出場順とスコアカード</small>
-                </div>
-                <div class="form-group">
-                    <label for="modalExceptionsFile">4. exceptions.csv <span style="color: red;">*必須</span>:</label>
-                    <input type="file" id="modalExceptionsFile" name="exceptionsFile" accept=".csv" required>
-                    <small>※NPC Worldwide Membership 失効情報</small>
-                </div>
-                <div class="form-actions">
-                    <button type="button" onclick="registrationsManager.closeImportModal()" class="btn btn-secondary">キャンセル</button>
-                    <button type="button" id="modalImportBtn" disabled class="btn btn-primary">選択ファイルをインポート</button>
-                </div>
-                <div id="modalImportStatus" class="import-status hidden"></div>
-            </div>
-        </div>
-    </div>
-
     <!-- Export Modal -->
     <div id="exportModal" class="modal hidden">
         <div class="modal-content">
@@ -157,7 +108,6 @@
                     <label for="exportType">リスト:</label>
                     <select id="exportType" required>
                         <option value="">種類を選択</option>
-                        <option value="membership">メール配信用リスト</option>
                         <option value="athlete_numbers">ゼッケン表示用リスト</option>
                         <option value="all_fields">全項目</option>
                     </select>
@@ -171,164 +121,40 @@
         </div>
     </div>
 
-    <!-- Edit Modal -->
-    <div id="editModal" class="modal hidden">
-        <div class="modal-content modal-large">
+    <!-- Shopify Import Modal -->
+    <div id="shopifyImportModal" class="modal hidden">
+        <div class="modal-content">
             <div class="modal-header">
-                <h2>出場登録編集</h2>
-                <div style="display: flex; gap: 10px;">
-                    <button type="button" onclick="registrationsManager.closeEditModal()" class="btn btn-secondary">キャンセル</button>
-                    <button type="button" id="saveEditBtn" class="btn btn-primary">保存</button>
-                    <button class="modal-close" onclick="registrationsManager.closeEditModal()">&times;</button>
-                </div>
+                <h2>Shopifyインポート</h2>
+                <button class="modal-close" onclick="registrationsManager.closeShopifyImportModal()">&times;</button>
             </div>
             <div class="modal-form">
-                <input type="hidden" id="editRegistrationId">
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="editContestDate">大会開催日:</label>
-                        <input type="date" id="editContestDate" readonly style="background-color: #f0f0f0;">
-                    </div>
-                    <div class="form-group">
-                        <label for="editContestName">大会名:</label>
-                        <input type="text" id="editContestName" readonly style="background-color: #f0f0f0;">
-                    </div>
+                <p class="modal-description">Ordersシートのデータを元に、Membersシートと紐付けてRegistrationsを作成します。</p>
+                <div class="form-group">
+                    <label for="shopifyContestName">大会名:</label>
+                    <select id="shopifyContestName" required>
+                        <option value="">大会を選択してください</option>
+                    </select>
                 </div>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="editPlayerNo">ゼッケン番号:</label>
-                        <input type="text" id="editPlayerNo" readonly style="background-color: #f0f0f0;">
-                    </div>
-                    <div class="form-group">
-                        <label for="editFwjCardNo">FWJカード番号:</label>
-                        <input type="text" id="editFwjCardNo">
-                    </div>
+                <div class="form-group">
+                    <label for="shopifyContestDate">大会開催日:</label>
+                    <input type="date" id="shopifyContestDate" readonly required>
+                    <small>※大会名を選択すると自動的に設定されます</small>
                 </div>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="editNameJa">氏名:</label>
-                        <input type="text" id="editNameJa">
+                <div class="form-group">
+                    <label>Shopifyから最新データを取得:</label>
+                    <div class="sync-buttons">
+                        <button type="button" id="syncMembersBtn" class="btn btn-secondary">最新のMembersをインポート</button>
+                        <button type="button" id="syncOrdersBtn" class="btn btn-secondary" disabled>最新のエントリーをインポート</button>
                     </div>
-                    <div class="form-group">
-                        <label for="editNameJaKana">フリガナ:</label>
-                        <input type="text" id="editNameJaKana">
-                    </div>
+                    <small>※エントリーのインポートには大会名の選択が必要です</small>
                 </div>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="editFirstName">First Name:</label>
-                        <input type="text" id="editFirstName" readonly style="background-color: #f0f0f0;">
-                    </div>
-                    <div class="form-group">
-                        <label for="editLastName">Last Name:</label>
-                        <input type="text" id="editLastName" readonly style="background-color: #f0f0f0;">
-                    </div>
-                    <div class="form-group" style="display: flex; align-items: flex-end;">
-                        <button type="button" id="swapNamesBtn" class="btn btn-secondary" style="white-space: nowrap;">姓名入換</button>
-                    </div>
+                <div id="syncStatus" class="import-status hidden"></div>
+                <div class="form-actions">
+                    <button type="button" onclick="registrationsManager.closeShopifyImportModal()" class="btn btn-secondary">キャンセル</button>
+                    <button type="button" id="shopifyImportExecuteBtn" disabled class="btn btn-primary">インポート実行</button>
                 </div>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="editFixedFirstName">Fixed First Name:</label>
-                        <input type="text" id="editFixedFirstName">
-                    </div>
-                    <div class="form-group">
-                        <label for="editFixedLastName">Fixed Last Name:</label>
-                        <input type="text" id="editFixedLastName">
-                    </div>
-                </div>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="editEmail">Email:</label>
-                        <input type="email" id="editEmail" readonly style="background-color: #f0f0f0;">
-                    </div>
-                    <div class="form-group">
-                        <label for="editPhone">電話番号:</label>
-                        <input type="text" id="editPhone" readonly style="background-color: #f0f0f0;">
-                    </div>
-                </div>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="editNpcMemberNo">NPC会員番号:</label>
-                        <input type="text" id="editNpcMemberNo" readonly style="background-color: #f0f0f0;">
-                    </div>
-                    <div class="form-group">
-                        <label for="editNpcMemberStatus">NPC会員状態:</label>
-                        <input type="text" id="editNpcMemberStatus" readonly style="background-color: #f0f0f0;">
-                    </div>
-                </div>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="editCountry">国:</label>
-                        <input type="text" id="editCountry" readonly style="background-color: #f0f0f0;">
-                    </div>
-                    <div class="form-group">
-                        <label for="editAge">年齢:</label>
-                        <input type="number" id="editAge" readonly style="background-color: #f0f0f0;">
-                    </div>
-                </div>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="editClassName">クラス名:</label>
-                        <input type="text" id="editClassName" readonly style="background-color: #f0f0f0;">
-                    </div>
-                    <div class="form-group">
-                        <label for="editClassCode">クラスコード:</label>
-                        <input type="text" id="editClassCode" readonly style="background-color: #f0f0f0;">
-                    </div>
-                </div>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="editClassRegulation">クラス規定:</label>
-                        <input type="text" id="editClassRegulation" readonly style="background-color: #f0f0f0;">
-                    </div>
-                    <div class="form-group">
-                        <label for="editSortIndex">ソート順:</label>
-                        <input type="text" id="editSortIndex" readonly style="background-color: #f0f0f0;">
-                    </div>
-                </div>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="editScoreCard">スコアカード:</label>
-                        <input type="text" id="editScoreCard" readonly style="background-color: #f0f0f0;">
-                    </div>
-                    <div class="form-group">
-                        <label for="editContestOrder">開催順:</label>
-                        <input type="text" id="editContestOrder" readonly style="background-color: #f0f0f0;">
-                    </div>
-                </div>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="editBackstagePass">バックステージパス:</label>
-                        <input type="text" id="editBackstagePass" readonly style="background-color: #f0f0f0;">
-                    </div>
-                    <div class="form-group">
-                        <label for="editHeight">身長:</label>
-                        <input type="text" id="editHeight" readonly style="background-color: #f0f0f0;">
-                    </div>
-                </div>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="editWeight">体重:</label>
-                        <input type="text" id="editWeight" readonly style="background-color: #f0f0f0;">
-                    </div>
-                    <div class="form-group">
-                        <label for="editOccupation">職業:</label>
-                        <input type="text" id="editOccupation" readonly style="background-color: #f0f0f0;">
-                    </div>
-                </div>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="editInstagram">Instagram:</label>
-                        <input type="text" id="editInstagram" readonly style="background-color: #f0f0f0;">
-                    </div>
-                </div>
-                <div class="form-row">
-                    <div class="form-group full-width">
-                        <label for="editBiography">Biography:</label>
-                        <textarea id="editBiography" rows="3" readonly style="background-color: #f0f0f0;"></textarea>
-                    </div>
-                </div>
+                <div id="shopifyImportStatus" class="import-status hidden"></div>
             </div>
         </div>
     </div>

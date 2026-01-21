@@ -13,6 +13,7 @@ const noteRoutes = require('./routes/notes');
 const contestRoutes = require('./routes/contests');
 const guestRoutes = require('./routes/guests');
 const memberRoutes = require('./routes/members');
+const orderRoutes = require('./routes/orders');
 const { checkAuth, requireIpRestriction } = require('./middleware/auth');
 const { sessionCompatibility } = require('./middleware/jwt');
 
@@ -52,6 +53,7 @@ app.use('/api/notes', requireIpRestriction);
 app.use('/api/contests', requireIpRestriction);
 app.use('/api/guests', requireIpRestriction);
 app.use('/api/members', requireIpRestriction);
+app.use('/api/orders', requireIpRestriction);
 
 // セッション互換性ミドルウェア（JWT対応）
 app.use(sessionCompatibility);
@@ -97,6 +99,10 @@ app.get('/members', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'members.html'));
 });
 
+app.get('/orders', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'orders.html'));
+});
+
 app.get('/manual.html', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'manual.html'));
 });
@@ -114,6 +120,7 @@ app.use('/api/notes', noteRoutes);
 app.use('/api/contests', contestRoutes);
 app.use('/api/guests', guestRoutes);
 app.use('/api/members', memberRoutes);
+app.use('/api/orders', orderRoutes);
 
 app.use((err, req, res, next) => {
   console.error(err.stack);

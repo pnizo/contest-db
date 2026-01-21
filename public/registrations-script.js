@@ -50,12 +50,6 @@ class RegistrationsManager {
             direction: 'desc'
         };
         this.contestsMap = new Map(); // 大会名と開催日のマップ
-        this.selectedFiles = {
-            registrations: null,
-            athleteList: null,
-            order: null,
-            exceptions: null
-        };
         console.log('REGISTRATIONS: About to call init()');
         this.init();
     }
@@ -178,42 +172,28 @@ class RegistrationsManager {
 
     bindEvents() {
         // モーダル関連のイベント
-        document.getElementById('importModalBtn').addEventListener('click', () => {
-            this.openImportModal();
-        });
-
         document.getElementById('exportModalBtn').addEventListener('click', () => {
             this.openExportModal();
         });
 
-        // 4つのファイル入力イベントハンドラー
-        document.getElementById('modalRegistrationsFile').addEventListener('change', (e) => {
-            this.handleMultiFileSelect('registrations', e);
-        });
-        document.getElementById('modalAthleteListFile').addEventListener('change', (e) => {
-            this.handleMultiFileSelect('athleteList', e);
-        });
-        document.getElementById('modalOrderFile').addEventListener('change', (e) => {
-            this.handleMultiFileSelect('order', e);
-        });
-        document.getElementById('modalExceptionsFile').addEventListener('change', (e) => {
-            this.handleMultiFileSelect('exceptions', e);
+        document.getElementById('shopifyImportBtn').addEventListener('click', () => {
+            this.openShopifyImportModal();
         });
 
-        document.getElementById('modalImportBtn').addEventListener('click', () => {
-            this.handleModalImport();
+        document.getElementById('shopifyImportExecuteBtn').addEventListener('click', () => {
+            this.executeShopifyImport();
+        });
+
+        document.getElementById('syncMembersBtn').addEventListener('click', () => {
+            this.syncMembersFromShopify();
+        });
+
+        document.getElementById('syncOrdersBtn').addEventListener('click', () => {
+            this.syncOrdersFromShopify();
         });
 
         document.getElementById('modalExportBtn').addEventListener('click', () => {
             this.handleModalExport();
-        });
-
-        document.getElementById('saveEditBtn').addEventListener('click', () => {
-            this.saveEdit();
-        });
-
-        document.getElementById('swapNamesBtn').addEventListener('click', () => {
-            this.swapNames();
         });
 
         // 削除済み表示機能を削除
@@ -283,76 +263,11 @@ class RegistrationsManager {
         });
     }
 
-    // モーダル関連のメソッド
-    openImportModal() {
-        document.getElementById('importModal').classList.remove('hidden');
-
-        // コンテスト選択肢を設定
-        const contestSelect = document.getElementById('modalContestName');
-        contestSelect.innerHTML = '<option value="">大会を選択してください</option>';
-
-        // 開催日順（降順）にソートしてオプションを追加
-        const contests = Array.from(this.contestsMap.entries())
-            .sort((a, b) => new Date(b[1]) - new Date(a[1]));
-
-        contests.forEach(([name, date]) => {
-            const option = document.createElement('option');
-            option.value = name;
-            option.textContent = name;
-            option.setAttribute('data-date', date);
-            contestSelect.appendChild(option);
-        });
-
-        // フォームをリセット（4つのファイル入力）
-        document.getElementById('modalRegistrationsFile').value = '';
-        document.getElementById('modalAthleteListFile').value = '';
-        document.getElementById('modalOrderFile').value = '';
-        document.getElementById('modalExceptionsFile').value = '';
-        document.getElementById('modalImportBtn').disabled = true;
-        document.getElementById('modalImportStatus').className = 'import-status hidden';
-        this.selectedFiles = {
-            registrations: null,
-            athleteList: null,
-            order: null,
-            exceptions: null
-        };
-
-        // 今日以降で最も近い大会をデフォルト値として設定
-        if (this.defaultContest) {
-            document.getElementById('modalContestName').value = this.defaultContest.contest_name;
-            document.getElementById('modalContestDate').value = this.formatDateForInput(this.defaultContest.contest_date);
-        } else {
-            document.getElementById('modalContestDate').value = '';
-            document.getElementById('modalContestName').value = '';
-        }
-
-        // コンテスト名選択時に開催日を自動設定
-        contestSelect.removeEventListener('change', this.contestSelectChangeBound);
-        this.contestSelectChangeBound = (e) => {
-            const selectedName = e.target.value;
-            if (selectedName && this.contestsMap.has(selectedName)) {
-                const contestDate = this.contestsMap.get(selectedName);
-                // 日付フォーマットを yyyy/MM/dd から yyyy-MM-dd に変換
-                const formattedDate = this.formatDateForInput(contestDate);
-                document.getElementById('modalContestDate').value = formattedDate;
-            } else {
-                document.getElementById('modalContestDate').value = '';
-            }
-            this.validateMultiFileImportForm();
-        };
-        contestSelect.addEventListener('change', this.contestSelectChangeBound);
-    }
-
     // 日付を yyyy/MM/dd から yyyy-MM-dd に変換
     formatDateForInput(dateString) {
         if (!dateString) return '';
         // スラッシュをハイフンに置換
         return dateString.replace(/\//g, '-');
-    }
-
-    closeImportModal() {
-        document.getElementById('importModal').classList.add('hidden');
-        this.selectedModalFile = null;
     }
 
     // エクスポートモーダル関連のメソッド
@@ -374,6 +289,220 @@ class RegistrationsManager {
 
     closeExportModal() {
         document.getElementById('exportModal').classList.add('hidden');
+    }
+
+    // Shopifyインポートモーダル
+    openShopifyImportModal() {
+        document.getElementById('shopifyImportModal').classList.remove('hidden');
+
+        // コンテスト選択肢を設定
+        const contestSelect = document.getElementById('shopifyContestName');
+        contestSelect.innerHTML = '<option value="">大会を選択してください</option>';
+
+        // 開催日順（降順）にソートしてオプションを追加
+        const contests = Array.from(this.contestsMap.entries())
+            .sort((a, b) => new Date(b[1]) - new Date(a[1]));
+
+        contests.forEach(([name, date]) => {
+            const option = document.createElement('option');
+            option.value = name;
+            option.textContent = name;
+            option.setAttribute('data-date', date);
+            contestSelect.appendChild(option);
+        });
+
+        // フォームをリセット
+        document.getElementById('shopifyContestDate').value = '';
+        document.getElementById('shopifyImportExecuteBtn').disabled = true;
+        document.getElementById('shopifyImportStatus').className = 'import-status hidden';
+        document.getElementById('shopifyImportStatus').textContent = '';
+
+        // 今日以降で最も近い大会をデフォルト値として設定
+        if (this.defaultContest) {
+            document.getElementById('shopifyContestName').value = this.defaultContest.contest_name;
+            document.getElementById('shopifyContestDate').value = this.formatDateForInput(this.defaultContest.contest_date);
+            this.validateShopifyImportForm();
+        }
+
+        // コンテスト名選択時に開催日を自動設定
+        contestSelect.removeEventListener('change', this.shopifyContestSelectChangeBound);
+        this.shopifyContestSelectChangeBound = (e) => {
+            const selectedName = e.target.value;
+            if (selectedName && this.contestsMap.has(selectedName)) {
+                const contestDate = this.contestsMap.get(selectedName);
+                const formattedDate = this.formatDateForInput(contestDate);
+                document.getElementById('shopifyContestDate').value = formattedDate;
+            } else {
+                document.getElementById('shopifyContestDate').value = '';
+            }
+            this.validateShopifyImportForm();
+        };
+        contestSelect.addEventListener('change', this.shopifyContestSelectChangeBound);
+    }
+
+    closeShopifyImportModal() {
+        document.getElementById('shopifyImportModal').classList.add('hidden');
+    }
+
+    validateShopifyImportForm() {
+        const contestDate = document.getElementById('shopifyContestDate').value;
+        const contestName = document.getElementById('shopifyContestName').value;
+        const importBtn = document.getElementById('shopifyImportExecuteBtn');
+        const syncOrdersBtn = document.getElementById('syncOrdersBtn');
+
+        importBtn.disabled = !(contestDate && contestName);
+        syncOrdersBtn.disabled = !contestName;
+    }
+
+    async syncMembersFromShopify() {
+        const syncBtn = document.getElementById('syncMembersBtn');
+        const originalText = syncBtn.textContent;
+        const statusElement = document.getElementById('syncStatus');
+
+        try {
+            syncBtn.disabled = true;
+            syncBtn.textContent = '同期中...';
+            statusElement.className = 'import-status';
+            statusElement.style.display = 'block';
+            statusElement.textContent = 'Membersを同期中...';
+
+            const response = await authFetch('/api/members/sync', {
+                method: 'POST'
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                const message = result.message || `Members同期完了: ${result.synced}件を同期しました`;
+                this.showNotification(message, 'success');
+                statusElement.className = 'import-status success';
+                statusElement.textContent = message;
+            } else {
+                this.showNotification(result.error || 'Members同期に失敗しました', 'error');
+                statusElement.className = 'import-status error';
+                statusElement.textContent = 'Members同期に失敗しました: ' + (result.error || '');
+            }
+        } catch (error) {
+            this.showNotification('エラーが発生しました: ' + error.message, 'error');
+            statusElement.className = 'import-status error';
+            statusElement.textContent = 'エラーが発生しました: ' + error.message;
+        } finally {
+            syncBtn.disabled = false;
+            syncBtn.textContent = originalText;
+        }
+    }
+
+    async syncOrdersFromShopify() {
+        const contestName = document.getElementById('shopifyContestName').value;
+        if (!contestName) {
+            this.showNotification('大会名を選択してください', 'error');
+            return;
+        }
+
+        const syncBtn = document.getElementById('syncOrdersBtn');
+        const originalText = syncBtn.textContent;
+        const statusElement = document.getElementById('syncStatus');
+
+        try {
+            syncBtn.disabled = true;
+            syncBtn.textContent = '取得中...';
+            statusElement.className = 'import-status';
+            statusElement.style.display = 'block';
+            statusElement.textContent = 'エントリーを取得中...';
+
+            // "コンテストエントリー" と contest_name の2つのタグで検索してOrdersシートに出力
+            const tag = `"コンテストエントリー", "${contestName}"`;
+            const response = await authFetch('/api/orders/export', {
+                method: 'POST',
+                body: JSON.stringify({
+                    tag: tag,
+                    paidOnly: true
+                })
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                const message = result.message || `エントリー取得完了: ${result.exported}件`;
+                this.showNotification(message, 'success');
+                statusElement.className = 'import-status success';
+                statusElement.textContent = message;
+            } else {
+                this.showNotification(result.error || 'エントリー取得に失敗しました', 'error');
+                statusElement.className = 'import-status error';
+                statusElement.textContent = 'エントリー取得に失敗しました: ' + (result.error || '');
+            }
+        } catch (error) {
+            this.showNotification('エラーが発生しました: ' + error.message, 'error');
+            statusElement.className = 'import-status error';
+            statusElement.textContent = 'エラーが発生しました: ' + error.message;
+        } finally {
+            syncBtn.disabled = false;
+            syncBtn.textContent = originalText;
+            this.validateShopifyImportForm();
+        }
+    }
+
+    async executeShopifyImport() {
+        const contestDate = document.getElementById('shopifyContestDate').value;
+        const contestName = document.getElementById('shopifyContestName').value;
+
+        if (!contestDate || !contestName) {
+            this.showNotification('大会開催日と大会名を選択してください', 'error');
+            return;
+        }
+
+        try {
+            document.getElementById('shopifyImportExecuteBtn').disabled = true;
+            const statusElement = document.getElementById('shopifyImportStatus');
+            statusElement.className = 'import-status';
+            statusElement.style.display = 'block';
+            statusElement.textContent = 'インポート中...';
+
+            const response = await authFetch(`${this.apiUrl}/import-shopify`, {
+                method: 'POST',
+                body: JSON.stringify({ contestDate, contestName })
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                const { imported, skipped, memberNotFound, warnings } = result.data;
+
+                this.showNotification(`${imported}件のRegistrationをインポートしました`, 'success');
+
+                statusElement.className = 'import-status success';
+                let statusMessage = `インポート完了: ${contestName} (${contestDate}) - ${imported}件`;
+                if (memberNotFound > 0) {
+                    statusMessage += `\n※${memberNotFound}件はMemberが見つからず、Members由来の項目が空白です`;
+                }
+                statusElement.textContent = statusMessage;
+
+                // 警告がある場合はコンソールに出力
+                if (warnings && warnings.length > 0) {
+                    console.log('Shopify import warnings:', warnings);
+                }
+
+                await this.loadFilterOptions();
+                this.loadRegistrations();
+
+                // モーダルを閉じる
+                setTimeout(() => {
+                    this.closeShopifyImportModal();
+                }, 2000);
+            } else {
+                this.showNotification(result.error, 'error');
+                statusElement.className = 'import-status error';
+                statusElement.textContent = 'インポートに失敗しました: ' + result.error;
+            }
+        } catch (error) {
+            this.showNotification('エラーが発生しました: ' + error.message, 'error');
+            const statusElement = document.getElementById('shopifyImportStatus');
+            statusElement.className = 'import-status error';
+            statusElement.textContent = 'エラーが発生しました: ' + error.message;
+        } finally {
+            document.getElementById('shopifyImportExecuteBtn').disabled = false;
+        }
     }
 
     async loadExportContestNames() {
@@ -476,158 +605,6 @@ class RegistrationsManager {
         link.click();
         document.body.removeChild(link);
         URL.revokeObjectURL(url);
-    }
-
-    handleMultiFileSelect(fileType, e) {
-        const file = e.target.files[0];
-
-        if (file && file.name.toLowerCase().endsWith('.csv')) {
-            this.selectedFiles[fileType] = file;
-        } else {
-            this.selectedFiles[fileType] = null;
-            if (file) {
-                this.showNotification('CSVファイルを選択してください', 'error');
-            }
-        }
-
-        this.validateMultiFileImportForm();
-    }
-
-    validateMultiFileImportForm() {
-        // 4つすべてのファイルが選択されているかチェック
-        const allFilesSelected =
-            this.selectedFiles.registrations &&
-            this.selectedFiles.athleteList &&
-            this.selectedFiles.order &&
-            this.selectedFiles.exceptions;
-
-        const contestDate = document.getElementById('modalContestDate').value;
-        const contestName = document.getElementById('modalContestName').value;
-        const importBtn = document.getElementById('modalImportBtn');
-
-        const shouldEnable = !!(allFilesSelected && contestDate && contestName);
-        importBtn.disabled = !shouldEnable;
-    }
-
-    async handleModalImport() {
-        const contestDate = document.getElementById('modalContestDate').value;
-        const contestName = document.getElementById('modalContestName').value;
-
-        // 最低1つのファイルが選択されているか確認
-        const anyFileSelected =
-            this.selectedFiles.registrations ||
-            this.selectedFiles.athleteList ||
-            this.selectedFiles.order ||
-            this.selectedFiles.exceptions;
-
-        if (!anyFileSelected) {
-            this.showNotification('最低1つのCSVファイルを選択してください', 'error');
-            return;
-        }
-
-        if (!contestDate || !contestName) {
-            this.showNotification('大会開催日と大会名を入力してください', 'error');
-            return;
-        }
-
-        try {
-            document.getElementById('modalImportBtn').disabled = true;
-            document.getElementById('modalImportStatus').className = 'import-status';
-            document.getElementById('modalImportStatus').textContent = 'ファイル読み込み中...';
-
-            // 選択されたファイルのみを並列読み込み
-            const filesData = {};
-            const promises = [];
-            const fileKeys = [];
-
-            if (this.selectedFiles.registrations) {
-                promises.push(this.readFileAsText(this.selectedFiles.registrations));
-                fileKeys.push('registrations');
-            }
-            if (this.selectedFiles.athleteList) {
-                promises.push(this.readFileAsText(this.selectedFiles.athleteList));
-                fileKeys.push('athleteList');
-            }
-            if (this.selectedFiles.order) {
-                promises.push(this.readFileAsText(this.selectedFiles.order));
-                fileKeys.push('order');
-            }
-            if (this.selectedFiles.exceptions) {
-                promises.push(this.readFileAsText(this.selectedFiles.exceptions));
-                fileKeys.push('exceptions');
-            }
-
-            const fileContents = await Promise.all(promises);
-            fileKeys.forEach((key, index) => {
-                filesData[key] = fileContents[index];
-            });
-
-            // データ検証
-            for (const key in filesData) {
-                if (!filesData[key] || filesData[key].trim().length === 0) {
-                    this.showNotification(`${key}.csvのデータが空です`, 'error');
-                    return;
-                }
-            }
-
-            document.getElementById('modalImportStatus').textContent = 'インポート中...';
-
-            const requestData = {
-                filesData,
-                contestDate,
-                contestName
-            };
-
-            const response = await authFetch(`${this.apiUrl}/import-multi`, {
-                method: 'POST',
-                body: JSON.stringify(requestData)
-            });
-
-            const result = await response.json();
-
-            if (result.success) {
-                const { total, imported, message, contestDate: importedDate, contestName: importedName } = result.data;
-
-                this.showNotification(message || `${imported}件の登録データをインポートしました`, 'success');
-
-                const statusElement = document.getElementById('modalImportStatus');
-                statusElement.className = 'import-status success';
-                statusElement.style.display = 'block';
-                statusElement.textContent = `インポート完了: ${importedName} (${importedDate}) - ${imported}件`;
-
-                await this.loadFilterOptions();
-                this.loadRegistrations();
-
-                // モーダルを閉じる
-                setTimeout(() => {
-                    this.closeImportModal();
-                }, 2000);
-            } else {
-                // エラーメッセージを改行で分割して表示
-                const errorLines = result.error.split('\n');
-                const mainError = errorLines[0];
-                const detailError = errorLines.slice(1).join('\n');
-
-                this.showNotification(mainError, 'error');
-
-                const statusElement = document.getElementById('modalImportStatus');
-                statusElement.className = 'import-status error';
-                statusElement.style.display = 'block';
-                statusElement.innerHTML =
-                    detailError ?
-                    `<strong>インポートに失敗しました</strong><br><small style="font-size: 0.9em; line-height: 1.3; white-space: pre-wrap;">${detailError.replace(/\n/g, '<br>')}</small>` :
-                    '<strong>インポートに失敗しました</strong>';
-            }
-        } catch (error) {
-            this.showNotification('エラーが発生しました: ' + error.message, 'error');
-
-            const statusElement = document.getElementById('modalImportStatus');
-            statusElement.className = 'import-status error';
-            statusElement.style.display = 'block';
-            statusElement.innerHTML = `<strong>エラーが発生しました</strong><br><small>${error.message}</small>`;
-        } finally {
-            document.getElementById('modalImportBtn').disabled = false;
-        }
     }
 
     readFileAsText(file) {
@@ -762,21 +739,15 @@ class RegistrationsManager {
             { key: 'name_ja_kana', label: 'フリガナ' },
             { key: 'first_name', label: 'First Name' },
             { key: 'last_name', label: 'Last Name' },
-            { key: 'edit_action', label: '操作', isAction: true }, // 編集ボタン列
             { key: 'email', label: 'Email' },
             { key: 'phone', label: '電話番号' },
             { key: 'fwj_card_no', label: 'FWJ card #' },
-            { key: 'npc_member_no', label: 'NPC member #' },
             { key: 'country', label: '国' },
             { key: 'age', label: '年齢' },
             { key: 'class_name', label: 'クラス' },
-            { key: 'class_code', label: 'クラスコード' },
-            { key: 'class_regulation', label: 'クラス規定' },
             { key: 'sort_index', label: 'ソート順' },
-            { key: 'npc_member_status', label: 'NPC会員状態' },
             { key: 'score_card', label: 'スコアカード' },
             { key: 'contest_order', label: '開催順' },
-            { key: 'backstage_pass', label: 'BSP' },
             { key: 'height', label: '身長' },
             { key: 'weight', label: '体重' },
             { key: 'occupation', label: '職業' },
@@ -786,16 +757,6 @@ class RegistrationsManager {
 
         headers.forEach(header => {
             const th = document.createElement('th');
-
-            // 操作列の場合
-            if (header.isAction) {
-                if (this.isAdmin) {
-                    th.textContent = header.label;
-                    th.style.textAlign = 'center';
-                    headerRow.appendChild(th);
-                }
-                return;
-            }
 
             th.className = 'sortable';
             th.setAttribute('data-column', header.key);
@@ -824,17 +785,6 @@ class RegistrationsManager {
             }
 
             headers.forEach(header => {
-                // 操作列の場合
-                if (header.isAction) {
-                    if (this.isAdmin) {
-                        const actionTd = document.createElement('td');
-                        actionTd.style.textAlign = 'center';
-                        actionTd.innerHTML = this.createActionButtons(registration);
-                        row.appendChild(actionTd);
-                    }
-                    return;
-                }
-
                 const td = document.createElement('td');
                 let value = registration[header.key] || '';
 
@@ -842,26 +792,7 @@ class RegistrationsManager {
                     value = new Date(value).toLocaleDateString('ja-JP');
                 }
 
-                // First Name/Last Nameの表示ロジック
-                if (header.key === 'first_name') {
-                    const fixedValue = registration['fixed_first_name'] || '';
-                    if (fixedValue !== '') {
-                        td.textContent = fixedValue;
-                        td.style.color = '#dc2626'; // 赤色
-                    } else {
-                        td.textContent = value;
-                    }
-                } else if (header.key === 'last_name') {
-                    const fixedValue = registration['fixed_last_name'] || '';
-                    if (fixedValue !== '') {
-                        td.textContent = fixedValue;
-                        td.style.color = '#dc2626'; // 赤色
-                    } else {
-                        td.textContent = value;
-                    }
-                } else {
-                    td.textContent = value;
-                }
+                td.textContent = value;
 
                 row.appendChild(td);
             });
@@ -871,11 +802,6 @@ class RegistrationsManager {
 
         container.innerHTML = '';
         container.appendChild(table);
-    }
-
-    createActionButtons(registration) {
-        const buttons = `<button class="btn btn-sm btn-edit" onclick="registrationsManager.openEditModal('${registration.id}')">編集</button>`;
-        return buttons;
     }
 
     getSortIcon(column) {
@@ -1108,104 +1034,6 @@ class RegistrationsManager {
     //         this.showNotification('エラーが発生しました', 'error');
     //     }
     // }
-
-    async openEditModal(id) {
-        try {
-            // レコード詳細を取得
-            const response = await authFetch(`${this.apiUrl}/${id}`);
-            const result = await response.json();
-
-            if (!result.success) {
-                this.showNotification('レコードの取得に失敗しました', 'error');
-                return;
-            }
-
-            const registration = result.data;
-
-            // モーダルのフィールドに値をセット
-            document.getElementById('editRegistrationId').value = registration.id;
-            document.getElementById('editContestDate').value = registration.contest_date || '';
-            document.getElementById('editContestName').value = registration.contest_name || '';
-            document.getElementById('editPlayerNo').value = registration.player_no || '';
-            document.getElementById('editFwjCardNo').value = registration.fwj_card_no || '';
-            document.getElementById('editNameJa').value = registration.name_ja || '';
-            document.getElementById('editNameJaKana').value = registration.name_ja_kana || '';
-            document.getElementById('editFirstName').value = registration.first_name || '';
-            document.getElementById('editLastName').value = registration.last_name || '';
-            document.getElementById('editFixedFirstName').value = registration.fixed_first_name || '';
-            document.getElementById('editFixedLastName').value = registration.fixed_last_name || '';
-            document.getElementById('editEmail').value = registration.email || '';
-            document.getElementById('editPhone').value = registration.phone || '';
-            document.getElementById('editNpcMemberNo').value = registration.npc_member_no || '';
-            document.getElementById('editNpcMemberStatus').value = registration.npc_member_status || '';
-            document.getElementById('editCountry').value = registration.country || '';
-            document.getElementById('editAge').value = registration.age || '';
-            document.getElementById('editClassName').value = registration.class_name || '';
-            document.getElementById('editClassCode').value = registration.class_code || '';
-            document.getElementById('editClassRegulation').value = registration.class_regulation || '';
-            document.getElementById('editSortIndex').value = registration.sort_index || '';
-            document.getElementById('editScoreCard').value = registration.score_card || '';
-            document.getElementById('editContestOrder').value = registration.contest_order || '';
-            document.getElementById('editBackstagePass').value = registration.backstage_pass || '';
-            document.getElementById('editHeight').value = registration.height || '';
-            document.getElementById('editWeight').value = registration.weight || '';
-            document.getElementById('editOccupation').value = registration.occupation || '';
-            document.getElementById('editInstagram').value = registration.instagram || '';
-            document.getElementById('editBiography').value = registration.biography || '';
-
-            // モーダル表示
-            document.getElementById('editModal').classList.remove('hidden');
-        } catch (error) {
-            console.error('Edit modal error:', error);
-            this.showNotification('エラーが発生しました', 'error');
-        }
-    }
-
-    closeEditModal() {
-        document.getElementById('editModal').classList.add('hidden');
-    }
-
-    async saveEdit() {
-        try {
-            const id = document.getElementById('editRegistrationId').value;
-            // 編集可能なフィールドのみを送信
-            const updateData = {
-                name_ja: document.getElementById('editNameJa').value,
-                name_ja_kana: document.getElementById('editNameJaKana').value,
-                fixed_first_name: document.getElementById('editFixedFirstName').value,
-                fixed_last_name: document.getElementById('editFixedLastName').value,
-                fwj_card_no: document.getElementById('editFwjCardNo').value
-            };
-
-            const response = await authFetch(`${this.apiUrl}/${id}`, {
-                method: 'PUT',
-                body: JSON.stringify(updateData)
-            });
-
-            const result = await response.json();
-
-            if (result.success) {
-                this.showNotification('更新しました', 'success');
-                this.closeEditModal();
-                await this.loadRegistrations();
-            } else {
-                this.showNotification(result.error || '更新に失敗しました', 'error');
-            }
-        } catch (error) {
-            console.error('Save edit error:', error);
-            this.showNotification('エラーが発生しました', 'error');
-        }
-    }
-
-    swapNames() {
-        // Last Name → Fixed First Name
-        const lastName = document.getElementById('editLastName').value;
-        document.getElementById('editFixedFirstName').value = lastName;
-
-        // First Name → Fixed Last Name
-        const firstName = document.getElementById('editFirstName').value;
-        document.getElementById('editFixedLastName').value = firstName;
-    }
 
     showNotification(message, type = 'info') {
         const notification = document.getElementById('notification');

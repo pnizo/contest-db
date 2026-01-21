@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>注文検索 - スプレッドシートDB</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <div id="authHeader" class="auth-header" style="display: none;">
+            <div class="user-info-display">
+                <div class="user-avatar" id="userAvatar"></div>
+                <div class="user-details-display">
+                    <div class="name" id="userName"></div>
+                    <div class="role" id="userRole"></div>
+                </div>
+            </div>
+            <div class="auth-actions">
+                <nav class="page-nav">
+                    <a href="/users" class="nav-link">ユーザー</a>
+                    <a href="/scores" class="nav-link">大会成績</a>
+                    <a href="/registrations" class="nav-link">出場登録</a>
+                    <a href="/notes" class="nav-link">特記事項</a>
+                    <a href="/guests" class="nav-link">関係者チケット</a>
+                    <a href="/contests" class="nav-link">大会情報</a>
+                    <a href="/members" class="nav-link">FWJ会員情報</a>
+                    <a href="/orders" class="nav-link active">注文検索</a>
+                    <a href="/subjects" class="nav-link admin-only">違反認定者</a>
+                </nav>
+                <a href="/manual.html" target="_blank" class="manual-link">マニュアル</a>
+                <button id="logoutBtn" class="logout-btn">ログアウト</button>
+            </div>
+        </div>
+
+        <main class="orders-main">
+            <section class="orders-section">
+                <h2>Shopify注文検索</h2>
+                
+                <div class="section-controls">
+                    <div class="controls">
+                        <div class="search-container">
+                            <div class="search-input-wrapper">
+                                <input type="text" id="tagInput" placeholder="注文タグ（任意）例：タグ1,タグ2 または &quot;スペース含むタグ&quot;" class="search-input">
+                            </div>
+                            <button type="button" id="searchBtn" class="search-btn">検索</button>
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="paidOnlyCheckbox" checked>
+                                支払済の注文のみ検索する
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="info-message">
+                    <p>※ 「支払い済み」の注文をShopifyから検索し、スプレッドシートに出力できます。</p>
+                    <p>※ タグ指定は任意。複数タグはカンマまたはスペースで区切り（AND検索）。引用符で囲むとスペース含むタグを指定可能。</p>
+                    <p>※ キャンセル済み・アーカイブ済みの注文は除外されます。</p>
+                    <p>※ 1つの注文に複数商品がある場合、商品ごとに行が展開されます。</p>
+                </div>
+
+                <div id="searchResult" class="search-result hidden">
+                    <div class="result-summary">
+                        <span id="resultCount">0件の注文（0行）が見つかりました</span>
+                    </div>
+
+                    <div class="export-controls admin-only">
+                        <button type="button" id="exportBtn" class="action-btn primary">Ordersシートに出力</button>
+                        <span class="export-note">※ 既存のOrdersシートは上書きされます</span>
+                    </div>
+                </div>
+
+                <div id="ordersTableContainer" class="table-scroll-container">
+                    <div class="no-data">タグを入力して検索してください</div>
+                </div>
+            </section>
+        </main>
+
+        <div id="notification" class="notification hidden"></div>
+    </div>
+
+    <script src="orders-script.js"></script>
+</body>
+</html>

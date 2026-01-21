@@ -3,6 +3,7 @@ const Registration = require('../models/Registration');
 const Subject = require('../models/Subject');
 const Note = require('../models/Note');
 const Member = require('../models/Member');
+const SheetsService = require('../config/sheets');
 const { requireAuth, requireAdmin, checkAuth } = require('../middleware/auth');
 const { parseFlexibleDate, formatToISODate, calculateAge } = require('../utils/dateUtils');
 const wanakana = require('wanakana');
@@ -12,6 +13,7 @@ const registrationModel = new Registration();
 const subjectModel = new Subject();
 const noteModel = new Note();
 const memberModel = new Member();
+const sheetsService = new SheetsService();
 
 // 氏名を正規化する関数（スペースを除去）
 function normalizeNameJa(nameJa) {
@@ -37,12 +39,6 @@ function hasMatchingNote(registration, notes) {
     // fwj_card_noでマッチ
     if (registration.fwj_card_no && note.fwj_card_no &&
         registration.fwj_card_no.toString() === note.fwj_card_no.toString()) {
-      return true;
-    }
-
-    // npc_member_noでマッチ
-    if (registration.npc_member_no && note.npc_member_no &&
-        registration.npc_member_no.toString() === note.npc_member_no.toString()) {
       return true;
     }
 
@@ -134,16 +130,16 @@ router.get('/filter-options', requireAuth, async (req, res) => {
 // 番号による検索エンドポイント（特記事項用）
 router.get('/search/by-number', requireAuth, async (req, res) => {
   try {
-    const { contest_name, player_no, fwj_card_no, npc_member_no } = req.query;
+    const { contest_name, player_no, fwj_card_no } = req.query;
 
     console.log('=== SEARCH BY NUMBER DEBUG ===');
-    console.log('Parameters:', { contest_name, player_no, fwj_card_no, npc_member_no });
+    console.log('Parameters:', { contest_name, player_no, fwj_card_no });
 
     if (!contest_name) {
       return res.status(400).json({ success: false, error: '大会名は必須です' });
     }
 
-    if (!player_no && !fwj_card_no && !npc_member_no) {
+    if (!player_no && !fwj_card_no) {
       return res.status(400).json({ success: false, error: 'いずれかの番号フィールドが必要です' });
     }
 
@@ -174,14 +170,6 @@ router.get('/search/by-number', requireAuth, async (req, res) => {
         reg.fwj_card_no && reg.fwj_card_no.toString() === fwj_card_no.toString()
       );
       console.log('Found by fwj_card_no:', !!foundRecord);
-    }
-
-    if (!foundRecord && npc_member_no) {
-      console.log('Searching by npc_member_no:', npc_member_no);
-      foundRecord = contestRegistrations.find(reg =>
-        reg.npc_member_no && reg.npc_member_no.toString() === npc_member_no.toString()
-      );
-      console.log('Found by npc_member_no:', !!foundRecord);
     }
 
     console.log('Final result:', foundRecord ? 'FOUND' : 'NOT FOUND');
@@ -429,358 +417,6 @@ router.get('/fwj/:fwjCard', requireAuth, async (req, res) => {
   }
 });
 
-// 4ファイルCSVインポート（認証済みユーザー）
-router.post('/import-multi', requireAuth, async (req, res) => {
-  try {
-    console.log('=== MULTI-FILE IMPORT REQUEST START ===');
-    const { filesData, contestDate, contestName } = req.body;
-
-    // バリデーション: contest情報
-    if (!contestDate || !contestName) {
-      console.log('ERROR: Missing contest date or name');
-      return res.status(400).json({ success: false, error: '大会開催日と大会名は必須です' });
-    }
-
-    // バリデーション: 4つのファイルすべてが必須
-    if (!filesData || Object.keys(filesData).length === 0) {
-      console.log('ERROR: No files provided');
-      return res.status(400).json({ success: false, error: '4つのCSVファイルをすべて選択してください' });
-    }
-
-    const requiredFiles = ['registrations', 'athleteList', 'order', 'exceptions'];
-    const missingFiles = requiredFiles.filter(file => !filesData[file]);
-
-    if (missingFiles.length > 0) {
-      const fileNames = {
-        registrations: 'registrations.csv',
-        athleteList: 'athlete_list.csv',
-        order: 'order.csv',
-        exceptions: 'exceptions.csv'
-      };
-      const missingFileNames = missingFiles.map(f => fileNames[f]).join(', ');
-      console.log('ERROR: Missing required files:', missingFileNames);
-      return res.status(400).json({
-        success: false,
-        error: `以下のファイルが不足しています: ${missingFileNames}`
-      });
-    }
-
-    console.log('Files received:', Object.keys(filesData));
-
-    // CSV解析ヘルパー関数
-    const parseCSVLine = (line) => {
-      const values = [];
-      let current = '';
-      let inQuotes = false;
-
-      for (let i = 0; i < line.length; i++) {
-        const char = line[i];
-        if (char === '"') {
-          inQuotes = !inQuotes;
-        } else if (char === ',' && !inQuotes) {
-          values.push(current);
-          current = '';
-        } else {
-          current += char;
-        }
-      }
-      values.push(current);
-      return values;
-    };
-
-    const parseCSVString = (csvString) => {
-      const lines = csvString.split(/\r?\n/).filter(line => line.trim());
-      if (lines.length < 2) {
-        throw new Error('CSVファイルにデータがありません');
-      }
-      return lines.map(line => parseCSVLine(line));
-    };
-
-    const csvToObjects = (rawData) => {
-      const headers = rawData[0].map(h => h.toString().toLowerCase().trim());
-      const rows = rawData.slice(1);
-      return rows.map(row => {
-        const obj = {};
-        headers.forEach((header, index) => {
-          obj[header] = row[index] || '';
-        });
-        return obj;
-      }).filter(row => Object.values(row).some(v => v && v.toString().trim() !== ''));
-    };
-
-    // 各CSVをパース
-    let registrationsData = [];
-    let athleteListData = [];
-    let orderData = [];
-    let exceptionsData = [];
-
-    try {
-      if (filesData.registrations) {
-        const rawData = parseCSVString(filesData.registrations);
-        registrationsData = csvToObjects(rawData);
-        console.log(`Parsed Registrations.csv: ${registrationsData.length} rows`);
-      }
-
-      if (filesData.athleteList) {
-        const rawData = parseCSVString(filesData.athleteList);
-        athleteListData = csvToObjects(rawData);
-        console.log(`Parsed athlete_list.csv: ${athleteListData.length} rows`);
-      }
-
-      if (filesData.order) {
-        const rawData = parseCSVString(filesData.order);
-        orderData = csvToObjects(rawData);
-        console.log(`Parsed order.csv: ${orderData.length} rows`);
-      }
-
-      if (filesData.exceptions) {
-        const rawData = parseCSVString(filesData.exceptions);
-        exceptionsData = csvToObjects(rawData);
-        console.log(`Parsed exceptions.csv: ${exceptionsData.length} rows`);
-      }
-    } catch (parseError) {
-      console.error('CSV parsing error:', parseError);
-      return res.status(400).json({ success: false, error: `CSV解析エラー: ${parseError.message}` });
-    }
-
-    // データマージ処理
-    console.log('Merging CSV data...');
-    console.log(`DEBUG: registrationsData.length = ${registrationsData.length}`);
-    console.log(`DEBUG: athleteListData.length = ${athleteListData.length}`);
-    const allRecords = []; // 配列を使用して重複を許可
-    const errors = [];
-
-    // Step 1: Registrations.csvから基本レコード作成（必須）
-    // 重複を許可するため、全ての行をそのまま追加
-    console.log('Creating base records from Registrations.csv...');
-    registrationsData.forEach((reg, index) => {
-      const athleteNo = reg['athlete #'];
-      if (!athleteNo) {
-        console.warn(`Registrations.csv row ${index + 2}: Missing Athlete #`);
-        return;
-      }
-
-      allRecords.push({
-        player_no: athleteNo, // Athlete #をそのままplayer_noに使用
-        first_name: reg['first name'] || '',
-        last_name: reg['last name'] || '',
-        email: reg['email address'] || '',
-        npc_member_no: reg['member number'] || '',
-        country: reg['country'] || '',
-        age: reg['age'] || '',
-        class_name: reg['class'] || '',
-        class_code: reg['class code'] || '',
-        class_regulation: '',
-        sort_index: reg['sort index'] || '',
-        phone: '',
-        backstage_pass: '',
-        height: '',
-        weight: '',
-        occupation: '',
-        instagram: '',
-        biography: '',
-        npc_member_status: '',
-        score_card: '',
-        contest_order: ''
-      });
-    });
-
-    // Step 2: athlete_list.csvから詳細情報をマージ（同じAthlete #の全レコードに適用）
-    athleteListData.forEach((athlete, index) => {
-      const athleteNo = athlete['athlete #'];
-      if (!athleteNo) {
-        console.warn(`athlete_list.csv row ${index + 2}: Missing Athlete #`);
-        return;
-      }
-
-      // 同じAthlete #を持つ全てのレコードを検索
-      const matchingRecords = allRecords.filter(record => record.player_no === athleteNo);
-
-      if (matchingRecords.length === 0) {
-        console.warn(`Warning: Athlete ${athleteNo} not found in existing registrations, skipping`);
-        return; // 既存レコードがない場合はスキップ
-      }
-
-      // Backstage Pass処理
-      const pass1 = athlete['1 backstage pass']?.toUpperCase() === 'Y';
-      const pass2 = athlete['2 backstage passes']?.toUpperCase() === 'Y';
-
-      if (pass1 && pass2) {
-        const errorMsg = `選手 ${athleteNo}: バックステージパスが両方Yになっています`;
-        console.error(errorMsg);
-        errors.push(errorMsg);
-      }
-
-      // 同じAthlete #を持つ全てのレコードに情報をマージ
-      matchingRecords.forEach(record => {
-        if (pass1) {
-          record.backstage_pass = '1';
-        } else if (pass2) {
-          record.backstage_pass = '2';
-        }
-
-        // 既存の値がある場合は上書きしない、空の場合のみ更新
-        if (athlete['phone number']) record.phone = athlete['phone number'];
-        if (athlete['height']) record.height = athlete['height'];
-        if (athlete['weight']) record.weight = athlete['weight'];
-        if (athlete['occupation']) record.occupation = athlete['occupation'];
-        if (athlete['instagram']) record.instagram = athlete['instagram'];
-        if (athlete['biography']) record.biography = athlete['biography'];
-      });
-    });
-
-    // Backstage Passエラーがあれば中断
-    if (errors.length > 0) {
-      return res.status(400).json({ success: false, error: errors.join('\n') });
-    }
-
-    // Step 3: order.csvからclass_regulation, score_card, contest_orderをマージ
-    const orderMap = new Map();
-    orderData.forEach(o => {
-      orderMap.set(o['class_code'], {
-        class_regulation: o['class_regulation'] || '',
-        score_card: o['score_card'] || '',
-        contest_order: o['contest_order'] || ''
-      });
-    });
-
-    allRecords.forEach((record) => {
-      const orderInfo = orderMap.get(record.class_code);
-      if (orderInfo) {
-        record.class_regulation = orderInfo.class_regulation;
-        record.score_card = orderInfo.score_card;
-        record.contest_order = orderInfo.contest_order;
-      }
-    });
-
-    // Step 4: exceptions.csvからmember_numberとstatusを優先上書き（同じAthlete #の全レコードに適用）
-    exceptionsData.forEach((exc) => {
-      const athleteNo = exc['athlete #'];
-      if (!athleteNo) {
-        console.warn(`exceptions.csv: Missing Athlete #`);
-        return;
-      }
-
-      // 同じAthlete #を持つ全てのレコードを検索
-      const matchingRecords = allRecords.filter(record => record.player_no === athleteNo);
-
-      if (matchingRecords.length === 0) {
-        console.warn(`Warning: Athlete ${athleteNo} not found in existing registrations, skipping`);
-        return; // 既存レコードがない場合はスキップ
-      }
-
-      // 同じAthlete #を持つ全てのレコードに情報を適用
-      matchingRecords.forEach(record => {
-        // 既存レコードを優先上書き
-        if (exc['member number']) {
-          record.npc_member_no = exc['member number'];
-        }
-        if (exc['membership status']) {
-          record.npc_member_status = exc['membership status'];
-        }
-
-        // オプション上書き
-        if (exc['country']) record.country = exc['country'];
-        if (exc['phone number']) record.phone = exc['phone number'];
-      });
-    });
-
-    // Step 5: Membersシートから日本語名を補完
-    console.log('Fetching Members data for enrichment...');
-    try {
-      const allMembers = await memberModel.findAll();
-      console.log(`Found ${allMembers.length} members in Members sheet`);
-
-      const membersByEmail = new Map();
-      allMembers.forEach(member => {
-        if (member.email && member.email.trim()) {
-          const emailKey = member.email.toLowerCase().trim();
-          membersByEmail.set(emailKey, member);
-        }
-      });
-
-      let enrichedCount = 0;
-      allRecords.forEach(record => {
-        if (record.email && record.email.trim()) {
-          const emailKey = record.email.toLowerCase().trim();
-          const member = membersByEmail.get(emailKey);
-
-          if (member) {
-            if (member.shopify_id && member.shopify_id.trim()) {
-              record.fwj_card_no = member.shopify_id.trim();
-            }
-
-            const memberFwjLastName = member.fwj_lastname ? member.fwj_lastname.trim() : '';
-            const memberFwjFirstName = member.fwj_firstname ? member.fwj_firstname.trim() : '';
-            if (memberFwjLastName || memberFwjFirstName) {
-              record.name_ja = `${memberFwjLastName} ${memberFwjFirstName}`.trim();
-            }
-
-            const memberFwjLastNameKana = member.fwj_kanalastname ? member.fwj_kanalastname.trim() : '';
-            const memberFwjFirstNameKana = member.fwj_kanafirstname ? member.fwj_kanafirstname.trim() : '';
-            if (memberFwjLastNameKana || memberFwjFirstNameKana) {
-              record.name_ja_kana = `${memberFwjLastNameKana} ${memberFwjFirstNameKana}`.trim();
-            }
-
-            enrichedCount++;
-          }
-        }
-
-        // name_ja_kanaが未設定の場合、WanaKanaで生成
-        if (!record.name_ja_kana || record.name_ja_kana.trim() === '') {
-          const csvLastName = record.last_name ? record.last_name.trim() : '';
-          const csvFirstName = record.first_name ? record.first_name.trim() : '';
-          if (csvLastName || csvFirstName) {
-            const lastNameKana = csvLastName ? wanakana.toKatakana(csvLastName) : '';
-            const firstNameKana = csvFirstName ? wanakana.toKatakana(csvFirstName) : '';
-            if (lastNameKana || firstNameKana) {
-              record.name_ja_kana = `${lastNameKana} ${firstNameKana}`.trim();
-            }
-          }
-        }
-      });
-
-      console.log(`Enriched ${enrichedCount} records with Members data`);
-    } catch (memberError) {
-      console.error('Error fetching Members data:', memberError);
-      console.log('Continuing import without Members enrichment');
-    }
-
-    // 配列をそのまま使用（重複を含む全てのレコード）
-    const mergedData = allRecords;
-    console.log(`Total merged records: ${mergedData.length}`);
-
-    if (mergedData.length === 0) {
-      return res.status(400).json({ success: false, error: 'インポート可能なデータがありません' });
-    }
-
-    // バッチインポート実行
-    console.log('Starting batch import...');
-    const result = await registrationModel.batchImport(mergedData, contestDate, contestName, 'multi');
-    console.log('Batch import result:', result.success ? 'SUCCESS' : 'FAILED');
-
-    if (result.success) {
-      console.log('Import completed successfully:', result.data);
-      res.json({
-        success: true,
-        data: {
-          total: result.data.total,
-          imported: result.data.imported,
-          contestDate: result.data.contestDate,
-          contestName: result.data.contestName,
-          message: `${result.data.imported}件の登録データを正常にインポートしました`
-        }
-      });
-    } else {
-      console.log('Import failed:', result.error);
-      res.status(500).json({ success: false, error: result.error });
-    }
-  } catch (error) {
-    console.error('Import error:', error);
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
 // 大会・日付別登録データ取得
 router.get('/contest/:contestName/:contestDate', requireAuth, async (req, res) => {
   try {
@@ -797,53 +433,6 @@ router.get('/contest/:contestName/:contestDate', requireAuth, async (req, res) =
       contestDate: decodeURIComponent(contestDate)
     });
   } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-// NPC Worldwide Membership 加入督促者リストエクスポート
-router.get('/export/membership/:contestName', requireAuth, async (req, res) => {
-  try {
-    const contestName = decodeURIComponent(req.params.contestName);
-    const allRegistrations = await registrationModel.findAll();
-
-    // 指定された大会の登録データを取得し、membership_statusに値があるものをフィルター
-    const targetRegistrations = allRegistrations.filter(reg =>
-      reg.contest_name === contestName &&
-      reg.npc_member_status &&
-      reg.npc_member_status.trim() !== '' &&
-      (reg.npc_member_status === 'Not Found' || reg.npc_member_status === 'Expired')
-    );
-
-    // contest_dateを取得（最初のレコードから）
-    const contestDate = targetRegistrations.length > 0 ? targetRegistrations[0].contest_date : '';
-
-    // emailで重複排除
-    const uniqueEmails = new Map();
-    targetRegistrations.forEach(reg => {
-      if (reg.email && reg.email.trim() !== '' && !uniqueEmails.has(reg.email)) {
-        uniqueEmails.set(reg.email, {
-          email: reg.email,
-          name: reg.name_ja || ''
-        });
-      }
-    });
-
-    const csvData = Array.from(uniqueEmails.values());
-
-    // ファイル名: (contest_date)_(contest_name)_(用途名).csv
-    const sanitizedContestName = contestName.replace(/[^a-zA-Z0-9\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]/g, '_');
-    const filename = contestDate
-      ? `${contestDate}_${sanitizedContestName}_メール配信用.csv`
-      : `${sanitizedContestName}_メール配信用.csv`;
-
-    res.json({
-      success: true,
-      data: csvData,
-      filename
-    });
-  } catch (error) {
-    console.error('Membership export error:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -872,9 +461,7 @@ router.get('/export/athlete_numbers/:contestName', requireAuth, async (req, res)
           'Last Name': reg.last_name || '',
           'Age': reg.age || '',
           'Height': reg.height || '',
-          'Weight': reg.weight || '',
-          'Member Number': reg.npc_member_no || '',
-          'payment': reg.npc_member_status || ''
+          'Weight': reg.weight || ''
         });
       }
     });
@@ -923,21 +510,14 @@ router.get('/export/all_fields/:contestName', requireAuth, async (req, res) => {
       'fwj_card_no': reg.fwj_card_no || '',
       'first_name': reg.first_name || '',
       'last_name': reg.last_name || '',
-      'fixed_first_name': reg.fixed_first_name || '',
-      'fixed_last_name': reg.fixed_last_name || '',
       'email': reg.email || '',
       'phone': reg.phone || '',
-      'npc_member_no': reg.npc_member_no || '',
       'country': reg.country || '',
       'age': reg.age || '',
       'class_name': reg.class_name || '',
-      'class_regulation': reg.class_regulation || '',
-      'class_code': reg.class_code || '',
       'sort_index': reg.sort_index || '',
-      'npc_member_status': reg.npc_member_status || '',
       'score_card': reg.score_card || '',
       'contest_order': reg.contest_order || '',
-      'backstage_pass': reg.backstage_pass || '',
       'height': reg.height || '',
       'weight': reg.weight || '',
       'occupation': reg.occupation || '',
@@ -999,6 +579,259 @@ router.put('/:id', requireAdmin, async (req, res) => {
     res.json(result);
   } catch (error) {
     console.error('Update registration error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// POST /import-shopify - OrdersシートとMembersシートからRegistrationsを作成
+router.post('/import-shopify', requireAdmin, async (req, res) => {
+  try {
+    const { contestDate, contestName } = req.body;
+
+    if (!contestDate || !contestName) {
+      return res.status(400).json({
+        success: false,
+        error: '大会開催日と大会名は必須です'
+      });
+    }
+
+    console.log(`Starting Shopify import for ${contestName} (${contestDate})`);
+
+    // Ordersシートから全データを取得
+    const ordersData = await sheetsService.getOrdersData();
+    console.log(`Loaded ${ordersData.length} order rows from Orders sheet`);
+
+    if (ordersData.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Ordersシートにデータがありません'
+      });
+    }
+
+    // Membersの全データを取得（findByShopifyIdが全件取得するため効率化）
+    const allMembers = await memberModel.findAll();
+    console.log(`Loaded ${allMembers.length} members from Members sheet`);
+
+    // shopify_idでMembersをMapに変換（高速ルックアップ用）
+    const membersMap = new Map();
+    allMembers.forEach(member => {
+      if (member.shopify_id) {
+        membersMap.set(String(member.shopify_id), member);
+      }
+    });
+
+    // 変換結果
+    const registrations = [];
+    const skippedOrders = [];
+    const memberNotFoundOrders = [];
+
+    // 各Orderレコードを処理
+    for (const order of ordersData) {
+      const shopifyId = order.shopify_id;
+
+      if (!shopifyId) {
+        skippedOrders.push({ reason: 'shopify_id不明', order: order.order_no || 'unknown' });
+        continue;
+      }
+
+      // Memberを検索
+      const member = membersMap.get(String(shopifyId));
+
+      // class_nameを生成: product_name + " - " + variant（contest_nameを除去）
+      const productName = order.product_name || '';
+      const variant = order.variant || '';
+      let className = variant ? `${productName} - ${variant}` : productName;
+      // contest_nameを除去
+      if (contestName && className.includes(contestName)) {
+        className = className.replace(contestName, '').trim();
+        // 先頭や末尾の不要な記号を除去
+        className = className.replace(/^[\s\-–—:：]+|[\s\-–—:：]+$/g, '').trim();
+      }
+
+      // 年齢を計算（fwj_birthday と contestDate から）
+      let age = '';
+      if (member && member.fwj_birthday) {
+        const calculatedAge = calculateAge(member.fwj_birthday, contestDate);
+        if (calculatedAge !== null) {
+          age = String(calculatedAge);
+        }
+      }
+
+      // Registrationレコードを生成
+      const registration = {
+        // Members由来のデータ（memberが見つからない場合は空白）
+        name_ja: member ? `${member.fwj_lastname || ''} ${member.fwj_firstname || ''}`.trim() : '',
+        name_ja_kana: member ? `${member.fwj_kanalastname || ''} ${member.fwj_kanafirstname || ''}`.trim() : '',
+        first_name: member ? (member.first_name || '') : '',
+        last_name: member ? (member.last_name || '') : '',
+        phone: member ? (member.phone || '') : '',
+        height: member ? (member.fwj_height || '') : '',
+        weight: member ? (member.fwj_weight || '') : '',
+        country: member ? (member.fwj_nationality || '') : '',
+        age: age,
+
+        // Orders由来のデータ
+        fwj_card_no: shopifyId,
+        email: order.email || '',
+        class_name: className,
+
+        // 空白のフィールド
+        player_no: '',
+        sort_index: '',
+        score_card: '',
+        contest_order: '',
+        occupation: '',
+        instagram: '',
+        biography: ''
+      };
+
+      registrations.push(registration);
+
+      // Memberが見つからなかった場合は記録
+      if (!member) {
+        memberNotFoundOrders.push({
+          shopify_id: shopifyId,
+          order_no: order.order_no || '',
+          email: order.email || ''
+        });
+      }
+    }
+
+    if (registrations.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'インポート可能なデータがありませんでした'
+      });
+    }
+
+    // class_nameでカスタムソート（2段階優先度ソート）
+    // カテゴリー辞書（優先度順）
+    const CATEGORY_PRIORITY = [
+      'Fit Model', 'フィットモデル',
+      'Bikini', 'ビキニ',
+      'Wellness', 'ウェルネス',
+      'Figure', 'フィギュア',
+      'Women\'s Physique', 'ウィメンズフィジーク',
+      'Men\'s Physique', 'メンズフィジーク',
+      'Classic Physique', 'クラシックフィジーク',
+      'Bodybuilding', 'ボディビルディング'
+    ];
+
+    // クラス辞書（優先度順）
+    const CLASS_PRIORITY = [
+      'True Novice', 'トゥルーノービス',
+      'Beginners', 'ビギナーズ',
+      'Novice', 'ノービス',
+      'Local', 'ローカル',
+      'Junior', 'ジュニア',
+      'Teen', 'ティーン',
+      'Masters', 'マスターズ',
+      'Open', 'オープン'
+    ];
+
+    // ソートキーを取得する関数
+    function getCustomSortKey(className) {
+      // カテゴリー優先度を取得（マッチしない場合は大きな値）
+      let categoryIndex = CATEGORY_PRIORITY.length;
+      for (let i = 0; i < CATEGORY_PRIORITY.length; i++) {
+        if (className.includes(CATEGORY_PRIORITY[i])) {
+          categoryIndex = i;
+          break;
+        }
+      }
+
+      // クラス優先度を取得（マッチしない場合は大きな値）
+      let classIndex = CLASS_PRIORITY.length;
+      for (let i = 0; i < CLASS_PRIORITY.length; i++) {
+        if (className.includes(CLASS_PRIORITY[i])) {
+          classIndex = i;
+          break;
+        }
+      }
+
+      return { categoryIndex, classIndex, className };
+    }
+
+    // 2段階優先度ソート
+    registrations.sort((a, b) => {
+      const keyA = getCustomSortKey(a.class_name || '');
+      const keyB = getCustomSortKey(b.class_name || '');
+
+      const aMatchesBoth = keyA.categoryIndex < CATEGORY_PRIORITY.length && keyA.classIndex < CLASS_PRIORITY.length;
+      const bMatchesBoth = keyB.categoryIndex < CATEGORY_PRIORITY.length && keyB.classIndex < CLASS_PRIORITY.length;
+
+      // マッチしたものを先に、マッチしないものを後に
+      if (aMatchesBoth && !bMatchesBoth) return -1;
+      if (!aMatchesBoth && bMatchesBoth) return 1;
+
+      // 両方マッチした場合: カテゴリー優先度 → クラス優先度 → 辞書順
+      if (aMatchesBoth && bMatchesBoth) {
+        if (keyA.categoryIndex !== keyB.categoryIndex) {
+          return keyA.categoryIndex - keyB.categoryIndex;
+        }
+        if (keyA.classIndex !== keyB.classIndex) {
+          return keyA.classIndex - keyB.classIndex;
+        }
+      }
+
+      // 同じ優先度、または両方マッチしない場合は辞書順
+      return keyA.className.localeCompare(keyB.className, 'ja');
+    });
+
+    // sort_index と player_no を設定
+    const shopifyIdToPlayerNo = new Map();
+    let playerNoCounter = 1;
+
+    registrations.forEach((reg, index) => {
+      // sort_index: 全レコードに対する連番（1開始）
+      reg.sort_index = String(index + 1);
+
+      // player_no: ユニークな shopify_id に対する連番（1開始）
+      const shopifyId = reg.fwj_card_no;
+      if (!shopifyIdToPlayerNo.has(shopifyId)) {
+        shopifyIdToPlayerNo.set(shopifyId, String(playerNoCounter));
+        playerNoCounter++;
+      }
+      reg.player_no = shopifyIdToPlayerNo.get(shopifyId);
+    });
+
+    // batchImportで一括登録
+    const result = await registrationModel.batchImport(registrations, contestDate, contestName);
+
+    if (!result.success) {
+      return res.status(400).json({
+        success: false,
+        error: result.error
+      });
+    }
+
+    // 結果レスポンス
+    const responseData = {
+      total: ordersData.length,
+      imported: result.data.imported,
+      skipped: skippedOrders.length,
+      memberNotFound: memberNotFoundOrders.length,
+      contestDate,
+      contestName,
+      message: `${result.data.imported}件のRegistrationをインポートしました`
+    };
+
+    // Memberが見つからなかったレコードがある場合は警告メッセージを追加
+    if (memberNotFoundOrders.length > 0) {
+      responseData.warnings = memberNotFoundOrders.map(o =>
+        `shopify_id: ${o.shopify_id} (注文: ${o.order_no}, email: ${o.email}) - Memberが見つからないため、Members由来の項目は空白です`
+      );
+    }
+
+    console.log(`Shopify import completed: ${result.data.imported} imported, ${skippedOrders.length} skipped, ${memberNotFoundOrders.length} member not found`);
+
+    res.json({
+      success: true,
+      data: responseData
+    });
+
+  } catch (error) {
+    console.error('Shopify import error:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });

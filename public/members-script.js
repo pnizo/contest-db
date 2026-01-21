@@ -206,6 +206,8 @@ class MembersManager {
             { key: 'fwj_birthday', label: '生年月日' },
             { key: 'fwj_sex', label: '性別' },
             { key: 'fwj_nationality', label: '国籍' },
+            { key: 'fwj_height', label: '身長' },
+            { key: 'fwj_weight', label: '体重' },
             { key: 'fwj_effectivedate', label: '有効期限' },
             { key: 'created_at', label: '登録日' }
         ];

@@ -1511,6 +1511,12 @@ input[type="file"]:hover {
     border-top: 1px solid #eee;
 }
 
+.sync-buttons {
+    display: flex;
+    gap: 10px;
+    margin-top: 5px;
+}
+
 .btn-secondary {
     background-color: #95a5a6;
     color: white;
@@ -1938,15 +1944,6 @@ input[type="file"]:hover {
     cursor: pointer;
     transition: background-color 0.2s;
     white-space: nowrap;
-}
-
-.btn-edit {
-    background: #f39c12;
-    color: white;
-}
-
-.btn-edit:hover {
-    background: #e67e22;
 }
 
 .btn-delete {

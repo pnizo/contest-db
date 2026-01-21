@@ -3,7 +3,7 @@ require('dotenv').config();
 class ShopifyService {
   constructor() {
     this.shopName = process.env.SHOPIFY_SHOP_NAME;
-    this.accessToken = process.env.SHOPIFY_ACCESS_TOKEN;
+    this.accessToken = process.env.SHOPIFY_ADMIN_ACCESS_TOKEN;
     this.apiVersion = process.env.SHOPIFY_API_VERSION || '2025-10';
     
     // 環境変数のバリデーション
@@ -11,14 +11,14 @@ class ShopifyService {
       throw new Error('SHOPIFY_SHOP_NAME environment variable is not set. Please add it to your .env file.');
     }
     if (!this.accessToken) {
-      throw new Error('SHOPIFY_ACCESS_TOKEN environment variable is not set. Please add it to your .env file.');
+      throw new Error('SHOPIFY_ADMIN_ACCESS_TOKEN environment variable is not set. Please add it to your .env file.');
     }
     
     this.baseUrl = `https://${this.shopName}/admin/api/${this.apiVersion}`;
   }
 
   // Shopify Admin APIを呼び出す
-  async makeRequest(endpoint, options = {}) {
+  async makeRequest(endpoint, options = {}, retries = 3) {
     const url = `${this.baseUrl}${endpoint}`;
 
     const defaultOptions = {
@@ -34,21 +34,33 @@ class ShopifyService {
       headers: {
         ...defaultOptions.headers,
         ...(options.headers || {})
-      }
+      },
+      signal: AbortSignal.timeout(60000) // 60秒タイムアウト
     };
 
-    try {
-      const response = await fetch(url, mergedOptions);
+    for (let attempt = 1; attempt <= retries; attempt++) {
+      try {
+        console.log(`Shopify API request attempt ${attempt}/${retries}: ${endpoint}`);
+        const response = await fetch(url, mergedOptions);
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Shopify API error: ${response.status} - ${errorText}`);
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`Shopify API error: ${response.status} - ${errorText}`);
+        }
+
+        return await response.json();
+      } catch (error) {
+        console.error(`Shopify API request failed (attempt ${attempt}/${retries}):`, error.message);
+        
+        if (attempt === retries) {
+          throw error;
+        }
+        
+        // リトライ前に待機（指数バックオフ）
+        const waitTime = Math.min(1000 * Math.pow(2, attempt - 1), 10000);
+        console.log(`Retrying in ${waitTime}ms...`);
+        await new Promise(resolve => setTimeout(resolve, waitTime));
       }
-
-      return await response.json();
-    } catch (error) {
-      console.error('Shopify API request failed:', error);
-      throw error;
     }
   }
 
@@ -172,8 +184,280 @@ class ShopifyService {
       fwj_firstname: metafields['custom.fwj_firstname'] || '',
       fwj_lastname: metafields['custom.fwj_lastname'] || '',
       fwj_kanafirstname: metafields['custom.fwj_kanafirstname'] || '',
-      fwj_kanalastname: metafields['custom.fwj_kanalastname'] || ''
+      fwj_kanalastname: metafields['custom.fwj_kanalastname'] || '',
+      fwj_height: metafields['custom.fwj_height'] || '',
+      fwj_weight: metafields['custom.fwj_weight'] || ''
     };
+  }
+
+
+  // 特定のタグを持つ注文を取得
+
+  // タグ入力をパースして配列に変換
+  // - カンマまたはスペースで区切り
+  // - 引用符（"または'）で囲まれた部分は1つのタグとして扱う
+  parseTags(input) {
+    const tags = [];
+    let current = '';
+    let inQuote = false;
+    let quoteChar = '';
+
+    for (let i = 0; i < input.length; i++) {
+      const char = input[i];
+
+      if ((char === '"' || char === "'") && !inQuote) {
+        // 引用符開始
+        inQuote = true;
+        quoteChar = char;
+      } else if (char === quoteChar && inQuote) {
+        // 引用符終了
+        inQuote = false;
+        quoteChar = '';
+      } else if ((char === ',' || char === ' ') && !inQuote) {
+        // 区切り文字（引用符外）
+        if (current.trim()) {
+          tags.push(current.trim());
+        }
+        current = '';
+      } else {
+        current += char;
+      }
+    }
+
+    // 最後のタグを追加
+    if (current.trim()) {
+      tags.push(current.trim());
+    }
+
+    return tags;
+  }
+
+  async getOrdersByTag(tagInput, limit = 0, paidOnly = true) {
+    try {
+      const allOrders = [];
+      let pageInfo = null;
+      let hasNextPage = true;
+      let pageCount = 0;
+
+      // タグをパースして配列に変換（空の場合は空配列）
+      const tags = tagInput ? this.parseTags(tagInput) : [];
+      
+      // 各タグをエスケープしてクエリを構築（AND検索）
+      let tagQueries = '';
+      if (tags.length > 0) {
+        tagQueries = tags.map(t => {
+          const escapedTag = t.includes(' ') || t.includes(':') ? `"${t}"` : t;
+          return `tag:${escapedTag}`;
+        }).join(' ') + ' ';
+      }
+      
+      // paidOnlyがtrueの場合は支払い済み、オープン状態、キャンセルされていない注文のみ取得
+      // paidOnlyがfalseの場合は全ての支払い状態・オープン状態・キャンセル状態を含む
+      let searchQuery = tagQueries.trim();
+      if (paidOnly) {
+        searchQuery = `${tagQueries}financial_status:paid status:open -status:cancelled`;
+      }
+      
+      console.log(`Parsed tags: ${JSON.stringify(tags)}`);
+      
+      // limit=0 は無制限を意味する
+      const isUnlimited = limit === 0;
+      
+      console.log(`Shopify order search query: ${searchQuery}, limit: ${isUnlimited ? 'unlimited' : limit}`);
+
+      while (hasNextPage) {
+        pageCount++;
+        const query = `
+          query getOrders($query: String!, $first: Int!, $after: String) {
+            orders(first: $first, query: $query, after: $after) {
+              edges {
+                node {
+                  id
+                  name
+                  createdAt
+                  totalPriceSet {
+                    shopMoney {
+                      amount
+                      currencyCode
+                    }
+                  }
+                  displayFinancialStatus
+                  displayFulfillmentStatus
+                  tags
+                  customer {
+                    id
+                    email
+                    firstName
+                    lastName
+                  }
+                  lineItems(first: 100) {
+                    edges {
+                      node {
+                        title
+                        variantTitle
+                        quantity
+                        originalUnitPriceSet {
+                          shopMoney {
+                            amount
+                            currencyCode
+                          }
+                        }
+                        product {
+                          tags
+                        }
+                      }
+                    }
+                  }
+                }
+                cursor
+              }
+              pageInfo {
+                hasNextPage
+                endCursor
+              }
+            }
+          }
+        `;
+
+        // 1回のリクエストで最大250件取得（Shopifyの制限）
+        const batchSize = isUnlimited ? 250 : Math.min(limit - allOrders.length, 250);
+
+        const variables = {
+          query: searchQuery,
+          first: batchSize,
+          after: pageInfo
+        };
+
+        console.log(`Shopify API call #${pageCount}, fetching up to ${batchSize} orders...`);
+
+        const response = await this.makeRequest('/graphql.json', {
+          method: 'POST',
+          body: JSON.stringify({ query, variables })
+        });
+
+        // GraphQLエラーをチェック
+        if (response.errors) {
+          console.error('Shopify GraphQL errors:', JSON.stringify(response.errors, null, 2));
+          throw new Error(`Shopify GraphQL error: ${response.errors.map(e => e.message).join(', ')}`);
+        }
+
+        const ordersInBatch = response.data?.orders?.edges?.length || 0;
+        console.log(`Shopify API call #${pageCount} received ${ordersInBatch} orders`);
+
+        if (response.data && response.data.orders) {
+          const orders = response.data.orders.edges.map(edge => edge.node);
+          allOrders.push(...orders);
+
+          const { hasNextPage: hasNext, endCursor } = response.data.orders.pageInfo;
+          
+          // 無制限の場合は次のページがある限り続ける、制限ありの場合は制限に達したら止める
+          hasNextPage = hasNext && (isUnlimited || allOrders.length < limit);
+          pageInfo = endCursor;
+          
+          console.log(`Total orders fetched so far: ${allOrders.length}, hasNextPage: ${hasNextPage}`);
+        } else {
+          console.log('No orders data in response:', JSON.stringify(response, null, 2));
+          hasNextPage = false;
+        }
+      }
+
+      console.log(`Shopify order fetch completed: ${allOrders.length} orders in ${pageCount} API calls`);
+      return allOrders;
+    } catch (error) {
+      console.error('Error fetching orders by tag:', error);
+      throw error;
+    }
+  }
+
+  // 注文データをスプレッドシート形式に変換（1注文が複数行になる可能性あり）
+  formatOrderForSheet(order) {
+    const orderId = order.id.replace('gid://shopify/Order/', '');
+    const orderName = order.name || '';
+    const createdAt = order.createdAt ? new Date(order.createdAt).toLocaleString('ja-JP') : '';
+    const customerId = order.customer?.id?.replace('gid://shopify/Customer/', '') || '';
+    const customerName = order.customer
+      ? `${order.customer.lastName || ''} ${order.customer.firstName || ''}`.trim()
+      : '';
+    const customerEmail = order.customer?.email || '';
+    const totalPrice = order.totalPriceSet?.shopMoney?.amount || '';
+    const financialStatus = this.translateFinancialStatus(order.displayFinancialStatus);
+    const fulfillmentStatus = this.translateFulfillmentStatus(order.displayFulfillmentStatus);
+
+    const lineItems = order.lineItems?.edges || [];
+
+    if (lineItems.length === 0) {
+      // 商品がない場合は1行（タグは空配列）
+      return [{
+        baseData: [
+          orderName,
+          createdAt,
+          customerId,
+          customerName,
+          customerEmail,
+          totalPrice,
+          financialStatus,
+          fulfillmentStatus,
+          '', // 商品名
+          '', // バリエーション
+          '', // 数量
+          ''  // 単価
+        ],
+        tags: []
+      }];
+    }
+
+    // 商品ごとに行を展開
+    return lineItems.map(edge => {
+      const item = edge.node;
+      const productTags = item.product?.tags || [];
+      return {
+        baseData: [
+          orderName,
+          createdAt,
+          customerId,
+          customerName,
+          customerEmail,
+          totalPrice,
+          financialStatus,
+          fulfillmentStatus,
+          item.title || '',
+          item.variantTitle || '',
+          item.quantity || '',
+          item.originalUnitPriceSet?.shopMoney?.amount || ''
+        ],
+        tags: productTags
+      };
+    });
+  }
+
+  // 支払いステータスを日本語に変換
+  translateFinancialStatus(status) {
+    const statusMap = {
+      'PENDING': '保留中',
+      'AUTHORIZED': '承認済み',
+      'PARTIALLY_PAID': '一部支払い済み',
+      'PAID': '支払い済み',
+      'PARTIALLY_REFUNDED': '一部返金済み',
+      'REFUNDED': '返金済み',
+      'VOIDED': '無効'
+    };
+    return statusMap[status] || status || '';
+  }
+
+  // 発送ステータスを日本語に変換
+  translateFulfillmentStatus(status) {
+    const statusMap = {
+      'UNFULFILLED': '未発送',
+      'PARTIALLY_FULFILLED': '一部発送済み',
+      'FULFILLED': '発送済み',
+      'RESTOCKED': '在庫戻し',
+      'PENDING_FULFILLMENT': '発送待ち',
+      'OPEN': 'オープン',
+      'IN_PROGRESS': '処理中',
+      'ON_HOLD': '保留',
+      'SCHEDULED': '予約済み'
+    };
+    return statusMap[status] || status || '';
   }
 }
 
