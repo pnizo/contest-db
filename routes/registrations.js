@@ -634,6 +634,13 @@ router.post('/import-shopify', requireAdmin, async (req, res) => {
         continue;
       }
 
+      // current_quantityが0以下（キャンセル・削除済み）の行をスキップ
+      const currentQty = parseInt(order.current_quantity, 10);
+      if (isNaN(currentQty) || currentQty <= 0) {
+        skippedOrders.push({ reason: 'current_quantity が 0 以下', order: order.order_no || 'unknown' });
+        continue;
+      }
+
       // Memberを検索
       const member = membersMap.get(String(shopifyId));
 

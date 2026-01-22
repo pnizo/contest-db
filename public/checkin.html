@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>チェックイン受付</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background-color: #f5f5f5;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .checkin-card {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            padding: 40px;
+            width: 100%;
+            max-width: 480px;
+        }
+
+        .checkin-header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .checkin-header h1 {
+            color: #2c3e50;
+            font-size: 24px;
+            margin-bottom: 8px;
+        }
+
+        .checkin-header p {
+            color: #7f8c8d;
+            font-size: 14px;
+        }
+
+        .code-input-group {
+            margin-bottom: 24px;
+        }
+
+        .code-input-group label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #555;
+        }
+
+        .code-input {
+            width: 100%;
+            padding: 16px;
+            font-size: 20px;
+            font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Code', monospace;
+            letter-spacing: 2px;
+            text-align: center;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            outline: none;
+            transition: border-color 0.2s, box-shadow 0.2s;
+            text-transform: uppercase;
+        }
+
+        .code-input:focus {
+            border-color: #3498db;
+            box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.2);
+        }
+
+        .code-input.error {
+            border-color: #e74c3c;
+        }
+
+        .code-input.success {
+            border-color: #27ae60;
+        }
+
+        .checkin-btn {
+            width: 100%;
+            padding: 16px;
+            font-size: 18px;
+            font-weight: 600;
+            color: white;
+            background: linear-gradient(135deg, #3498db, #2980b9);
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: transform 0.1s, box-shadow 0.2s;
+        }
+
+        .checkin-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(52, 152, 219, 0.4);
+        }
+
+        .checkin-btn:active {
+            transform: translateY(0);
+        }
+
+        .checkin-btn:disabled {
+            background: #bdc3c7;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .result-panel {
+            margin-top: 24px;
+            padding: 20px;
+            border-radius: 8px;
+            display: none;
+        }
+
+        .result-panel.success {
+            display: block;
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+
+        .result-panel.error {
+            display: block;
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+
+        .result-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .result-details {
+            font-size: 14px;
+        }
+
+        .result-details dt {
+            font-weight: 600;
+            color: inherit;
+            opacity: 0.8;
+            margin-top: 8px;
+        }
+
+        .result-details dd {
+            margin-left: 0;
+            font-size: 16px;
+        }
+
+        .quantity-change {
+            margin-top: 12px;
+            padding: 12px;
+            background: rgba(255,255,255,0.5);
+            border-radius: 6px;
+            text-align: center;
+        }
+
+        .quantity-change .arrow {
+            font-size: 20px;
+            margin: 0 8px;
+        }
+
+        .quantity-number {
+            font-size: 24px;
+            font-weight: 700;
+        }
+
+        .reset-btn {
+            margin-top: 16px;
+            padding: 12px 24px;
+            font-size: 14px;
+            color: #555;
+            background: #f0f0f0;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .reset-btn:hover {
+            background: #e0e0e0;
+        }
+
+        /* 確認パネル */
+        .confirm-panel {
+            margin-top: 24px;
+            padding: 20px;
+            border-radius: 8px;
+            background: #e8f4fd;
+            border: 1px solid #bee5eb;
+            display: none;
+        }
+
+        .confirm-panel.visible {
+            display: block;
+        }
+
+        .ticket-info {
+            margin-bottom: 20px;
+        }
+
+        .ticket-info dt {
+            font-weight: 600;
+            color: #555;
+            font-size: 12px;
+            margin-top: 8px;
+        }
+
+        .ticket-info dd {
+            margin-left: 0;
+            font-size: 16px;
+            color: #333;
+        }
+
+        .quantity-selector {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 16px;
+            margin: 20px 0;
+        }
+
+        .quantity-selector label {
+            font-weight: 600;
+            color: #555;
+        }
+
+        .quantity-btn {
+            width: 48px;
+            height: 48px;
+            font-size: 24px;
+            font-weight: 600;
+            color: white;
+            background: #3498db;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .quantity-btn:hover:not(:disabled) {
+            background: #2980b9;
+        }
+
+        .quantity-btn:disabled {
+            background: #bdc3c7;
+            cursor: not-allowed;
+        }
+
+        .quantity-display {
+            font-size: 32px;
+            font-weight: 700;
+            min-width: 60px;
+            text-align: center;
+            color: #2c3e50;
+        }
+
+        .quantity-max {
+            font-size: 14px;
+            color: #7f8c8d;
+            text-align: center;
+            margin-bottom: 16px;
+        }
+
+        .confirm-btn {
+            width: 100%;
+            padding: 16px;
+            font-size: 18px;
+            font-weight: 600;
+            color: white;
+            background: linear-gradient(135deg, #27ae60, #229954);
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: transform 0.1s, box-shadow 0.2s;
+        }
+
+        .confirm-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(39, 174, 96, 0.4);
+        }
+
+        .confirm-btn:disabled {
+            background: #bdc3c7;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .cancel-btn {
+            width: 100%;
+            margin-top: 12px;
+            padding: 12px;
+            font-size: 14px;
+            color: #555;
+            background: #f0f0f0;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+
+        .cancel-btn:hover {
+            background: #e0e0e0;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255,255,255,0.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s ease-in-out infinite;
+            margin-right: 8px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .footer {
+            text-align: center;
+            padding: 20px;
+            color: #999;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="checkin-card">
+            <div class="checkin-header">
+                <h1>チェックイン受付</h1>
+                <p>チェックインコードを入力してください</p>
+            </div>
+
+            <form id="checkinForm">
+                <div class="code-input-group">
+                    <label for="codeInput">チェックインコード</label>
+                    <input 
+                        type="text" 
+                        id="codeInput" 
+                        class="code-input" 
+                        placeholder="XXXX-XXXX-XXXX-..."
+                        autocomplete="off"
+                        autocapitalize="characters"
+                        spellcheck="false"
+                    >
+                </div>
+
+                <button type="submit" id="submitBtn" class="checkin-btn">
+                    コード確認
+                </button>
+            </form>
+
+            <!-- 確認パネル（検証後に表示） -->
+            <div id="confirmPanel" class="confirm-panel">
+                <dl class="ticket-info">
+                    <dt>注文番号</dt>
+                    <dd id="confirmOrderName"></dd>
+                    <dt>商品</dt>
+                    <dd id="confirmProductName"></dd>
+                    <dt>残り枚数</dt>
+                    <dd id="confirmCurrentQuantity"></dd>
+                </dl>
+
+                <div class="quantity-selector">
+                    <label>使用枚数</label>
+                    <button type="button" id="decreaseBtn" class="quantity-btn">−</button>
+                    <span id="useQuantityDisplay" class="quantity-display">1</span>
+                    <button type="button" id="increaseBtn" class="quantity-btn">+</button>
+                </div>
+                <div class="quantity-max" id="quantityMaxLabel">最大: 1枚</div>
+
+                <button type="button" id="confirmBtn" class="confirm-btn">
+                    チェックイン実行
+                </button>
+                <button type="button" id="cancelBtn" class="cancel-btn">
+                    キャンセル
+                </button>
+            </div>
+
+            <!-- 結果パネル -->
+            <div id="resultPanel" class="result-panel">
+                <div class="result-title" id="resultTitle"></div>
+                <div class="result-details" id="resultDetails"></div>
+                <button type="button" id="resetBtn" class="reset-btn">
+                    次のチェックイン
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="footer">
+        Checkin System
+    </div>
+
+    <script src="checkin-script.js"></script>
+</body>
+</html>

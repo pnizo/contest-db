@@ -293,6 +293,7 @@ class ShopifyService {
                   lineItems(first: 100) {
                     edges {
                       node {
+                        id
                         title
                         variantTitle
                         quantity
@@ -401,22 +402,21 @@ class ShopifyService {
           '', // 商品名
           '', // バリエーション
           '', // 数量
-          ''  // 単価
+          '', // 現在数量
+          '', // 単価
+          ''  // line_item_id
         ],
         tags: []
       }];
     }
 
-    // 商品ごとに行を展開（削除済み商品を除外）
+    // 商品ごとに行を展開（削除済み商品も含む）
     return lineItems
       .map(edge => edge.node)
-      .filter(item => {
-        // currentQuantity が 0 の商品（削除済み）を除外
-        const qty = item.currentQuantity ?? item.quantity;
-        return qty > 0;
-      })
       .map(item => {
         const productTags = item.product?.tags || [];
+        // line_item_id を GID から数値部分のみ抽出
+        const lineItemId = item.id ? item.id.replace('gid://shopify/LineItem/', '') : '';
         return {
           baseData: [
             orderName,
@@ -429,8 +429,10 @@ class ShopifyService {
             fulfillmentStatus,
             item.title || '',
             item.variantTitle || '',
-            item.currentQuantity ?? item.quantity ?? '',  // 編集後の数量を使用
-            item.originalUnitPriceSet?.shopMoney?.amount || ''
+            item.quantity ?? '',           // 元の数量
+            item.currentQuantity ?? '',    // 現在の数量
+            item.originalUnitPriceSet?.shopMoney?.amount || '',
+            lineItemId                     // line_item_id
           ],
           tags: productTags
         };
@@ -465,6 +467,427 @@ class ShopifyService {
       'SCHEDULED': '予約済み'
     };
     return statusMap[status] || status || '';
+  }
+
+
+  /**
+   * LineItem の currentQuantity をデクリメントする
+   * @param {string} orderId - 注文ID（数値部分のみ、または gid://shopify/Order/xxx 形式）
+   * @param {string} lineItemId - LineItem ID（数値部分のみ、または gid://shopify/LineItem/xxx 形式）
+   * @param {number} decrementBy - 減少させる数量（デフォルト: 1）
+   * @returns {Promise<object>} - 更新結果
+   */
+  async decrementLineItemQuantity(orderId, lineItemId, decrementBy = 1) {
+    try {
+      // GID形式に変換
+      const orderGid = orderId.startsWith('gid://') ? orderId : `gid://shopify/Order/${orderId}`;
+      const lineItemGid = lineItemId.startsWith('gid://') ? lineItemId : `gid://shopify/LineItem/${lineItemId}`;
+
+      console.log(`Starting order edit for order: ${orderGid}, lineItem: ${lineItemGid}, decrementBy: ${decrementBy}`);
+
+      // Step 1: orderEditBegin - 編集セッションを開始
+      const beginQuery = `
+        mutation orderEditBegin($id: ID!) {
+          orderEditBegin(id: $id) {
+            calculatedOrder {
+              id
+              lineItems(first: 100) {
+                edges {
+                  node {
+                    id
+                    quantity
+                    calculatedLineItem {
+                      id
+                    }
+                  }
+                }
+              }
+            }
+            userErrors {
+              field
+              message
+            }
+          }
+        }
+      `;
+
+      const beginResponse = await this.makeRequest('/graphql.json', {
+        method: 'POST',
+        body: JSON.stringify({
+          query: beginQuery,
+          variables: { id: orderGid }
+        })
+      });
+
+      if (beginResponse.errors) {
+        throw new Error(`GraphQL error: ${beginResponse.errors.map(e => e.message).join(', ')}`);
+      }
+
+      const beginResult = beginResponse.data?.orderEditBegin;
+      if (beginResult?.userErrors?.length > 0) {
+        throw new Error(`Order edit begin error: ${beginResult.userErrors.map(e => e.message).join(', ')}`);
+      }
+
+      const calculatedOrder = beginResult?.calculatedOrder;
+      if (!calculatedOrder) {
+        throw new Error('Failed to begin order edit: no calculatedOrder returned');
+      }
+
+      // LineItem に対応する CalculatedLineItem を探す
+      const lineItemEdge = calculatedOrder.lineItems.edges.find(edge => edge.node.id === lineItemGid);
+      if (!lineItemEdge) {
+        throw new Error(`LineItem not found: ${lineItemGid}`);
+      }
+
+      const currentQuantity = lineItemEdge.node.quantity;
+      const calculatedLineItemId = lineItemEdge.node.calculatedLineItem?.id;
+
+      if (!calculatedLineItemId) {
+        throw new Error(`CalculatedLineItem not found for LineItem: ${lineItemGid}`);
+      }
+
+      const newQuantity = Math.max(0, currentQuantity - decrementBy);
+
+      console.log(`Current quantity: ${currentQuantity}, new quantity: ${newQuantity}`);
+
+      // Step 2: orderEditSetQuantity - 数量を変更
+      const setQuantityQuery = `
+        mutation orderEditSetQuantity($id: ID!, $lineItemId: ID!, $quantity: Int!) {
+          orderEditSetQuantity(id: $id, lineItemId: $lineItemId, quantity: $quantity) {
+            calculatedOrder {
+              id
+            }
+            userErrors {
+              field
+              message
+            }
+          }
+        }
+      `;
+
+      const setQuantityResponse = await this.makeRequest('/graphql.json', {
+        method: 'POST',
+        body: JSON.stringify({
+          query: setQuantityQuery,
+          variables: {
+            id: calculatedOrder.id,
+            lineItemId: calculatedLineItemId,
+            quantity: newQuantity
+          }
+        })
+      });
+
+      if (setQuantityResponse.errors) {
+        throw new Error(`GraphQL error: ${setQuantityResponse.errors.map(e => e.message).join(', ')}`);
+      }
+
+      const setQuantityResult = setQuantityResponse.data?.orderEditSetQuantity;
+      if (setQuantityResult?.userErrors?.length > 0) {
+        throw new Error(`Set quantity error: ${setQuantityResult.userErrors.map(e => e.message).join(', ')}`);
+      }
+
+      // Step 3: orderEditCommit - 変更をコミット
+      const commitQuery = `
+        mutation orderEditCommit($id: ID!) {
+          orderEditCommit(id: $id, notifyCustomer: false) {
+            order {
+              id
+              name
+            }
+            userErrors {
+              field
+              message
+            }
+          }
+        }
+      `;
+
+      const commitResponse = await this.makeRequest('/graphql.json', {
+        method: 'POST',
+        body: JSON.stringify({
+          query: commitQuery,
+          variables: { id: calculatedOrder.id }
+        })
+      });
+
+      if (commitResponse.errors) {
+        throw new Error(`GraphQL error: ${commitResponse.errors.map(e => e.message).join(', ')}`);
+      }
+
+      const commitResult = commitResponse.data?.orderEditCommit;
+      if (commitResult?.userErrors?.length > 0) {
+        throw new Error(`Commit error: ${commitResult.userErrors.map(e => e.message).join(', ')}`);
+      }
+
+      console.log(`Successfully decremented LineItem ${lineItemId} quantity from ${currentQuantity} to ${newQuantity}`);
+
+      return {
+        success: true,
+        orderId: orderId,
+        lineItemId: lineItemId,
+        previousQuantity: currentQuantity,
+        newQuantity: newQuantity,
+        decrementedBy: decrementBy
+      };
+
+    } catch (error) {
+      console.error('Error decrementing LineItem quantity:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * チェックイン処理（注文情報取得 + 数量デクリメント）
+   * @param {string} orderId 
+   * @param {string} lineItemId 
+   * @returns {Promise<{orderName: string, productName: string, variantTitle: string, previousQuantity: number, newQuantity: number}>}
+   */
+  async checkinLineItem(orderId, lineItemId, decrementBy = 1) {
+    try {
+      // GID形式に変換
+      const orderGid = orderId.startsWith('gid://') ? orderId : `gid://shopify/Order/${orderId}`;
+      const lineItemGid = lineItemId.startsWith('gid://') ? lineItemId : `gid://shopify/LineItem/${lineItemId}`;
+
+      console.log(`Checkin for order: ${orderGid}, lineItem: ${lineItemGid}, decrementBy: ${decrementBy}`);
+
+      // Step 1: orderEditBegin - 編集セッションを開始し、注文情報も取得
+      const beginQuery = `
+        mutation orderEditBegin($id: ID!) {
+          orderEditBegin(id: $id) {
+            calculatedOrder {
+              id
+              lineItems(first: 100) {
+                edges {
+                  node {
+                    id
+                    quantity
+                    title
+                    variantTitle
+                    calculatedLineItem {
+                      id
+                    }
+                  }
+                }
+              }
+            }
+            userErrors {
+              field
+              message
+            }
+          }
+        }
+      `;
+
+      const beginResponse = await this.makeRequest('/graphql.json', {
+        method: 'POST',
+        body: JSON.stringify({
+          query: beginQuery,
+          variables: { id: orderGid }
+        })
+      });
+
+      if (beginResponse.errors) {
+        throw new Error(`GraphQL error: ${beginResponse.errors.map(e => e.message).join(', ')}`);
+      }
+
+      const beginResult = beginResponse.data?.orderEditBegin;
+      if (beginResult?.userErrors?.length > 0) {
+        throw new Error(`Order edit begin error: ${beginResult.userErrors.map(e => e.message).join(', ')}`);
+      }
+
+      const calculatedOrder = beginResult?.calculatedOrder;
+      if (!calculatedOrder) {
+        throw new Error('注文が見つかりません');
+      }
+
+      // LineItem に対応する CalculatedLineItem を探す
+      const lineItemEdge = calculatedOrder.lineItems.edges.find(edge => edge.node.id === lineItemGid);
+      if (!lineItemEdge) {
+        throw new Error(`商品が見つかりません: ${lineItemGid}`);
+      }
+
+      const lineItemNode = lineItemEdge.node;
+      const currentQuantity = lineItemNode.quantity;
+      const productName = lineItemNode.title || '商品名不明';
+      const variantTitle = lineItemNode.variantTitle || '';
+      const calculatedLineItemId = lineItemNode.calculatedLineItem?.id;
+
+      if (!calculatedLineItemId) {
+        throw new Error(`CalculatedLineItem not found for LineItem: ${lineItemGid}`);
+      }
+
+      // 現在数量が0の場合はエラー
+      if (currentQuantity <= 0) {
+        throw new Error('このチケットの現在数量が0のため、チェックインできません');
+      }
+
+      // 使用枚数が残り枚数を超えていないかチェック
+      if (decrementBy > currentQuantity) {
+        throw new Error(`残り枚数が足りません（残り${currentQuantity}枚に対して${decrementBy}枚使用しようとしています）`);
+      }
+
+      const newQuantity = currentQuantity - decrementBy;
+
+      console.log(`Product: ${productName}, Current quantity: ${currentQuantity}, new quantity: ${newQuantity}`);
+
+      // Step 2: orderEditSetQuantity - 数量を変更
+      const setQuantityQuery = `
+        mutation orderEditSetQuantity($id: ID!, $lineItemId: ID!, $quantity: Int!) {
+          orderEditSetQuantity(id: $id, lineItemId: $lineItemId, quantity: $quantity) {
+            calculatedOrder {
+              id
+            }
+            userErrors {
+              field
+              message
+            }
+          }
+        }
+      `;
+
+      const setQuantityResponse = await this.makeRequest('/graphql.json', {
+        method: 'POST',
+        body: JSON.stringify({
+          query: setQuantityQuery,
+          variables: {
+            id: calculatedOrder.id,
+            lineItemId: calculatedLineItemId,
+            quantity: newQuantity
+          }
+        })
+      });
+
+      if (setQuantityResponse.errors) {
+        throw new Error(`GraphQL error: ${setQuantityResponse.errors.map(e => e.message).join(', ')}`);
+      }
+
+      const setQuantityResult = setQuantityResponse.data?.orderEditSetQuantity;
+      if (setQuantityResult?.userErrors?.length > 0) {
+        throw new Error(`Set quantity error: ${setQuantityResult.userErrors.map(e => e.message).join(', ')}`);
+      }
+
+      // Step 3: orderEditCommit - 変更をコミット
+      const commitQuery = `
+        mutation orderEditCommit($id: ID!) {
+          orderEditCommit(id: $id, notifyCustomer: false) {
+            order {
+              id
+              name
+            }
+            userErrors {
+              field
+              message
+            }
+          }
+        }
+      `;
+
+      const commitResponse = await this.makeRequest('/graphql.json', {
+        method: 'POST',
+        body: JSON.stringify({
+          query: commitQuery,
+          variables: { id: calculatedOrder.id }
+        })
+      });
+
+      if (commitResponse.errors) {
+        throw new Error(`GraphQL error: ${commitResponse.errors.map(e => e.message).join(', ')}`);
+      }
+
+      const commitResult = commitResponse.data?.orderEditCommit;
+      if (commitResult?.userErrors?.length > 0) {
+        throw new Error(`Commit error: ${commitResult.userErrors.map(e => e.message).join(', ')}`);
+      }
+
+      const orderName = commitResult?.order?.name || `#${orderId}`;
+
+      console.log(`Checkin successful: ${orderName} - ${productName} (${currentQuantity} -> ${newQuantity})`);
+
+      return {
+        orderName,
+        productName,
+        variantTitle,
+        previousQuantity: currentQuantity,
+        newQuantity
+      };
+
+    } catch (error) {
+      console.error('Error in checkinLineItem:', error);
+      throw error;
+    }
+  }
+
+
+  /**
+   * LineItemの情報を取得（デクリメントなし）
+   * @param {string} orderId 
+   * @param {string} lineItemId 
+   * @returns {Promise<{orderName: string, productName: string, variantTitle: string, currentQuantity: number}>}
+   */
+  async getLineItemInfo(orderId, lineItemId) {
+    try {
+      // GID形式に変換
+      const orderGid = orderId.startsWith('gid://') ? orderId : `gid://shopify/Order/${orderId}`;
+      const lineItemGid = lineItemId.startsWith('gid://') ? lineItemId : `gid://shopify/LineItem/${lineItemId}`;
+
+      console.log(`Getting LineItem info for order: ${orderGid}, lineItem: ${lineItemGid}`);
+
+      // 注文情報を取得
+      const query = `
+        query getOrder($id: ID!) {
+          order(id: $id) {
+            id
+            name
+            lineItems(first: 100) {
+              edges {
+                node {
+                  id
+                  quantity
+                  title
+                  variantTitle
+                }
+              }
+            }
+          }
+        }
+      `;
+
+      const response = await this.makeRequest('/graphql.json', {
+        method: 'POST',
+        body: JSON.stringify({
+          query: query,
+          variables: { id: orderGid }
+        })
+      });
+
+      if (response.errors) {
+        throw new Error(`GraphQL error: ${response.errors.map(e => e.message).join(', ')}`);
+      }
+
+      const order = response.data?.order;
+      if (!order) {
+        throw new Error('注文が見つかりません');
+      }
+
+      // LineItemを探す
+      const lineItemEdge = order.lineItems.edges.find(edge => edge.node.id === lineItemGid);
+      if (!lineItemEdge) {
+        throw new Error(`商品が見つかりません: ${lineItemGid}`);
+      }
+
+      const lineItemNode = lineItemEdge.node;
+
+      return {
+        orderName: order.name,
+        productName: lineItemNode.title || '商品名不明',
+        variantTitle: lineItemNode.variantTitle || '',
+        currentQuantity: lineItemNode.quantity
+      };
+
+    } catch (error) {
+      console.error('Error in getLineItemInfo:', error);
+      throw error;
+    }
   }
 }
 

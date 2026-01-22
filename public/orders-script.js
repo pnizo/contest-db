@@ -178,8 +178,8 @@ class OrdersManager {
 
             row.forEach((cell, index) => {
                 const td = document.createElement('td');
-                // 合計金額と単価（インデックス5と11）は円マークを付ける
-                if ((index === 5 || index === 11) && cell !== '') {
+                // 合計金額と単価（インデックス5と12）は円マークを付ける
+                if ((index === 5 || index === 12) && cell !== '') {
                     td.textContent = `¥${Number(cell).toLocaleString()}`;
                 } else {
                     td.textContent = cell;
