@@ -296,6 +296,7 @@ class ShopifyService {
                         title
                         variantTitle
                         quantity
+                        currentQuantity
                         originalUnitPriceSet {
                           shopMoney {
                             amount
@@ -406,28 +407,34 @@ class ShopifyService {
       }];
     }
 
-    // 商品ごとに行を展開
-    return lineItems.map(edge => {
-      const item = edge.node;
-      const productTags = item.product?.tags || [];
-      return {
-        baseData: [
-          orderName,
-          createdAt,
-          customerId,
-          customerName,
-          customerEmail,
-          totalPrice,
-          financialStatus,
-          fulfillmentStatus,
-          item.title || '',
-          item.variantTitle || '',
-          item.quantity || '',
-          item.originalUnitPriceSet?.shopMoney?.amount || ''
-        ],
-        tags: productTags
-      };
-    });
+    // 商品ごとに行を展開（削除済み商品を除外）
+    return lineItems
+      .map(edge => edge.node)
+      .filter(item => {
+        // currentQuantity が 0 の商品（削除済み）を除外
+        const qty = item.currentQuantity ?? item.quantity;
+        return qty > 0;
+      })
+      .map(item => {
+        const productTags = item.product?.tags || [];
+        return {
+          baseData: [
+            orderName,
+            createdAt,
+            customerId,
+            customerName,
+            customerEmail,
+            totalPrice,
+            financialStatus,
+            fulfillmentStatus,
+            item.title || '',
+            item.variantTitle || '',
+            item.currentQuantity ?? item.quantity ?? '',  // 編集後の数量を使用
+            item.originalUnitPriceSet?.shopMoney?.amount || ''
+          ],
+          tags: productTags
+        };
+      });
   }
 
   // 支払いステータスを日本語に変換
