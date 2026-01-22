@@ -14,6 +14,7 @@ const contestRoutes = require('./routes/contests');
 const guestRoutes = require('./routes/guests');
 const memberRoutes = require('./routes/members');
 const orderRoutes = require('./routes/orders');
+const checkinRoutes = require('./routes/checkin');
 const { checkAuth, requireIpRestriction } = require('./middleware/auth');
 const { sessionCompatibility } = require('./middleware/jwt');
 
@@ -61,8 +62,14 @@ app.use(sessionCompatibility);
 // 認証チェックミドルウェア
 app.use(checkAuth);
 
-// ルートページ（ログイン）
+// ルートページ
 app.get('/', (req, res) => {
+  // チェックイン専用ドメインの場合はチェックインページを表示
+  const host = req.get('host') || '';
+  if (host.startsWith('checkin.')) {
+    return res.sendFile(path.join(__dirname, 'public', 'checkin.html'));
+  }
+  // 通常はログインページ
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
@@ -103,6 +110,10 @@ app.get('/orders', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'orders.html'));
 });
 
+app.get('/checkin', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'checkin.html'));
+});
+
 app.get('/manual.html', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'manual.html'));
 });
@@ -121,6 +132,9 @@ app.use('/api/contests', contestRoutes);
 app.use('/api/guests', guestRoutes);
 app.use('/api/members', memberRoutes);
 app.use('/api/orders', orderRoutes);
+
+// チェックインAPI（認証不要・IP制限なし）
+app.use('/api/checkin', checkinRoutes);
 
 app.use((err, req, res, next) => {
   console.error(err.stack);

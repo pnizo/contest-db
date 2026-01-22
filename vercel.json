@@ -12,6 +12,38 @@
   ],
   "routes": [
     {
+      "src": "/api/checkin/(.*)",
+      "has": [{ "type": "host", "value": "(?<checkinDomain>checkin\\..+)" }],
+      "dest": "/server.js"
+    },
+    {
+      "src": "/api/checkin",
+      "has": [{ "type": "host", "value": "(?<checkinDomain>checkin\\..+)" }],
+      "dest": "/server.js"
+    },
+    {
+      "src": "/checkin-script.js",
+      "has": [{ "type": "host", "value": "(?<checkinDomain>checkin\\..+)" }],
+      "dest": "/public/checkin-script.js"
+    },
+    {
+      "src": "/styles.css",
+      "has": [{ "type": "host", "value": "(?<checkinDomain>checkin\\..+)" }],
+      "dest": "/public/styles.css"
+    },
+    {
+      "src": "/",
+      "has": [{ "type": "host", "value": "(?<checkinDomain>checkin\\..+)" }],
+      "dest": "/server.js",
+      "headers": { "x-checkin-redirect": "true" }
+    },
+    {
+      "src": "/(.*)",
+      "has": [{ "type": "host", "value": "(?<checkinDomain>checkin\\..+)" }],
+      "status": 404
+    },
+
+    {
       "src": "/api/(.*)",
       "dest": "/server.js"
     },

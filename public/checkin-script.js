@@ -72,7 +72,7 @@ document.addEventListener('DOMContentLoaded', () => {
     submitBtn.innerHTML = '<span class="loading"></span>確認中...';
 
     try {
-      const response = await fetch('/api/orders/checkin/verify', {
+      const response = await fetch('/api/checkin/verify', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -160,7 +160,7 @@ document.addEventListener('DOMContentLoaded', () => {
     confirmBtn.innerHTML = '<span class="loading"></span>処理中...';
 
     try {
-      const response = await fetch('/api/orders/checkin', {
+      const response = await fetch('/api/checkin', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
