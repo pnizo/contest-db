@@ -41,6 +41,7 @@ const ALLOWED_CHECKIN_PATHS = [
   '/api/checkin',
   '/api/checkin/verify',
   '/api/auth/login',
+  '/api/auth/status',
   '/api/auth/me',
   '/api/auth/logout',
   '/checkin-script.js',
