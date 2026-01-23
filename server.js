@@ -58,7 +58,7 @@ app.use((req, res, next) => {
       path === allowed || path.startsWith(allowed + '/')
     );
     
-    if (!isAllowed && path !== '/') {
+    if (!isAllowed) {
       return res.status(404).send('Not Found');
     }
   }
