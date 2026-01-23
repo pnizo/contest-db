@@ -202,6 +202,22 @@
             background: #e0e0e0;
         }
 
+        /* オーバーレイ（確認パネル表示時） */
+        .overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 200;
+        }
+
+        .overlay.visible {
+            display: block;
+        }
+
         /* 確認パネル */
         .confirm-panel {
             margin-top: 24px;
@@ -210,6 +226,8 @@
             background: #e8f4fd;
             border: 1px solid #bee5eb;
             display: none;
+            position: relative;
+            z-index: 201;
         }
 
         .confirm-panel.visible {
@@ -235,6 +253,7 @@
 
         .quantity-selector {
             display: flex;
+            flex-wrap: wrap;
             align-items: center;
             justify-content: center;
             gap: 16px;
@@ -242,8 +261,11 @@
         }
 
         .quantity-selector label {
+            width: 100%;
+            text-align: center;
             font-weight: 600;
             color: #555;
+            margin-bottom: 4px;
         }
 
         .quantity-btn {
@@ -372,6 +394,7 @@
     </style>
 </head>
 <body>
+    <div id="overlay" class="overlay"></div>
     <div class="header-bar">
         <button type="button" id="logoutBtn" class="logout-btn">ログアウト</button>
     </div>

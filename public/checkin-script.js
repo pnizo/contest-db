@@ -37,6 +37,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const submitBtn = document.getElementById('submitBtn');
   const logoutBtn = document.getElementById('logoutBtn');
   
+  // オーバーレイ要素
+  const overlay = document.getElementById('overlay');
+
   // 確認パネル要素
   const confirmPanel = document.getElementById('confirmPanel');
   const confirmOrderName = document.getElementById('confirmOrderName');
@@ -169,12 +172,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // 確認パネルを表示
   function showConfirmPanel(data) {
-    const productDisplay = data.variantTitle 
-      ? `${data.productName} (${data.variantTitle})`
-      : data.productName;
-
     confirmOrderName.textContent = data.orderName;
-    confirmProductName.textContent = productDisplay;
+
+    // 商品名とバリエーション名を別行で表示
+    if (data.variantTitle) {
+      confirmProductName.innerHTML = `<strong>${escapeHtml(data.productName)}</strong><br><span style="color: #444;">${escapeHtml(data.variantTitle)}</span>`;
+    } else {
+      confirmProductName.innerHTML = `<strong>${escapeHtml(data.productName)}</strong>`;
+    }
+
     confirmCurrentQuantity.textContent = `${data.currentQuantity}枚`;
 
     // 最大使用枚数 = Shopify上の現在数量（コードに埋め込まれた値ではなく実際の残り枚数）
@@ -185,6 +191,7 @@ document.addEventListener('DOMContentLoaded', () => {
     updateQuantityDisplay();
     
     form.style.display = 'none';
+    overlay.classList.add('visible');
     confirmPanel.classList.add('visible');
     resultPanel.className = 'result-panel';
   }
@@ -227,6 +234,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // キャンセル
   cancelBtn.addEventListener('click', () => {
+    overlay.classList.remove('visible');
     confirmPanel.classList.remove('visible');
     form.style.display = 'block';
     codeInput.classList.remove('success');
@@ -270,6 +278,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // 成功表示
   function showSuccess(data) {
+    overlay.classList.remove('visible');
     confirmPanel.classList.remove('visible');
     resultPanel.className = 'result-panel success';
     
@@ -300,6 +309,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // エラー表示
   function showError(message) {
+    overlay.classList.remove('visible');
     confirmPanel.classList.remove('visible');
     resultPanel.className = 'result-panel error';
     resultTitle.innerHTML = '&#10008; エラー';
@@ -312,6 +322,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // リセット
   resetBtn.addEventListener('click', () => {
     resultPanel.className = 'result-panel';
+    overlay.classList.remove('visible');
     confirmPanel.classList.remove('visible');
     codeInput.value = '';
     codeInput.classList.remove('error', 'success');
