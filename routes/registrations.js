@@ -714,11 +714,16 @@ router.post('/import-shopify', requireAdmin, async (req, res) => {
     // class_nameでカスタムソート（2段階優先度ソート）
     // カテゴリー辞書（優先度順）
     const CATEGORY_PRIORITY = [
-      'Fit Model', 'フィットモデル',
+      'Family Physique', 'ファミリーフィジーク',
+      'Kid\s Physique', 'キッズフィジーク',
+      'Favorite Athlete', 'フェイバリットアスリート',
+      'Women\'s Athlete Model', 'ウィメンズアスリートモデル',
+      'Bikini Model', 'ビキニモデル',
       'Bikini', 'ビキニ',
       'Wellness', 'ウェルネス',
       'Figure', 'フィギュア',
-      'Women\'s Physique', 'ウィメンズフィジーク',
+      'Men\'s Fitness Model', 'メンズフィットネスモデル',
+      'Men\'s Athlete Model', 'メンズアスリートモデル',
       'Men\'s Physique', 'メンズフィジーク',
       'Classic Physique', 'クラシックフィジーク',
       'Bodybuilding', 'ボディビルディング'
@@ -726,13 +731,13 @@ router.post('/import-shopify', requireAdmin, async (req, res) => {
 
     // クラス辞書（優先度順）
     const CLASS_PRIORITY = [
-      'True Novice', 'トゥルーノービス',
-      'Beginners', 'ビギナーズ',
-      'Novice', 'ノービス',
-      'Local', 'ローカル',
-      'Junior', 'ジュニア',
+      'First Challenge', 'ファーストチャレンジ',
+      'Beginner', 'ビギナー',
       'Teen', 'ティーン',
+      'Junior', 'ジュニア',
       'Masters', 'マスターズ',
+      'Lean', 'リーン',
+      'Plus', 'プラス',
       'Open', 'オープン'
     ];
 
