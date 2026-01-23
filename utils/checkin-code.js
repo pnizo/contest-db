@@ -121,7 +121,14 @@ function bytesToBigInt(bytes) {
  */
 function verifyCheckinCode(code) {
   const CHECKIN_SALT = process.env.CHECKIN_SALT;
-  
+
+  console.log('[verifyCheckinCode] Starting verification');
+  console.log('[verifyCheckinCode] CHECKIN_SALT set:', !!CHECKIN_SALT);
+  if (CHECKIN_SALT) {
+    // SALTの先頭文字だけ表示（デバッグ用、セキュリティのため一部のみ）
+    console.log('[verifyCheckinCode] CHECKIN_SALT starts with:', CHECKIN_SALT.substring(0, 3) + '...');
+  }
+
   if (!CHECKIN_SALT) {
     return { valid: false, error: 'システム設定エラー: CHECKIN_SALTが未設定です' };
   }
@@ -129,30 +136,41 @@ function verifyCheckinCode(code) {
   try {
     // ハイフン除去 & 大文字変換
     const cleanCode = code.replace(/-/g, '').toUpperCase();
+    console.log('[verifyCheckinCode] Clean code:', cleanCode);
+    console.log('[verifyCheckinCode] Code length:', cleanCode.length);
 
     // 長さチェック（36文字: 22バイト = 176ビット → ceil(176/5) = 36文字）
     if (cleanCode.length !== 36) {
+      console.log('[verifyCheckinCode] Invalid code length, expected 36');
       return { valid: false, error: '無効なコード形式です' };
     }
 
     // Base32デコード
     const payload = base32Decode(cleanCode);
+    console.log('[verifyCheckinCode] Decoded payload length:', payload.length);
+    console.log('[verifyCheckinCode] Payload hex:', payload.toString('hex'));
 
     // 22バイト必要（データ19バイト + 署名3バイト）
     if (payload.length < 22) {
+      console.log('[verifyCheckinCode] Payload too short, expected >= 22');
       return { valid: false, error: '無効なコードです' };
     }
 
     // データ部分と署名を分離
     const data = payload.slice(0, 19);      // 19バイト (6+6+6+1)
     const signature = payload.slice(19, 22); // 3バイト
+    console.log('[verifyCheckinCode] Data hex:', data.toString('hex'));
+    console.log('[verifyCheckinCode] Signature hex:', signature.toString('hex'));
 
     // 署名を再計算して検証
     const hmac = crypto.createHmac('sha256', CHECKIN_SALT);
     hmac.update(data);
     const expectedSig = hmac.digest().slice(0, 3);
+    console.log('[verifyCheckinCode] Expected signature hex:', expectedSig.toString('hex'));
+    console.log('[verifyCheckinCode] Signature match:', signature.equals(expectedSig));
 
     if (!signature.equals(expectedSig)) {
+      console.log('[verifyCheckinCode] Signature mismatch!');
       return { valid: false, error: '無効なコードです' };
     }
 
@@ -161,6 +179,12 @@ function verifyCheckinCode(code) {
     const orderId = bytesToBigInt(data.slice(6, 12)).toString();
     const lineItemId = bytesToBigInt(data.slice(12, 18)).toString();
     const quantity = data[18];  // 1バイト (0-255)
+
+    console.log('[verifyCheckinCode] Extracted IDs:');
+    console.log('  customerId:', customerId);
+    console.log('  orderId:', orderId);
+    console.log('  lineItemId:', lineItemId);
+    console.log('  quantity:', quantity);
 
     return { valid: true, customerId, orderId, lineItemId, quantity };
   } catch (error) {

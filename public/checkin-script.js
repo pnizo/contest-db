@@ -136,15 +136,18 @@ document.addEventListener('DOMContentLoaded', () => {
     submitBtn.innerHTML = '<span class="loading"></span>確認中...';
 
     try {
+      const token = localStorage.getItem('authToken');
       const response = await fetch('/api/checkin/verify', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + token
         },
         body: JSON.stringify({ code })
       });
 
       const data = await response.json();
+      console.log('Verify response:', data);
 
       if (data.success) {
         currentCode = code;
@@ -174,10 +177,11 @@ document.addEventListener('DOMContentLoaded', () => {
     confirmProductName.textContent = productDisplay;
     confirmCurrentQuantity.textContent = `${data.currentQuantity}枚`;
 
-    // 最大使用枚数 = min(ticketQuantity, currentQuantity)
-    maxQuantity = Math.min(data.ticketQuantity, data.currentQuantity);
-    useQuantity = 1;
-    
+    // 最大使用枚数 = Shopify上の現在数量（コードに埋め込まれた値ではなく実際の残り枚数）
+    maxQuantity = data.currentQuantity;
+    // 残り枚数が0の場合も考慮して初期値を設定
+    useQuantity = maxQuantity > 0 ? 1 : 0;
+
     updateQuantityDisplay();
     
     form.style.display = 'none';
@@ -189,9 +193,20 @@ document.addEventListener('DOMContentLoaded', () => {
   function updateQuantityDisplay() {
     useQuantityDisplay.textContent = useQuantity;
     quantityMaxLabel.textContent = `最大: ${maxQuantity}枚`;
-    
-    decreaseBtn.disabled = useQuantity <= 1;
-    increaseBtn.disabled = useQuantity >= maxQuantity;
+
+    decreaseBtn.disabled = useQuantity <= 1 || maxQuantity <= 0;
+    increaseBtn.disabled = useQuantity >= maxQuantity || maxQuantity <= 0;
+
+    // 残り枚数不足の場合はボタンを無効化
+    if (maxQuantity <= 0 || useQuantity <= 0 || useQuantity > maxQuantity) {
+      confirmBtn.disabled = true;
+      confirmBtn.textContent = 'チケット残り枚数不足';
+      confirmBtn.style.background = '#bdc3c7';
+    } else {
+      confirmBtn.disabled = false;
+      confirmBtn.textContent = 'チェックイン実行';
+      confirmBtn.style.background = '';
+    }
   }
 
   // 枚数減少
@@ -224,10 +239,12 @@ document.addEventListener('DOMContentLoaded', () => {
     confirmBtn.innerHTML = '<span class="loading"></span>処理中...';
 
     try {
+      const token = localStorage.getItem('authToken');
       const response = await fetch('/api/checkin', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + token
         },
         body: JSON.stringify({ 
           code: currentCode,

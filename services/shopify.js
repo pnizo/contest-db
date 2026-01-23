@@ -650,7 +650,60 @@ class ShopifyService {
 
       console.log(`Checkin for order: ${orderGid}, lineItem: ${lineItemGid}, decrementBy: ${decrementBy}`);
 
-      // Step 1: orderEditBegin - 編集セッションを開始し、注文情報も取得
+      // Step 1: まず注文情報を取得して、LineItem の variant ID を取得
+      const orderQuery = `
+        query getOrder($id: ID!) {
+          order(id: $id) {
+            id
+            name
+            lineItems(first: 100) {
+              edges {
+                node {
+                  id
+                  quantity
+                  title
+                  variantTitle
+                  variant {
+                    id
+                  }
+                }
+              }
+            }
+          }
+        }
+      `;
+
+      const orderResponse = await this.makeRequest('/graphql.json', {
+        method: 'POST',
+        body: JSON.stringify({
+          query: orderQuery,
+          variables: { id: orderGid }
+        })
+      });
+
+      if (orderResponse.errors) {
+        throw new Error(`GraphQL error: ${orderResponse.errors.map(e => e.message).join(', ')}`);
+      }
+
+      const order = orderResponse.data?.order;
+      if (!order) {
+        throw new Error('注文が見つかりません');
+      }
+
+      // 元の LineItem を見つける
+      const originalLineItem = order.lineItems.edges.find(edge => edge.node.id === lineItemGid);
+      if (!originalLineItem) {
+        throw new Error(`商品が見つかりません: ${lineItemGid}`);
+      }
+
+      const originalNode = originalLineItem.node;
+      const variantId = originalNode.variant?.id;
+      const productName = originalNode.title || '商品名不明';
+      const variantTitle = originalNode.variantTitle || '';
+
+      console.log(`Found LineItem: ${productName} (variant: ${variantId})`);
+
+      // Step 2: orderEditBegin - 編集セッションを開始
       const beginQuery = `
         mutation orderEditBegin($id: ID!) {
           orderEditBegin(id: $id) {
@@ -663,7 +716,7 @@ class ShopifyService {
                     quantity
                     title
                     variantTitle
-                    calculatedLineItem {
+                    variant {
                       id
                     }
                   }
@@ -697,24 +750,31 @@ class ShopifyService {
 
       const calculatedOrder = beginResult?.calculatedOrder;
       if (!calculatedOrder) {
-        throw new Error('注文が見つかりません');
+        throw new Error('編集セッションを開始できません');
       }
 
-      // LineItem に対応する CalculatedLineItem を探す
-      const lineItemEdge = calculatedOrder.lineItems.edges.find(edge => edge.node.id === lineItemGid);
-      if (!lineItemEdge) {
-        throw new Error(`商品が見つかりません: ${lineItemGid}`);
+      // variant ID でマッチングして CalculatedLineItem を探す
+      let calcLineItemEdge;
+      if (variantId) {
+        calcLineItemEdge = calculatedOrder.lineItems.edges.find(
+          edge => edge.node.variant?.id === variantId
+        );
+      }
+      
+      // variant ID でマッチしない場合は title と variantTitle でマッチ
+      if (!calcLineItemEdge) {
+        calcLineItemEdge = calculatedOrder.lineItems.edges.find(
+          edge => edge.node.title === productName && edge.node.variantTitle === variantTitle
+        );
       }
 
-      const lineItemNode = lineItemEdge.node;
-      const currentQuantity = lineItemNode.quantity;
-      const productName = lineItemNode.title || '商品名不明';
-      const variantTitle = lineItemNode.variantTitle || '';
-      const calculatedLineItemId = lineItemNode.calculatedLineItem?.id;
-
-      if (!calculatedLineItemId) {
-        throw new Error(`CalculatedLineItem not found for LineItem: ${lineItemGid}`);
+      if (!calcLineItemEdge) {
+        throw new Error(`CalculatedLineItem が見つかりません`);
       }
+
+      const calcLineItem = calcLineItemEdge.node;
+      const currentQuantity = calcLineItem.quantity;
+      const calculatedLineItemId = calcLineItem.id;
 
       // 現在数量が0の場合はエラー
       if (currentQuantity <= 0) {
@@ -730,7 +790,7 @@ class ShopifyService {
 
       console.log(`Product: ${productName}, Current quantity: ${currentQuantity}, new quantity: ${newQuantity}`);
 
-      // Step 2: orderEditSetQuantity - 数量を変更
+      // Step 3: orderEditSetQuantity - 数量を変更
       const setQuantityQuery = `
         mutation orderEditSetQuantity($id: ID!, $lineItemId: ID!, $quantity: Int!) {
           orderEditSetQuantity(id: $id, lineItemId: $lineItemId, quantity: $quantity) {
@@ -766,7 +826,7 @@ class ShopifyService {
         throw new Error(`Set quantity error: ${setQuantityResult.userErrors.map(e => e.message).join(', ')}`);
       }
 
-      // Step 3: orderEditCommit - 変更をコミット
+      // Step 4: orderEditCommit - 変更をコミット
       const commitQuery = `
         mutation orderEditCommit($id: ID!) {
           orderEditCommit(id: $id, notifyCustomer: false) {
@@ -799,7 +859,7 @@ class ShopifyService {
         throw new Error(`Commit error: ${commitResult.userErrors.map(e => e.message).join(', ')}`);
       }
 
-      const orderName = commitResult?.order?.name || `#${orderId}`;
+      const orderName = commitResult?.order?.name || order.name || `#${orderId}`;
 
       console.log(`Checkin successful: ${orderName} - ${productName} (${currentQuantity} -> ${newQuantity})`);
 
@@ -832,7 +892,7 @@ class ShopifyService {
 
       console.log(`Getting LineItem info for order: ${orderGid}, lineItem: ${lineItemGid}`);
 
-      // 注文情報を取得
+      // 注文情報を取得（currentQuantity = 編集後の現在数量）
       const query = `
         query getOrder($id: ID!) {
           order(id: $id) {
@@ -843,6 +903,7 @@ class ShopifyService {
                 node {
                   id
                   quantity
+                  currentQuantity
                   title
                   variantTitle
                 }
@@ -877,11 +938,13 @@ class ShopifyService {
 
       const lineItemNode = lineItemEdge.node;
 
+      console.log(`LineItem found: quantity=${lineItemNode.quantity}, currentQuantity=${lineItemNode.currentQuantity}`);
+
       return {
         orderName: order.name,
         productName: lineItemNode.title || '商品名不明',
         variantTitle: lineItemNode.variantTitle || '',
-        currentQuantity: lineItemNode.quantity
+        currentQuantity: lineItemNode.currentQuantity  // 編集後の現在数量を使用
       };
 
     } catch (error) {

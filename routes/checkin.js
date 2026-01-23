@@ -23,6 +23,8 @@ router.use(requireAuth);
 router.post('/verify', async (req, res) => {
   try {
     const { code } = req.body;
+    console.log('Verify request - code:', code);
+    console.log('CHECKIN_SALT set:', !!process.env.CHECKIN_SALT);
 
     if (!code) {
       return res.status(400).json({
@@ -33,6 +35,8 @@ router.post('/verify', async (req, res) => {
 
     // コードを検証
     const verification = verifyCheckinCode(code);
+    console.log('Verification result:', verification);
+    
     if (!verification.valid) {
       return res.status(400).json({
         success: false,
@@ -98,15 +102,10 @@ router.post('/', async (req, res) => {
     }
 
     const { customerId, orderId, lineItemId, quantity } = verification;
-    console.log(`Checkin: customerId=${customerId}, orderId=${orderId}, lineItemId=${lineItemId}, quantity=${quantity}, useQuantity=${useQty}`);
+    console.log(`Checkin: customerId=${customerId}, orderId=${orderId}, lineItemId=${lineItemId}, codeQuantity=${quantity}, useQuantity=${useQty}`);
 
-    // 使用枚数がコードに埋め込まれた枚数を超えていないかチェック
-    if (useQty > quantity) {
-      return res.status(400).json({
-        success: false,
-        error: `使用枚数は${quantity}枚以下にしてください`
-      });
-    }
+    // 注意: 使用枚数のチェックはShopify API側（checkinLineItem）で実際の残り枚数に基づいて行う
+    // コードに埋め込まれた quantity は参考値として扱い、Shopify上の currentQuantity を正とする
 
     // Shopify APIで注文情報を取得し、数量をデクリメント
     const shopify = getShopifyService();
