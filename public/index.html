@@ -55,6 +55,15 @@
                 this.init();
             }
 
+            // チェックイン専用ドメインかどうかでリダイレクト先を決定
+            getRedirectUrl() {
+                const host = window.location.hostname;
+                if (host === 'ticket-checkin.fwj.jp' || host.startsWith('ticket-checkin.')) {
+                    return '/checkin';
+                }
+                return '/registrations';
+            }
+
             init() {
                 this.checkAuthStatus();
                 this.bindEvents();
@@ -78,8 +87,9 @@
                     console.log('Auth status result:', result);
                     
                     if (result.isAuthenticated) {
-                        console.log('User is authenticated, redirecting to /registrations');
-                        window.location.href = '/registrations';
+                        const redirectTo = this.getRedirectUrl();
+                        console.log('User is authenticated, redirecting to ' + redirectTo);
+                        window.location.href = redirectTo;
                     } else {
                         console.log('User is not authenticated, staying on login page');
                     }
@@ -132,10 +142,11 @@
                         }
                         this.showNotification('ログインしました', 'success');
                         submitBtn.textContent = 'リダイレクト中...';
+                        const redirectTo = this.getRedirectUrl();
                         setTimeout(() => {
-                            console.log('Redirecting to /registrations after login...');
+                            console.log('Redirecting to ' + redirectTo + ' after login...');
                             console.log('Final token check before redirect:', AuthToken.get() ? 'exists' : 'missing');
-                            window.location.href = '/registrations';
+                            window.location.href = redirectTo;
                         }, 1000);
                     } else {
                         this.showNotification(result.error, 'error');

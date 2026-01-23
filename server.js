@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const session = require('express-session');
+const cookieParser = require('cookie-parser');
 require('dotenv').config();
 
 const userRoutes = require('./routes/users');
@@ -30,13 +31,18 @@ app.use(cors({
 }));
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
+app.use(cookieParser());
 
 // チェックイン専用ドメインのアクセス制御
 const CHECKIN_DOMAIN = 'ticket-checkin.fwj.jp';
 const ALLOWED_CHECKIN_PATHS = [
+  '/',
   '/checkin',
   '/api/checkin',
   '/api/checkin/verify',
+  '/api/auth/login',
+  '/api/auth/me',
+  '/api/auth/logout',
   '/checkin-script.js',
   '/styles.css',
   '/favicon.ico',
@@ -51,8 +57,11 @@ app.use((req, res, next) => {
     return next();
   }
   
+  // チェックイン専用ドメインかどうかをリクエストに記録
+  req.isCheckinDomain = (host === CHECKIN_DOMAIN || host.startsWith('ticket-checkin.'));
+  
   // チェックイン専用ドメインの場合、許可されたパスのみアクセス可能
-  if (host === CHECKIN_DOMAIN || host.startsWith('ticket-checkin.')) {
+  if (req.isCheckinDomain) {
     const path = req.path;
     const isAllowed = ALLOWED_CHECKIN_PATHS.some(allowed => 
       path === allowed || path.startsWith(allowed + '/')
@@ -97,14 +106,8 @@ app.use(sessionCompatibility);
 // 認証チェックミドルウェア
 app.use(checkAuth);
 
-// ルートページ
+// ルートページ（常にログインページを表示）
 app.get('/', (req, res) => {
-  // チェックイン専用ドメインの場合はチェックインページを表示
-  const host = req.get('host') || '';
-  if (host.startsWith('checkin.')) {
-    return res.sendFile(path.join(__dirname, 'public', 'checkin.html'));
-  }
-  // 通常はログインページ
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
@@ -145,7 +148,13 @@ app.get('/orders', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'orders.html'));
 });
 
+// チェックインページ（認証必須）
 app.get('/checkin', (req, res) => {
+  // 認証チェック（JWTトークンがあるか確認）
+  const token = req.cookies?.token || req.headers.authorization?.replace('Bearer ', '');
+  if (!token) {
+    return res.redirect('/');
+  }
   res.sendFile(path.join(__dirname, 'public', 'checkin.html'));
 });
 
