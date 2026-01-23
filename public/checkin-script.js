@@ -60,6 +60,22 @@ document.addEventListener('DOMContentLoaded', () => {
   let useQuantity = 1;
   let maxQuantity = 1;  // min(ticketQuantity, currentQuantity)
 
+  // URLパラメータからコードを取得して初期値に設定
+  const urlParams = new URLSearchParams(window.location.search);
+  const initialCode = urlParams.get('code');
+  if (initialCode) {
+    // ハイフンを除去してから再フォーマット
+    let cleanCode = initialCode.toUpperCase().replace(/[^A-Z0-9]/g, '');
+    let formatted = '';
+    for (let i = 0; i < cleanCode.length; i++) {
+      if (i > 0 && i % 4 === 0) {
+        formatted += '-';
+      }
+      formatted += cleanCode[i];
+    }
+    codeInput.value = formatted;
+  }
+
   // ログアウト処理
   logoutBtn.addEventListener('click', async () => {
     try {
