@@ -738,7 +738,9 @@ router.post('/import-shopify', requireAdmin, async (req, res) => {
       'Masters', 'マスターズ',
       'Lean', 'リーン',
       'Plus', 'プラス',
-      'Open', 'オープン'
+      'Open', 'オープン',
+      'Lightweight', 'ライトウェイト',
+      'Heavyweight', 'ヘビーウェイト'
     ];
 
     // ソートキーを取得する関数
