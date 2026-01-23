@@ -35,6 +35,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const form = document.getElementById('checkinForm');
   const codeInput = document.getElementById('codeInput');
   const submitBtn = document.getElementById('submitBtn');
+  const logoutBtn = document.getElementById('logoutBtn');
   
   // 確認パネル要素
   const confirmPanel = document.getElementById('confirmPanel');
@@ -58,6 +59,24 @@ document.addEventListener('DOMContentLoaded', () => {
   let currentCode = '';
   let useQuantity = 1;
   let maxQuantity = 1;  // min(ticketQuantity, currentQuantity)
+
+  // ログアウト処理
+  logoutBtn.addEventListener('click', async () => {
+    try {
+      const token = localStorage.getItem('authToken');
+      await fetch('/api/auth/logout', {
+        method: 'POST',
+        headers: {
+          'Authorization': 'Bearer ' + token,
+          'Content-Type': 'application/json'
+        }
+      });
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
+    localStorage.removeItem('authToken');
+    window.location.href = '/';
+  });
 
   // コード入力のフォーマット処理
   codeInput.addEventListener('input', (e) => {

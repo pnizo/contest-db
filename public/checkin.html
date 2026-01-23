@@ -345,9 +345,37 @@
             color: #999;
             font-size: 12px;
         }
+
+        .header-bar {
+            position: fixed;
+            top: 0;
+            right: 0;
+            padding: 16px;
+            z-index: 100;
+        }
+
+        .logout-btn {
+            padding: 8px 16px;
+            font-size: 14px;
+            color: #666;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background 0.2s, color 0.2s;
+        }
+
+        .logout-btn:hover {
+            background: #f5f5f5;
+            color: #333;
+        }
     </style>
 </head>
 <body>
+    <div class="header-bar">
+        <button type="button" id="logoutBtn" class="logout-btn">ログアウト</button>
+    </div>
+
     <div class="container">
         <div class="checkin-card">
             <div class="checkin-header">
