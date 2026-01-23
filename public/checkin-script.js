@@ -2,6 +2,35 @@
  * チェックイン受付スクリプト
  */
 
+// 認証チェック（ページ読み込み時）
+(async function checkAuth() {
+  const token = localStorage.getItem('authToken');
+  if (!token) {
+    window.location.href = '/';
+    return;
+  }
+  
+  // サーバー側で認証状態を確認
+  try {
+    const response = await fetch('/api/auth/status', {
+      headers: {
+        'Authorization': 'Bearer ' + token,
+        'Content-Type': 'application/json'
+      }
+    });
+    const result = await response.json();
+    if (!result.isAuthenticated) {
+      localStorage.removeItem('authToken');
+      window.location.href = '/';
+      return;
+    }
+  } catch (error) {
+    console.error('Auth check error:', error);
+    window.location.href = '/';
+    return;
+  }
+})();
+
 document.addEventListener('DOMContentLoaded', () => {
   const form = document.getElementById('checkinForm');
   const codeInput = document.getElementById('codeInput');

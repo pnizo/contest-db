@@ -1,6 +1,7 @@
 const express = require('express');
 const ShopifyService = require('../services/shopify');
 const { verifyCheckinCode } = require('../utils/checkin-code');
+const { requireAuth } = require('../middleware/auth');
 const router = express.Router();
 
 // サービスの遅延初期化
@@ -14,8 +15,9 @@ function getShopifyService() {
 }
 
 // ============================================
-// チェックインAPI（認証不要・IP制限なし）
+// チェックインAPI（認証必須・IP制限なし）
 // ============================================
+router.use(requireAuth);
 
 // POST /verify - コード検証のみ（チケット情報を取得）
 router.post('/verify', async (req, res) => {

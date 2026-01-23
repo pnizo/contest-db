@@ -149,13 +149,8 @@ app.get('/orders', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'orders.html'));
 });
 
-// チェックインページ（認証必須）
+// チェックインページ（認証チェックはフロントエンドで行う）
 app.get('/checkin', (req, res) => {
-  // 認証チェック（JWTトークンがあるか確認）
-  const token = req.cookies?.token || req.headers.authorization?.replace('Bearer ', '');
-  if (!token) {
-    return res.redirect('/');
-  }
   res.sendFile(path.join(__dirname, 'public', 'checkin.html'));
 });
 

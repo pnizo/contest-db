@@ -55,10 +55,15 @@
                 this.init();
             }
 
+            // チェックイン専用ドメインかどうか
+            isCheckinDomain() {
+                const host = window.location.hostname;
+                return host === 'ticket-checkin.fwj.jp' || host.startsWith('ticket-checkin.');
+            }
+
             // チェックイン専用ドメインかどうかでリダイレクト先を決定
             getRedirectUrl() {
-                const host = window.location.hostname;
-                if (host === 'ticket-checkin.fwj.jp' || host.startsWith('ticket-checkin.')) {
+                if (this.isCheckinDomain()) {
                     return '/checkin';
                 }
                 return '/registrations';
@@ -87,9 +92,14 @@
                     console.log('Auth status result:', result);
                     
                     if (result.isAuthenticated) {
-                        const redirectTo = this.getRedirectUrl();
-                        console.log('User is authenticated, redirecting to ' + redirectTo);
-                        window.location.href = redirectTo;
+                        // チェックイン専用ドメインでは自動リダイレクトしない（無限ループ防止）
+                        if (this.isCheckinDomain()) {
+                            console.log('User is authenticated on checkin domain, staying on login page');
+                        } else {
+                            const redirectTo = this.getRedirectUrl();
+                            console.log('User is authenticated, redirecting to ' + redirectTo);
+                            window.location.href = redirectTo;
+                        }
                     } else {
                         console.log('User is not authenticated, staying on login page');
                     }
