@@ -31,6 +31,41 @@ app.use(cors({
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
+// チェックイン専用ドメインのアクセス制御
+const CHECKIN_DOMAIN = 'ticket-checkin.fwj.jp';
+const ALLOWED_CHECKIN_PATHS = [
+  '/checkin',
+  '/api/checkin',
+  '/api/checkin/verify',
+  '/checkin-script.js',
+  '/styles.css',
+  '/favicon.ico',
+  '/favicon.png'
+];
+
+app.use((req, res, next) => {
+  const host = req.get('host') || '';
+  
+  // localhost（デバッグ時）は全機能にアクセス可能
+  if (host.startsWith('localhost') || host.startsWith('127.0.0.1')) {
+    return next();
+  }
+  
+  // チェックイン専用ドメインの場合、許可されたパスのみアクセス可能
+  if (host === CHECKIN_DOMAIN || host.startsWith('ticket-checkin.')) {
+    const path = req.path;
+    const isAllowed = ALLOWED_CHECKIN_PATHS.some(allowed => 
+      path === allowed || path.startsWith(allowed + '/')
+    );
+    
+    if (!isAllowed && path !== '/') {
+      return res.status(404).send('Not Found');
+    }
+  }
+  
+  next();
+});
+
 // セッション設定（本番環境では無効化）
 if (process.env.NODE_ENV !== 'production') {
   app.use(session({
