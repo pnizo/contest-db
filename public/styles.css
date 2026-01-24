@@ -1836,6 +1836,36 @@ input[type="file"]:hover {
     background-color: #f8f9fa;
 }
 
+/* Contest ready status background colors */
+.data-table tr.contest-ready {
+    background-color: #d4edda; /* 薄い緑 - 公開済み */
+}
+
+.data-table tr.contest-not-ready {
+    background-color: #f8d7da; /* 薄い赤 - 非公開 */
+}
+
+.data-table tr.contest-ready:hover {
+    background-color: #c3e6cb; /* ホバー時は少し濃い緑 */
+}
+
+.data-table tr.contest-not-ready:hover {
+    background-color: #f1c1c6; /* ホバー時は少し濃い赤 */
+}
+
+/* Center aligned header and cell */
+.data-table th.center-header,
+.data-table td.center-cell {
+    text-align: center;
+    width: 60px;
+}
+
+.data-table td.center-cell input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    cursor: default;
+}
+
 /* Small Form Element */
 .form-group small {
     display: block;

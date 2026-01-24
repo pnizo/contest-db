@@ -271,19 +271,24 @@ class ContestsManager {
             { key: 'contest_name', label: '大会名' },
             { key: 'contest_date', label: '開催日' },
             { key: 'contest_place', label: '開催地' },
+            { key: 'is_ready', label: '公開' },
             { key: '_actions', label: '操作' }
         ];
 
         headers.forEach(header => {
             const th = document.createElement('th');
-            if (header.key !== '_actions') {
+            if (header.key === '_actions' || header.key === 'is_ready') {
+                th.textContent = header.label;
+                if (header.key === '_actions') {
+                    th.className = 'actions-header';
+                } else {
+                    th.className = 'center-header';
+                }
+            } else {
                 th.className = 'sortable';
                 th.setAttribute('data-column', header.key);
                 th.innerHTML = `${header.label}${this.getSortIcon(header.key)}`;
                 th.addEventListener('click', () => this.sortBy(header.key));
-            } else {
-                th.textContent = header.label;
-                th.className = 'actions-header';
             }
             headerRow.appendChild(th);
         });
@@ -293,6 +298,14 @@ class ContestsManager {
         // データ行作成
         contests.forEach(contest => {
             const row = document.createElement('tr');
+
+            // is_readyに基づいて背景色クラスを設定
+            const isReady = contest.is_ready;
+            if (isReady === 'TRUE' || isReady === true || isReady === '○') {
+                row.classList.add('contest-ready');
+            } else {
+                row.classList.add('contest-not-ready');
+            }
 
             headers.forEach(header => {
                 const td = document.createElement('td');
@@ -324,6 +337,14 @@ class ContestsManager {
                     } else {
                         td.textContent = '';
                     }
+                } else if (header.key === 'is_ready') {
+                    // 公開チェックボックス（表示のみ）
+                    td.className = 'center-cell';
+                    const checkbox = document.createElement('input');
+                    checkbox.type = 'checkbox';
+                    checkbox.checked = isReady === 'TRUE' || isReady === true || isReady === '○';
+                    checkbox.disabled = true;
+                    td.appendChild(checkbox);
                 } else {
                     td.textContent = contest[header.key] || '';
                 }
@@ -452,6 +473,11 @@ class ContestsManager {
         
         document.getElementById('edit_contest_place').value = contest.contest_place || '';
 
+        // is_readyの設定（TRUE/true/'○'の場合にチェック）
+        const isReady = contest.is_ready;
+        document.getElementById('edit_is_ready').checked =
+            isReady === 'TRUE' || isReady === true || isReady === '○';
+
         document.getElementById('editDialog').classList.remove('hidden');
     }
 
@@ -468,7 +494,8 @@ class ContestsManager {
         const contestData = {
             contest_name: document.getElementById('edit_contest_name').value,
             contest_date: document.getElementById('edit_contest_date').value,
-            contest_place: document.getElementById('edit_contest_place').value
+            contest_place: document.getElementById('edit_contest_place').value,
+            is_ready: document.getElementById('edit_is_ready').checked ? 'TRUE' : 'FALSE'
         };
         
         console.log('Contest data to save:', contestData);
