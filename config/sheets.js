@@ -76,6 +76,20 @@ class SheetsService {
     }
   }
 
+  async getSheetId(sheetName) {
+    try {
+      const response = await this.sheets.spreadsheets.get({
+        spreadsheetId: this.spreadsheetId,
+        fields: 'sheets(properties(sheetId,title))'
+      });
+      const sheet = response.data.sheets.find(s => s.properties.title === sheetName);
+      return sheet ? sheet.properties.sheetId : null;
+    } catch (error) {
+      console.error('Error getting sheet ID:', error);
+      throw error;
+    }
+  }
+
   async deleteRow(sheetName, rowIndex) {
     try {
       const response = await this.sheets.spreadsheets.batchUpdate({
@@ -96,6 +110,39 @@ class SheetsService {
       return response.data;
     } catch (error) {
       console.error('Error deleting row:', error);
+      throw error;
+    }
+  }
+
+  async deleteRows(sheetName, rowIndices) {
+    if (!rowIndices || rowIndices.length === 0) return;
+
+    try {
+      const sheetId = await this.getSheetId(sheetName);
+      if (sheetId === null) throw new Error(`Sheet ${sheetName} not found`);
+
+      // 行インデックスを降順でソート（削除時のインデックスずれを防ぐ）
+      const sortedIndices = [...rowIndices].sort((a, b) => b - a);
+
+      const requests = sortedIndices.map(rowIndex => ({
+        deleteDimension: {
+          range: {
+            sheetId: sheetId,
+            dimension: 'ROWS',
+            startIndex: rowIndex,
+            endIndex: rowIndex + 1
+          }
+        }
+      }));
+
+      const response = await this.sheets.spreadsheets.batchUpdate({
+        spreadsheetId: this.spreadsheetId,
+        requestBody: { requests }
+      });
+
+      return response.data;
+    } catch (error) {
+      console.error('Error deleting rows:', error);
       throw error;
     }
   }

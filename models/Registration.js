@@ -7,10 +7,37 @@ class Registration extends BaseModel {
 
   async findByContestAndDate(contestName, contestDate) {
     const all = await this.findAll();
-    return all.filter(registration => 
-      registration.contest_name === contestName && 
+    return all.filter(registration =>
+      registration.contest_name === contestName &&
       registration.contest_date === contestDate
     );
+  }
+
+  async deleteByContestAndDate(contestName, contestDate) {
+    await this.ensureInitialized();
+
+    // 全データを取得（削除済み含む）
+    const allData = await this.getSheetsService().getValues(`${this.sheetName}!A:AA`);
+    if (!allData || allData.length <= 1) return { deleted: 0 };
+
+    const headers = allData[0];
+    const contestNameIdx = headers.indexOf('contest_name');
+    const contestDateIdx = headers.indexOf('contest_date');
+
+    // 対象行のインデックスを収集（0始まり、ヘッダー行=0）
+    const rowIndicesToDelete = [];
+    for (let i = 1; i < allData.length; i++) {
+      const row = allData[i];
+      if (row[contestNameIdx] === contestName && row[contestDateIdx] === contestDate) {
+        rowIndicesToDelete.push(i); // スプレッドシートの行インデックス（0始まり）
+      }
+    }
+
+    if (rowIndicesToDelete.length > 0) {
+      await this.getSheetsService().deleteRows(this.sheetName, rowIndicesToDelete);
+    }
+
+    return { deleted: rowIndicesToDelete.length };
   }
 
   async findByFwjCard(fwjCard) {
