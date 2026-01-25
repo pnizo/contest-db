@@ -9,7 +9,7 @@
     window.location.href = '/';
     return;
   }
-  
+
   // サーバー側で認証状態を確認
   try {
     const response = await fetch('/api/auth/status', {
@@ -36,7 +36,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const codeInput = document.getElementById('codeInput');
   const submitBtn = document.getElementById('submitBtn');
   const logoutBtn = document.getElementById('logoutBtn');
-  
+
   // オーバーレイ要素
   const overlay = document.getElementById('overlay');
 
@@ -45,13 +45,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const confirmOrderName = document.getElementById('confirmOrderName');
   const confirmProductName = document.getElementById('confirmProductName');
   const confirmCurrentQuantity = document.getElementById('confirmCurrentQuantity');
-  const useQuantityDisplay = document.getElementById('useQuantityDisplay');
-  const quantityMaxLabel = document.getElementById('quantityMaxLabel');
-  const decreaseBtn = document.getElementById('decreaseBtn');
-  const increaseBtn = document.getElementById('increaseBtn');
   const confirmBtn = document.getElementById('confirmBtn');
   const cancelBtn = document.getElementById('cancelBtn');
-  
+
   // 結果パネル要素
   const resultPanel = document.getElementById('resultPanel');
   const resultTitle = document.getElementById('resultTitle');
@@ -60,8 +56,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // 状態管理
   let currentCode = '';
-  let useQuantity = 1;
-  let maxQuantity = 1;  // min(ticketQuantity, currentQuantity)
 
   // URLパラメータからコードを取得して初期値に設定
   const urlParams = new URLSearchParams(window.location.search);
@@ -100,13 +94,13 @@ document.addEventListener('DOMContentLoaded', () => {
   // コード入力のフォーマット処理
   codeInput.addEventListener('input', (e) => {
     let value = e.target.value.toUpperCase();
-    
+
     // 英数字以外を除去（ハイフンは許可）
     value = value.replace(/[^A-Z0-9-]/g, '');
-    
+
     // ハイフンを一旦除去
     const cleanValue = value.replace(/-/g, '');
-    
+
     // 4文字ごとにハイフンを挿入
     let formatted = '';
     for (let i = 0; i < cleanValue.length; i++) {
@@ -115,9 +109,9 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       formatted += cleanValue[i];
     }
-    
+
     e.target.value = formatted;
-    
+
     // エラー状態をクリア
     codeInput.classList.remove('error', 'success');
   });
@@ -125,9 +119,9 @@ document.addEventListener('DOMContentLoaded', () => {
   // Step 1: コード検証
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
-    
+
     const code = codeInput.value.trim();
-    
+
     if (!code) {
       showError('コードを入力してください');
       codeInput.classList.add('error');
@@ -181,56 +175,26 @@ document.addEventListener('DOMContentLoaded', () => {
       confirmProductName.innerHTML = `<strong>${escapeHtml(data.productName)}</strong>`;
     }
 
-    confirmCurrentQuantity.textContent = `${data.currentQuantity}枚`;
+    // 使用可否を表示
+    if (data.isUsable) {
+      confirmCurrentQuantity.textContent = '使用可能';
+      confirmCurrentQuantity.style.color = '#27ae60';
+      confirmBtn.disabled = false;
+      confirmBtn.textContent = 'チェックイン実行';
+      confirmBtn.style.background = '';
+    } else {
+      confirmCurrentQuantity.textContent = '使用済み';
+      confirmCurrentQuantity.style.color = '#e74c3c';
+      confirmBtn.disabled = true;
+      confirmBtn.textContent = 'このチケットは使用済みです';
+      confirmBtn.style.background = '#bdc3c7';
+    }
 
-    // 最大使用枚数 = Shopify上の現在数量（コードに埋め込まれた値ではなく実際の残り枚数）
-    maxQuantity = data.currentQuantity;
-    // 残り枚数が0の場合も考慮して初期値を設定
-    useQuantity = maxQuantity > 0 ? 1 : 0;
-
-    updateQuantityDisplay();
-    
     form.style.display = 'none';
     overlay.classList.add('visible');
     confirmPanel.classList.add('visible');
     resultPanel.className = 'result-panel';
   }
-
-  // 枚数表示を更新
-  function updateQuantityDisplay() {
-    useQuantityDisplay.textContent = useQuantity;
-    quantityMaxLabel.textContent = `最大: ${maxQuantity}枚`;
-
-    decreaseBtn.disabled = useQuantity <= 1 || maxQuantity <= 0;
-    increaseBtn.disabled = useQuantity >= maxQuantity || maxQuantity <= 0;
-
-    // 残り枚数不足の場合はボタンを無効化
-    if (maxQuantity <= 0 || useQuantity <= 0 || useQuantity > maxQuantity) {
-      confirmBtn.disabled = true;
-      confirmBtn.textContent = 'チケット残り枚数不足';
-      confirmBtn.style.background = '#bdc3c7';
-    } else {
-      confirmBtn.disabled = false;
-      confirmBtn.textContent = 'チェックイン実行';
-      confirmBtn.style.background = '';
-    }
-  }
-
-  // 枚数減少
-  decreaseBtn.addEventListener('click', () => {
-    if (useQuantity > 1) {
-      useQuantity--;
-      updateQuantityDisplay();
-    }
-  });
-
-  // 枚数増加
-  increaseBtn.addEventListener('click', () => {
-    if (useQuantity < maxQuantity) {
-      useQuantity++;
-      updateQuantityDisplay();
-    }
-  });
 
   // キャンセル
   cancelBtn.addEventListener('click', () => {
@@ -254,10 +218,7 @@ document.addEventListener('DOMContentLoaded', () => {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer ' + token
         },
-        body: JSON.stringify({ 
-          code: currentCode,
-          useQuantity: useQuantity
-        })
+        body: JSON.stringify({ code: currentCode })
       });
 
       const data = await response.json();
@@ -281,8 +242,8 @@ document.addEventListener('DOMContentLoaded', () => {
     overlay.classList.remove('visible');
     confirmPanel.classList.remove('visible');
     resultPanel.className = 'result-panel success';
-    
-    const productDisplay = data.variantTitle 
+
+    const productDisplay = data.variantTitle
       ? `${data.productName} (${data.variantTitle})`
       : data.productName;
 
@@ -293,17 +254,9 @@ document.addEventListener('DOMContentLoaded', () => {
         <dd>${escapeHtml(data.orderName)}</dd>
         <dt>商品</dt>
         <dd>${escapeHtml(productDisplay)}</dd>
-        <dt>使用枚数</dt>
-        <dd>${data.usedQuantity}枚</dd>
       </dl>
-      <div class="quantity-change">
-        残り枚数: 
-        <span class="quantity-number">${data.previousQuantity}</span>
-        <span class="arrow">→</span>
-        <span class="quantity-number">${data.newQuantity}</span>
-      </div>
     `;
-    
+
     form.style.display = 'none';
   }
 
@@ -314,7 +267,7 @@ document.addEventListener('DOMContentLoaded', () => {
     resultPanel.className = 'result-panel error';
     resultTitle.innerHTML = '&#10008; エラー';
     resultDetails.innerHTML = `<p>${escapeHtml(message)}</p>`;
-    
+
     // フォームは表示したまま
     form.style.display = 'block';
   }
@@ -328,8 +281,6 @@ document.addEventListener('DOMContentLoaded', () => {
     codeInput.classList.remove('error', 'success');
     form.style.display = 'block';
     currentCode = '';
-    useQuantity = 1;
-    maxQuantity = 1;
     codeInput.focus();
   });
 

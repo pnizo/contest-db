@@ -27,4 +27,17 @@ function generateUniqueId() {
   return `${datePart}-${timePart}-${randomPart}`;
 }
 
-module.exports = { generateUniqueId };
+/**
+ * チケット用の数値IDを生成する
+ * 4バイト（32ビット）のランダムID
+ * @returns {number} 0 - 4294967295 の範囲の数値
+ */
+function generateTicketId() {
+  // crypto.randomBytesを使用して4バイトのランダムIDを生成
+  const crypto = require('crypto');
+  const bytes = crypto.randomBytes(4);
+  // 符号なし32ビット整数として読み取り
+  return bytes.readUInt32BE(0);
+}
+
+module.exports = { generateUniqueId, generateTicketId };

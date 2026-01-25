@@ -168,24 +168,6 @@
             font-size: 16px;
         }
 
-        .quantity-change {
-            margin-top: 12px;
-            padding: 12px;
-            background: rgba(255,255,255,0.5);
-            border-radius: 6px;
-            text-align: center;
-        }
-
-        .quantity-change .arrow {
-            font-size: 20px;
-            margin: 0 8px;
-        }
-
-        .quantity-number {
-            font-size: 24px;
-            font-weight: 700;
-        }
-
         .reset-btn {
             margin-top: 16px;
             padding: 12px 24px;
@@ -249,60 +231,6 @@
             margin-left: 0;
             font-size: 16px;
             color: #333;
-        }
-
-        .quantity-selector {
-            display: flex;
-            flex-wrap: wrap;
-            align-items: center;
-            justify-content: center;
-            gap: 16px;
-            margin: 20px 0;
-        }
-
-        .quantity-selector label {
-            width: 100%;
-            text-align: center;
-            font-weight: 600;
-            color: #555;
-            margin-bottom: 4px;
-        }
-
-        .quantity-btn {
-            width: 48px;
-            height: 48px;
-            font-size: 24px;
-            font-weight: 600;
-            color: white;
-            background: #3498db;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            transition: background 0.2s;
-        }
-
-        .quantity-btn:hover:not(:disabled) {
-            background: #2980b9;
-        }
-
-        .quantity-btn:disabled {
-            background: #bdc3c7;
-            cursor: not-allowed;
-        }
-
-        .quantity-display {
-            font-size: 32px;
-            font-weight: 700;
-            min-width: 60px;
-            text-align: center;
-            color: #2c3e50;
-        }
-
-        .quantity-max {
-            font-size: 14px;
-            color: #7f8c8d;
-            text-align: center;
-            margin-bottom: 16px;
         }
 
         .confirm-btn {
@@ -413,7 +341,7 @@
                         type="text" 
                         id="codeInput" 
                         class="code-input" 
-                        placeholder="XXXX-XXXX-XXXX-..."
+                        placeholder="XXXX-XXXX-XXXX"
                         autocomplete="off"
                         autocapitalize="characters"
                         spellcheck="false"
@@ -432,17 +360,9 @@
                     <dd id="confirmOrderName"></dd>
                     <dt>商品</dt>
                     <dd id="confirmProductName"></dd>
-                    <dt>残り枚数</dt>
+                    <dt>ステータス</dt>
                     <dd id="confirmCurrentQuantity"></dd>
                 </dl>
-
-                <div class="quantity-selector">
-                    <label>使用枚数</label>
-                    <button type="button" id="decreaseBtn" class="quantity-btn">−</button>
-                    <span id="useQuantityDisplay" class="quantity-display">1</span>
-                    <button type="button" id="increaseBtn" class="quantity-btn">+</button>
-                </div>
-                <div class="quantity-max" id="quantityMaxLabel">最大: 1枚</div>
 
                 <button type="button" id="confirmBtn" class="confirm-btn">
                     チェックイン実行

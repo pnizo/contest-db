@@ -1,18 +1,8 @@
 const express = require('express');
-const ShopifyService = require('../services/shopify');
 const { verifyCheckinCode } = require('../utils/checkin-code');
 const { requireAuth } = require('../middleware/auth');
+const Ticket = require('../models/Ticket');
 const router = express.Router();
-
-// サービスの遅延初期化
-let shopifyService = null;
-
-function getShopifyService() {
-  if (!shopifyService) {
-    shopifyService = new ShopifyService();
-  }
-  return shopifyService;
-}
 
 // ============================================
 // チェックインAPI（認証必須・IP制限なし）
@@ -23,8 +13,6 @@ router.use(requireAuth);
 router.post('/verify', async (req, res) => {
   try {
     const { code } = req.body;
-    console.log('Verify request - code:', code);
-    console.log('CHECKIN_SALT set:', !!process.env.CHECKIN_SALT);
 
     if (!code) {
       return res.status(400).json({
@@ -35,8 +23,7 @@ router.post('/verify', async (req, res) => {
 
     // コードを検証
     const verification = verifyCheckinCode(code);
-    console.log('Verification result:', verification);
-    
+
     if (!verification.valid) {
       return res.status(400).json({
         success: false,
@@ -44,29 +31,34 @@ router.post('/verify', async (req, res) => {
       });
     }
 
-    const { customerId, orderId, lineItemId, quantity } = verification;
-    console.log(`Verify: customerId=${customerId}, orderId=${orderId}, lineItemId=${lineItemId}, quantity=${quantity}`);
+    const { ticketId } = verification;
 
-    // Shopify APIで注文情報を取得（デクリメントはしない）
-    const shopify = getShopifyService();
-    const result = await shopify.getLineItemInfo(orderId, lineItemId);
+    // Ticketsシートで確認
+    const ticketModel = new Ticket();
+    const ticket = await ticketModel.findByTicketId(ticketId);
+
+    if (!ticket) {
+      return res.status(400).json({
+        success: false,
+        error: 'チケットが見つかりません'
+      });
+    }
 
     res.json({
       success: true,
-      orderName: result.orderName,
-      productName: result.productName,
-      variantTitle: result.variantTitle,
-      ticketQuantity: quantity,      // コードに埋め込まれた購入枚数
-      currentQuantity: result.currentQuantity  // 現在の残り枚数
+      orderName: ticket.order_no,
+      productName: ticket.product_name,
+      variantTitle: ticket.variant,
+      isUsable: ticket.is_usable === 'TRUE'
     });
   } catch (error) {
     console.error('Verify error:', error);
-    
+
     let errorMessage = 'コード検証中にエラーが発生しました';
     if (error.message.includes('not found') || error.message.includes('見つかりません')) {
       errorMessage = '注文情報が見つかりません';
     }
-    
+
     res.status(400).json({ success: false, error: errorMessage });
   }
 });
@@ -74,21 +66,12 @@ router.post('/verify', async (req, res) => {
 // POST / - チェックインコードで受付処理
 router.post('/', async (req, res) => {
   try {
-    const { code, useQuantity = 1 } = req.body;
+    const { code } = req.body;
 
     if (!code) {
       return res.status(400).json({
         success: false,
         error: 'コードを入力してください'
-      });
-    }
-
-    // 使用枚数の検証
-    const useQty = parseInt(useQuantity, 10);
-    if (isNaN(useQty) || useQty < 1) {
-      return res.status(400).json({
-        success: false,
-        error: '使用枚数は1以上を指定してください'
       });
     }
 
@@ -101,40 +84,45 @@ router.post('/', async (req, res) => {
       });
     }
 
-    const { customerId, orderId, lineItemId, quantity } = verification;
-    console.log(`Checkin: customerId=${customerId}, orderId=${orderId}, lineItemId=${lineItemId}, codeQuantity=${quantity}, useQuantity=${useQty}`);
+    const { ticketId } = verification;
 
-    // 注意: 使用枚数のチェックはShopify API側（checkinLineItem）で実際の残り枚数に基づいて行う
-    // コードに埋め込まれた quantity は参考値として扱い、Shopify上の currentQuantity を正とする
+    // Ticketsシートでチケットを取得
+    const ticketModel = new Ticket();
+    const ticket = await ticketModel.findByTicketId(ticketId);
 
-    // Shopify APIで注文情報を取得し、数量をデクリメント
-    const shopify = getShopifyService();
-    const result = await shopify.checkinLineItem(orderId, lineItemId, useQty);
+    if (!ticket) {
+      return res.status(400).json({
+        success: false,
+        error: 'チケットが見つかりません'
+      });
+    }
+
+    // 使用済みチェック
+    if (ticket.is_usable !== 'TRUE') {
+      return res.status(400).json({
+        success: false,
+        error: 'このチケットは既に使用済みです'
+      });
+    }
+
+    // チェックイン実行（is_usableをFALSEに更新）
+    await ticketModel.checkin(ticket._rowIndex);
 
     res.json({
       success: true,
       message: '受付完了',
-      orderName: result.orderName,
-      productName: result.productName,
-      variantTitle: result.variantTitle,
-      ticketQuantity: quantity,       // コードに埋め込まれた購入枚数
-      usedQuantity: useQty,           // 今回使用した枚数
-      previousQuantity: result.previousQuantity,
-      newQuantity: result.newQuantity
+      orderName: ticket.order_no,
+      productName: ticket.product_name,
+      variantTitle: ticket.variant
     });
   } catch (error) {
     console.error('Checkin error:', error);
-    
-    // ユーザーフレンドリーなエラーメッセージ
+
     let errorMessage = 'チェックイン処理中にエラーが発生しました';
-    if (error.message.includes('already 0') || error.message.includes('現在数量が0')) {
-      errorMessage = 'このチケットは既に使用済みです';
-    } else if (error.message.includes('not found') || error.message.includes('見つかりません')) {
+    if (error.message.includes('not found') || error.message.includes('見つかりません')) {
       errorMessage = '注文情報が見つかりません';
-    } else if (error.message.includes('残り枚数が足りません')) {
-      errorMessage = error.message;
     }
-    
+
     res.status(400).json({ success: false, error: errorMessage });
   }
 });

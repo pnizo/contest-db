@@ -1,5 +1,5 @@
 const BaseModel = require('./BaseModel');
-const { generateUniqueId } = require('../utils/generateId');
+const { generateUniqueId, generateTicketId } = require('../utils/generateId');
 
 class Ticket extends BaseModel {
   constructor() {
@@ -315,7 +315,7 @@ class Ticket extends BaseModel {
           is_usable = existing.is_usable === 'FALSE' ? 'FALSE' : ticket.baseData.is_usable;
         } else {
           // 新規データ（枝番増加分など）
-          id = generateUniqueId();
+          id = generateTicketId();
           owner_shopify_id = ticket.baseData.owner_shopify_id;
           reserved_seat = ticket.baseData.reserved_seat;
           is_usable = 'TRUE';  // 新規追加は常にTRUE
@@ -433,7 +433,7 @@ class Ticket extends BaseModel {
   async _appendSingleTicket(ticketData) {
     await this.ensureInitialized();
 
-    const id = generateUniqueId();
+    const id = generateTicketId();
     
     // 基本データを配列に変換
     const rowData = [
@@ -465,6 +465,28 @@ class Ticket extends BaseModel {
 
     // シートに追加
     await this.getSheetsService().appendValues(`${this.sheetName}!A:A`, [rowData]);
+  }
+
+  /**
+   * チケットIDで検索
+   * @param {number} ticketId - 数値ID
+   * @returns {Promise<Object|null>} マッチしたチケット、またはnull
+   */
+  async findByTicketId(ticketId) {
+    const allTickets = await this._getAllTicketsForMerge();
+    const ticketIdStr = ticketId.toString();
+    return allTickets.find(ticket =>
+      ticket.id && ticket.id.toString() === ticketIdStr
+    ) || null;
+  }
+
+  /**
+   * チェックイン実行（is_usableをFALSEに更新）
+   * @param {number} rowIndex - スプレッドシートの行インデックス
+   * @returns {Promise<Object>} 更新結果
+   */
+  async checkin(rowIndex) {
+    return this.updateByRowIndex(rowIndex, { is_usable: 'FALSE' });
   }
 
   /**
