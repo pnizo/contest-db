@@ -1,10 +1,12 @@
 {
-  "framework": null,
-  "buildCommand": "",
-  "installCommand": "npm install",
-  "rewrites": [
-    { "source": "/api/(.*)", "destination": "/server.js" },
-    { "source": "/(styles\\.css|.*-script\\.js|.*\\.html|.*\\.png|.*\\.jpg|.*\\.jpeg|.*\\.gif|.*\\.svg|.*\\.ico|favicon\\.ico)", "destination": "/public/$1" },
-    { "source": "/(.*)", "destination": "/server.js" }
+  "version": 2,
+  "builds": [
+    { "src": "server.js", "use": "@vercel/node" },
+    { "src": "public/**", "use": "@vercel/static" }
+  ],
+  "routes": [
+    { "src": "/api/(.*)", "dest": "/server.js" },
+    { "src": "/(styles\\.css|.*-script\\.js|.*\\.html|.*\\.png|.*\\.jpg|.*\\.jpeg|.*\\.gif|.*\\.svg|.*\\.ico|favicon\\.ico)", "dest": "/public/$1" },
+    { "src": "/(.*)", "dest": "/server.js" }
   ]
 }
