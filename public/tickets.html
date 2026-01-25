@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>チケット管理 - スプレッドシートDB</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <div id="authHeader" class="auth-header" style="display: none;">
+            <div class="user-info-display">
+                <div class="user-avatar" id="userAvatar"></div>
+                <div class="user-details-display">
+                    <div class="name" id="userName"></div>
+                    <div class="role" id="userRole"></div>
+                </div>
+            </div>
+            <div class="auth-actions">
+                <nav class="page-nav">
+                    <a href="/users" class="nav-link">ユーザー</a>
+
+                    <div class="nav-dropdown">
+                        <button class="nav-link dropdown-toggle">大会運営 <span class="dropdown-arrow">▼</span></button>
+                        <div class="dropdown-menu">
+                            <a href="/contests" class="dropdown-item">コンテスト情報</a>
+                            <a href="/registrations" class="dropdown-item">出場登録</a>
+                            <a href="/scores" class="dropdown-item">大会成績</a>
+                            <a href="/notes" class="dropdown-item">特記事項</a>
+                            <a href="/subjects" class="dropdown-item admin-only">違反認定者</a>
+                        </div>
+                    </div>
+
+                    <div class="nav-dropdown">
+                        <button class="nav-link dropdown-toggle active">入場管理 <span class="dropdown-arrow">▼</span></button>
+                        <div class="dropdown-menu">
+                            <a href="/guests" class="dropdown-item">関係者チケット</a>
+                            <a href="/tickets" class="dropdown-item active">チケット管理</a>
+                            <a href="/members" class="dropdown-item">FWJ会員情報</a>
+                            <a href="/orders" class="dropdown-item">注文検索</a>
+                        </div>
+                    </div>
+                </nav>
+                <a href="/manual.html" target="_blank" class="manual-link">マニュアル</a>
+                <button id="logoutBtn" class="logout-btn">ログアウト</button>
+            </div>
+        </div>
+
+        <main class="tickets-main">
+            <section class="tickets-section">
+                <h2>チケット管理</h2>
+                <div class="section-controls">
+                    <div class="controls">
+                        <div class="search-container">
+                            <div class="search-input-wrapper">
+                                <input type="text" id="searchInput" placeholder="氏名・メール・注文番号・座席番号で検索..." class="search-input">
+                                <button type="button" id="clearSearchBtn" class="clear-btn hidden" title="検索をクリア">×</button>
+                            </div>
+                            <button type="button" id="searchBtn" class="search-btn" title="検索">検索</button>
+                        </div>
+                        <div class="control-buttons admin-only">
+                            <button id="importBtn">Shopifyインポート</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="filters">
+                    <div class="filter-row">
+                        <select id="productFilter" class="filter-select">
+                            <option value="">商品名を選択</option>
+                        </select>
+                        <select id="financialStatusFilter" class="filter-select">
+                            <option value="">支払いステータス</option>
+                        </select>
+                        <input type="text" id="shopifyIdFilter" placeholder="Shopify ID" class="filter-input">
+                        <div class="filter-checkbox">
+                            <input type="checkbox" id="validOnlyFilter">
+                            <label for="validOnlyFilter">有効のみ表示</label>
+                        </div>
+                        <div class="filter-actions">
+                            <button id="applyFiltersBtn" class="filter-btn">絞り込み</button>
+                            <button id="clearFiltersBtn" class="filter-btn">クリア</button>
+                        </div>
+                    </div>
+                </div>
+                
+                <div id="ticketsTableContainer" class="table-scroll-container">
+                    <div class="loading">読み込み中...</div>
+                </div>
+                
+                <div id="pagination" class="pagination hidden">
+                    <button id="prevPageBtn" class="pagination-btn">前へ</button>
+                    <span id="pageInfo" class="page-info">ページ 1 / 1 (全 0 件)</span>
+                    <button id="nextPageBtn" class="pagination-btn">次へ</button>
+                </div>
+            </section>
+        </main>
+
+        <div id="notification" class="notification hidden"></div>
+    </div>
+
+    <!-- Edit Modal -->
+    <div id="editModal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>チケット編集</h2>
+                <button class="modal-close" onclick="ticketsManager.closeEditModal()">&times;</button>
+            </div>
+            <div class="modal-form">
+                <div class="form-group">
+                    <label>注文番号:</label>
+                    <span id="editOrderNo" class="form-value"></span>
+                </div>
+                <div class="form-group">
+                    <label>注文日時:</label>
+                    <span id="editOrderDate" class="form-value"></span>
+                </div>
+                <div class="form-group">
+                    <label>購入者名:</label>
+                    <span id="editFullName" class="form-value"></span>
+                </div>
+                <div class="form-group">
+                    <label>商品名:</label>
+                    <span id="editProductName" class="form-value"></span>
+                </div>
+                <div class="form-group">
+                    <label>バリエーション:</label>
+                    <span id="editVariant" class="form-value"></span>
+                </div>
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="editIsUsable">
+                        有効なチケット
+                    </label>
+                    <small>※チェックを外すとチケットが無効になります</small>
+                </div>
+                <div class="form-group">
+                    <label for="editOwnerShopifyId">所有者 Shopify ID:</label>
+                    <input type="text" id="editOwnerShopifyId" class="form-input">
+                    <small>※チケットを譲渡する場合に変更してください</small>
+                </div>
+                <div class="form-group">
+                    <label for="editReservedSeat">指定席番号:</label>
+                    <input type="text" id="editReservedSeat" class="form-input">
+                    <small>※座席指定がある場合に入力してください</small>
+                </div>
+                <input type="hidden" id="editRowIndex">
+                <div class="form-actions">
+                    <button type="button" onclick="ticketsManager.closeEditModal()" class="btn btn-secondary">キャンセル</button>
+                    <button type="button" id="saveEditBtn" class="btn btn-primary">保存</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Import Modal -->
+    <div id="importModal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Shopifyインポート</h2>
+                <button class="modal-close" onclick="ticketsManager.closeImportModal()">&times;</button>
+            </div>
+            <div class="modal-form">
+                <p class="modal-description">Shopifyから「観戦チケット」タグを持つ注文をインポートします。</p>
+                <div class="form-group">
+                    <label for="importTag">検索タグ:</label>
+                    <input type="text" id="importTag" value="観戦チケット" class="form-input">
+                    <small>※Shopifyの注文タグで検索します</small>
+                </div>
+                <div class="form-group">
+                    <label for="importMonthsAgo">取得期間（月数）:</label>
+                    <input type="number" id="importMonthsAgo" value="6" min="1" max="24" class="form-input">
+                    <small>※何ヶ月前からの注文を取得するか指定します</small>
+                </div>
+                <div class="form-warning">
+                    <strong>注意:</strong> インポートを実行すると、既存のTicketsシートのデータは上書きされます。
+                </div>
+                <div class="form-actions">
+                    <button type="button" onclick="ticketsManager.closeImportModal()" class="btn btn-secondary">キャンセル</button>
+                    <button type="button" id="executeImportBtn" class="btn btn-primary">インポート実行</button>
+                </div>
+                <div id="importStatus" class="import-status hidden"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div id="deleteModal" class="modal hidden">
+        <div class="modal-content modal-small">
+            <div class="modal-header">
+                <h2>削除確認</h2>
+                <button class="modal-close" onclick="ticketsManager.closeDeleteModal()">&times;</button>
+            </div>
+            <div class="modal-form">
+                <p>このチケットを削除してもよろしいですか？</p>
+                <p class="delete-info">
+                    <strong>注文番号:</strong> <span id="deleteOrderNo"></span><br>
+                    <strong>商品名:</strong> <span id="deleteProductName"></span>
+                </p>
+                <input type="hidden" id="deleteRowIndex">
+                <div class="form-actions">
+                    <button type="button" onclick="ticketsManager.closeDeleteModal()" class="btn btn-secondary">キャンセル</button>
+                    <button type="button" id="confirmDeleteBtn" class="btn btn-danger">削除</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="tickets-script.js"></script>
+</body>
+</html>

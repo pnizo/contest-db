@@ -1903,6 +1903,73 @@ input[type="file"]:hover {
     display: none;
 }
 
+/* ドロップダウンメニュー */
+.nav-dropdown {
+    position: relative;
+    display: inline-block;
+}
+
+.dropdown-toggle {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: inherit;
+    font-family: inherit;
+    padding: 8px 16px;
+    color: #2c3e50;
+    font-weight: 500;
+    border-radius: 4px;
+    transition: background-color 0.2s;
+}
+
+.dropdown-toggle:hover {
+    background-color: #ecf0f1;
+}
+
+.dropdown-toggle.active {
+    background-color: #3498db;
+    color: white;
+}
+
+.dropdown-arrow {
+    font-size: 10px;
+    margin-left: 4px;
+}
+
+.dropdown-menu {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    min-width: 160px;
+    z-index: 1000;
+}
+
+.nav-dropdown:hover .dropdown-menu {
+    display: block;
+}
+
+.dropdown-item {
+    display: block;
+    padding: 10px 16px;
+    color: #2c3e50;
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+.dropdown-item:hover {
+    background-color: #ecf0f1;
+}
+
+.dropdown-item.active {
+    background-color: #3498db;
+    color: white;
+}
+
 /* Checkbox label alignment */
 .form-group label input[type="checkbox"] {
     vertical-align: middle;

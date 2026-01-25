@@ -952,6 +952,324 @@ class ShopifyService {
       throw error;
     }
   }
+
+  /**
+   * 観戦チケットタグを持つ注文を取得
+   * @param {string} tag - 検索するタグ（デフォルト: "観戦チケット"）
+   * @param {number} monthsAgo - 何ヶ月前からの注文を取得するか（デフォルト: 6）
+   * @returns {Promise<Array>} 注文リスト
+   */
+  async getTicketOrders(tag = '観戦チケット', monthsAgo = 6) {
+    try {
+      // 指定月数前の日付を計算
+      const sinceDate = new Date();
+      sinceDate.setMonth(sinceDate.getMonth() - monthsAgo);
+      const dateStr = sinceDate.toISOString().split('T')[0];
+
+      console.log(`Fetching ticket orders with tag: "${tag}", since: ${dateStr}`);
+
+      // タグと日付でクエリを構築
+      const tagQuery = tag.includes(' ') || tag.includes(':') ? `"${tag}"` : tag;
+      const searchQuery = `tag:${tagQuery} created_at:>${dateStr}`;
+
+      console.log(`Ticket order search query: ${searchQuery}`);
+
+      const allOrders = [];
+      let pageInfo = null;
+      let hasNextPage = true;
+      let pageCount = 0;
+
+      while (hasNextPage) {
+        pageCount++;
+        const query = `
+          query getOrders($query: String!, $first: Int!, $after: String) {
+            orders(first: $first, query: $query, after: $after) {
+              edges {
+                node {
+                  id
+                  name
+                  createdAt
+                  totalPriceSet {
+                    shopMoney {
+                      amount
+                      currencyCode
+                    }
+                  }
+                  displayFinancialStatus
+                  displayFulfillmentStatus
+                  tags
+                  customer {
+                    id
+                    email
+                    firstName
+                    lastName
+                  }
+                  lineItems(first: 100) {
+                    edges {
+                      node {
+                        id
+                        title
+                        variantTitle
+                        quantity
+                        currentQuantity
+                        originalUnitPriceSet {
+                          shopMoney {
+                            amount
+                            currencyCode
+                          }
+                        }
+                        product {
+                          tags
+                        }
+                      }
+                    }
+                  }
+                }
+                cursor
+              }
+              pageInfo {
+                hasNextPage
+                endCursor
+              }
+            }
+          }
+        `;
+
+        const variables = {
+          query: searchQuery,
+          first: 250,
+          after: pageInfo
+        };
+
+        console.log(`Ticket API call #${pageCount}, fetching up to 250 orders...`);
+
+        const response = await this.makeRequest('/graphql.json', {
+          method: 'POST',
+          body: JSON.stringify({ query, variables })
+        });
+
+        if (response.errors) {
+          console.error('Shopify GraphQL errors:', JSON.stringify(response.errors, null, 2));
+          throw new Error(`Shopify GraphQL error: ${response.errors.map(e => e.message).join(', ')}`);
+        }
+
+        const ordersInBatch = response.data?.orders?.edges?.length || 0;
+        console.log(`Ticket API call #${pageCount} received ${ordersInBatch} orders`);
+
+        if (response.data && response.data.orders) {
+          const orders = response.data.orders.edges.map(edge => edge.node);
+          allOrders.push(...orders);
+
+          const { hasNextPage: hasNext, endCursor } = response.data.orders.pageInfo;
+          hasNextPage = hasNext;
+          pageInfo = endCursor;
+
+          console.log(`Total ticket orders fetched so far: ${allOrders.length}, hasNextPage: ${hasNextPage}`);
+        } else {
+          console.log('No orders data in response:', JSON.stringify(response, null, 2));
+          hasNextPage = false;
+        }
+      }
+
+      console.log(`Ticket order fetch completed: ${allOrders.length} orders in ${pageCount} API calls`);
+      return allOrders;
+    } catch (error) {
+      console.error('Error fetching ticket orders:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * 注文データをTicketシート形式に変換
+   * quantity分の行を生成し、currentQuantity分はis_usable=TRUE、残りはFALSE
+   * @param {object} order - Shopify注文データ
+   * @returns {Array<object>} Ticketシート行データの配列
+   */
+  formatOrderForTicketSheet(order) {
+    const orderId = order.id.replace('gid://shopify/Order/', '');
+    const orderName = order.name || '';
+    const createdAt = order.createdAt ? new Date(order.createdAt).toLocaleString('ja-JP') : '';
+    const customerId = order.customer?.id?.replace('gid://shopify/Customer/', '') || '';
+    const customerName = order.customer
+      ? `${order.customer.lastName || ''} ${order.customer.firstName || ''}`.trim()
+      : '';
+    const customerEmail = order.customer?.email || '';
+    const totalPrice = order.totalPriceSet?.shopMoney?.amount || '';
+    const financialStatus = this.translateFinancialStatus(order.displayFinancialStatus);
+    const fulfillmentStatus = this.translateFulfillmentStatus(order.displayFulfillmentStatus);
+    const orderTags = order.tags || [];
+
+    const lineItems = order.lineItems?.edges || [];
+    const rows = [];
+
+    // 各LineItemを処理
+    lineItems.forEach(edge => {
+      const item = edge.node;
+      const lineItemId = item.id ? item.id.replace('gid://shopify/LineItem/', '') : '';
+      const price = item.originalUnitPriceSet?.shopMoney?.amount || '';
+      const quantity = item.quantity || 0;
+      const currentQuantity = item.currentQuantity || 0;
+
+      // quantity分だけ行を生成
+      // currentQuantity分はis_usable=TRUE、残りはis_usable=FALSE
+      for (let i = 0; i < quantity; i++) {
+        const isValid = i < currentQuantity ? 'TRUE' : 'FALSE';
+        rows.push({
+          baseData: {
+            order_no: orderName,
+            order_date: createdAt,
+            shopify_id: customerId,
+            full_name: customerName,
+            email: customerEmail,
+            total_price: totalPrice,
+            financial_status: financialStatus,
+            fulfillment_status: fulfillmentStatus,
+            product_name: item.title || '',
+            variant: item.variantTitle || '',
+            price: price,
+            line_item_id: lineItemId,
+            item_sub_no: i + 1,           // 枝番（1から開始）
+            owner_shopify_id: customerId, // 初期値は購入者のshopify_id
+            reserved_seat: '',            // 初期値は空欄
+            is_usable: isValid
+          },
+          tags: orderTags
+        });
+      }
+    });
+
+    // LineItemがない場合は1行（タグのみ）
+    if (rows.length === 0) {
+      rows.push({
+        baseData: {
+          order_no: orderName,
+          order_date: createdAt,
+          shopify_id: customerId,
+          full_name: customerName,
+          email: customerEmail,
+          total_price: totalPrice,
+          financial_status: financialStatus,
+          fulfillment_status: fulfillmentStatus,
+          product_name: '',
+          variant: '',
+          price: '',
+          line_item_id: '',
+          item_sub_no: 1,
+          owner_shopify_id: customerId,
+          reserved_seat: '',
+          is_usable: 'TRUE'
+        },
+        tags: orderTags
+      });
+    }
+
+    return rows;
+  }
+
+  /**
+   * Webhook署名を検証
+   * @param {Buffer} body - リクエストボディ（raw）
+   * @param {string} hmac - X-Shopify-Hmac-SHA256ヘッダーの値
+   * @returns {boolean} 署名が有効かどうか
+   */
+  verifyWebhookSignature(body, hmac) {
+    if (!hmac) return false;
+    
+    const secret = process.env.SHOPIFY_WEBHOOK_SECRET;
+    if (!secret) {
+      console.error('[Webhook] SHOPIFY_WEBHOOK_SECRET is not set');
+      return false;
+    }
+
+    const crypto = require('crypto');
+    const hash = crypto
+      .createHmac('sha256', secret)
+      .update(body, 'utf8')
+      .digest('base64');
+    
+    return hash === hmac;
+  }
+
+  /**
+   * Webhook形式の注文データをTicket形式に変換
+   * REST API形式（Webhook）からGraphQL形式に近い構造に変換し、
+   * 既存のformatOrderForTicketSheet()を再利用
+   * @param {Object} order - Webhook経由で受信した注文データ（REST API形式）
+   * @returns {Array} Ticket形式のデータ配列
+   */
+  formatWebhookOrderForTicket(order) {
+    // REST API形式のデータをGraphQL形式に変換
+    const graphqlLikeOrder = {
+      id: `gid://shopify/Order/${order.id}`,
+      name: order.name,
+      createdAt: order.created_at,
+      customer: order.customer ? {
+        id: `gid://shopify/Customer/${order.customer.id}`,
+        firstName: order.customer.first_name,
+        lastName: order.customer.last_name,
+        email: order.customer.email
+      } : null,
+      totalPriceSet: {
+        shopMoney: {
+          amount: order.total_price
+        }
+      },
+      displayFinancialStatus: this._mapFinancialStatus(order.financial_status),
+      displayFulfillmentStatus: this._mapFulfillmentStatus(order.fulfillment_status),
+      tags: order.tags ? order.tags.split(', ') : [],
+      lineItems: {
+        edges: (order.line_items || []).map(item => ({
+          node: {
+            id: `gid://shopify/LineItem/${item.id}`,
+            title: item.title,
+            variantTitle: item.variant_title,
+            quantity: item.quantity,
+            currentQuantity: item.quantity - (item.fulfillable_quantity !== undefined ? 
+              (item.quantity - item.fulfillable_quantity) : 0),
+            originalUnitPriceSet: {
+              shopMoney: {
+                amount: item.price
+              }
+            }
+          }
+        }))
+      }
+    };
+
+    // 既存のメソッドを使用してTicket形式に変換
+    return this.formatOrderForTicketSheet(graphqlLikeOrder);
+  }
+
+  /**
+   * REST API形式のfinancial_statusをGraphQL形式にマッピング
+   * @private
+   */
+  _mapFinancialStatus(status) {
+    const mapping = {
+      'pending': 'PENDING',
+      'authorized': 'AUTHORIZED',
+      'partially_paid': 'PARTIALLY_PAID',
+      'paid': 'PAID',
+      'partially_refunded': 'PARTIALLY_REFUNDED',
+      'refunded': 'REFUNDED',
+      'voided': 'VOIDED'
+    };
+    return mapping[status] || status?.toUpperCase() || 'PENDING';
+  }
+
+  /**
+   * REST API形式のfulfillment_statusをGraphQL形式にマッピング
+   * @private
+   */
+  _mapFulfillmentStatus(status) {
+    const mapping = {
+      null: null,
+      'fulfilled': 'FULFILLED',
+      'partial': 'PARTIALLY_FULFILLED',
+      'restocked': 'RESTOCKED'
+    };
+    return mapping[status] || status?.toUpperCase() || null;
+  }
 }
 
 module.exports = ShopifyService;

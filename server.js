@@ -16,6 +16,8 @@ const guestRoutes = require('./routes/guests');
 const memberRoutes = require('./routes/members');
 const orderRoutes = require('./routes/orders');
 const checkinRoutes = require('./routes/checkin');
+const ticketRoutes = require('./routes/tickets');
+const webhookRoutes = require('./routes/webhooks');
 const { checkAuth, requireIpRestriction } = require('./middleware/auth');
 const { sessionCompatibility } = require('./middleware/jwt');
 
@@ -24,6 +26,10 @@ const PORT = process.env.PORT || 3000;
 
 // プロキシ信頼設定（Vercel、Cloudflare等で必要）
 app.set('trust proxy', true);
+
+// Webhook用にraw bodyを保持（署名検証に必要）
+// 他のbody parserより先に設定する必要がある
+app.use('/api/webhooks', express.raw({ type: 'application/json' }));
 
 app.use(cors({
   origin: process.env.NODE_ENV === 'production' ? process.env.VERCEL_URL : 'http://localhost:3000',
@@ -100,6 +106,7 @@ app.use('/api/contests', requireIpRestriction);
 app.use('/api/guests', requireIpRestriction);
 app.use('/api/members', requireIpRestriction);
 app.use('/api/orders', requireIpRestriction);
+app.use('/api/tickets', requireIpRestriction);
 
 // セッション互換性ミドルウェア（JWT対応）
 app.use(sessionCompatibility);
@@ -149,6 +156,10 @@ app.get('/orders', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'orders.html'));
 });
 
+app.get('/tickets', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'tickets.html'));
+});
+
 // チェックインページ（認証チェックはフロントエンドで行う）
 app.get('/checkin', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'checkin.html'));
@@ -172,9 +183,13 @@ app.use('/api/contests', contestRoutes);
 app.use('/api/guests', guestRoutes);
 app.use('/api/members', memberRoutes);
 app.use('/api/orders', orderRoutes);
+app.use('/api/tickets', ticketRoutes);
 
 // チェックインAPI（認証不要・IP制限なし）
 app.use('/api/checkin', checkinRoutes);
+
+// Shopify Webhook（認証不要・IP制限なし - HMAC署名で検証）
+app.use('/api/webhooks', webhookRoutes);
 
 app.use((err, req, res, next) => {
   console.error(err.stack);

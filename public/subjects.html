@@ -19,16 +19,29 @@
             <div class="auth-actions">
                 <nav class="page-nav">
                     <a href="/users" class="nav-link">ユーザー</a>
-                    <a href="/scores" class="nav-link">大会成績</a>
-                    <a href="/registrations" class="nav-link">出場登録</a>
-                    <a href="/notes" class="nav-link">特記事項</a>
-                    <a href="/guests" class="nav-link">関係者チケット</a>
-                    <a href="/contests" class="nav-link">大会情報</a>
-                    <a href="/members" class="nav-link">FWJ会員情報</a>
-                    <a href="/orders" class="nav-link">注文検索</a>
-                    <a href="/subjects" class="nav-link admin-only active">違反認定者</a>
+
+                    <div class="nav-dropdown">
+                        <button class="nav-link dropdown-toggle active">大会運営 <span class="dropdown-arrow">▼</span></button>
+                        <div class="dropdown-menu">
+                            <a href="/contests" class="dropdown-item">コンテスト情報</a>
+                            <a href="/registrations" class="dropdown-item">出場登録</a>
+                            <a href="/scores" class="dropdown-item">大会成績</a>
+                            <a href="/notes" class="dropdown-item">特記事項</a>
+                            <a href="/subjects" class="dropdown-item admin-only active">違反認定者</a>
+                        </div>
+                    </div>
+
+                    <div class="nav-dropdown">
+                        <button class="nav-link dropdown-toggle">入場管理 <span class="dropdown-arrow">▼</span></button>
+                        <div class="dropdown-menu">
+                            <a href="/guests" class="dropdown-item">関係者チケット</a>
+                            <a href="/tickets" class="dropdown-item">チケット管理</a>
+                            <a href="/members" class="dropdown-item">FWJ会員情報</a>
+                            <a href="/orders" class="dropdown-item">注文検索</a>
+                        </div>
+                    </div>
                 </nav>
-                <a href="/manual.html" target="_blank" class="manual-link">📘 マニュアル</a>
+                <a href="/manual.html" target="_blank" class="manual-link">マニュアル</a>
                 <button id="logoutBtn" class="logout-btn">ログアウト</button>
             </div>
         </div>
