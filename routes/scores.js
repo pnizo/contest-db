@@ -519,12 +519,12 @@ router.post('/import', requireAuth, async (req, res) => {
 // 複数のFWJカード番号の成績データをテキスト形式で取得
 router.get('/text/multiple', async (req, res) => {
   try {
-    const { fwjNos, id } = req.query;
+    const { fwjNos, shopify_id } = req.query;
     const sortBy = req.query.sort || 'contest_date';
     const sortOrder = req.query.order || 'desc';
     
-    if (!fwjNos && !id) {
-      return res.status(400).json({ success: false, error: 'fwjNosまたはidパラメータが必要です' });
+    if (!fwjNos && !shopify_id) {
+      return res.status(400).json({ success: false, error: 'fwjNosまたはshopify_idパラメータが必要です' });
     }
     
     // 全成績を取得
@@ -542,13 +542,13 @@ router.get('/text/multiple', async (req, res) => {
       }
     }
     
-    // idによる絞り込み（単一IDのみ）
-    if (id) {
-      const idScore = allScores.find(score => 
-        score.fwj_card_no && score.fwj_card_no.toString() === id.toString()
+    // shopify_idによる絞り込み（fwj_card_noと一致するすべての成績を取得）
+    if (shopify_id) {
+      const shopifyIdScores = allScores.filter(score => 
+        score.fwj_card_no && score.fwj_card_no.toString() === shopify_id.toString()
       );
-      if (idScore) {
-        targetScores = targetScores.concat([idScore]);
+      if (shopifyIdScores.length > 0) {
+        targetScores = targetScores.concat(shopifyIdScores);
       }
     }
     
@@ -558,11 +558,11 @@ router.get('/text/multiple', async (req, res) => {
     );
     
     if (uniqueScores.length === 0) {
-      const errorMsg = fwjNos && id ? 
-        `指定されたFWJ番号 [${fwjNos}] または ID ${id} の成績が見つかりません` :
+      const errorMsg = fwjNos && shopify_id ? 
+        `指定されたFWJ番号 [${fwjNos}] または Shopify ID ${shopify_id} の成績が見つかりません` :
         fwjNos ? 
         `指定されたFWJ番号 [${fwjNos}] の成績が見つかりません` :
-        `指定されたID ${id} の成績が見つかりません`;
+        `指定されたShopify ID ${shopify_id} の成績が見つかりません`;
       
       return res.status(404).json({ 
         success: false, 
