@@ -49,7 +49,9 @@ router.post('/verify', async (req, res) => {
       orderName: ticket.order_no,
       productName: ticket.product_name,
       variantTitle: ticket.variant,
-      isUsable: ticket.is_usable === 'TRUE'
+      isUsable: ticket.is_usable === 'TRUE',
+      reservedSeat: ticket.reserved_seat,
+      usedAt: ticket.used_at
     });
   } catch (error) {
     console.error('Verify error:', error);

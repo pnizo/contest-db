@@ -45,6 +45,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const confirmOrderName = document.getElementById('confirmOrderName');
   const confirmProductName = document.getElementById('confirmProductName');
   const confirmCurrentQuantity = document.getElementById('confirmCurrentQuantity');
+  const confirmSeatInfo = document.getElementById('confirmSeatInfo');
+  const confirmUsedAt = document.getElementById('confirmUsedAt');
+  const usedAtLabel = document.getElementById('usedAtLabel');
   const confirmBtn = document.getElementById('confirmBtn');
   const cancelBtn = document.getElementById('cancelBtn');
 
@@ -175,6 +178,13 @@ document.addEventListener('DOMContentLoaded', () => {
       confirmProductName.innerHTML = `<strong>${escapeHtml(data.productName)}</strong>`;
     }
 
+    // 座席情報を表示
+    if (data.reservedSeat && data.reservedSeat.trim() !== '') {
+      confirmSeatInfo.textContent = '座席: ' + data.reservedSeat;
+    } else {
+      confirmSeatInfo.textContent = '自由席';
+    }
+
     // 使用可否を表示
     if (data.isUsable) {
       confirmCurrentQuantity.textContent = '使用可能';
@@ -182,12 +192,21 @@ document.addEventListener('DOMContentLoaded', () => {
       confirmBtn.disabled = false;
       confirmBtn.textContent = 'チェックイン実行';
       confirmBtn.style.background = '';
+      // 使用日時は非表示
+      usedAtLabel.style.display = 'none';
+      confirmUsedAt.style.display = 'none';
     } else {
       confirmCurrentQuantity.textContent = '使用済み';
       confirmCurrentQuantity.style.color = '#e74c3c';
       confirmBtn.disabled = true;
       confirmBtn.textContent = 'このチケットは使用済みです';
       confirmBtn.style.background = '#bdc3c7';
+      // 使用日時を表示
+      if (data.usedAt) {
+        usedAtLabel.style.display = 'block';
+        confirmUsedAt.style.display = 'block';
+        confirmUsedAt.textContent = new Date(data.usedAt).toLocaleString('ja-JP');
+      }
     }
 
     form.style.display = 'none';
