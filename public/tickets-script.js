@@ -276,7 +276,8 @@ class TicketsManager {
             { key: 'price', label: '単価', sortable: true },
             { key: 'financial_status', label: '支払い', sortable: true },
             { key: 'owner_shopify_id', label: '所有者ID', sortable: true },
-            { key: 'reserved_seat', label: '座席番号', sortable: true }
+            { key: 'reserved_seat', label: '座席番号', sortable: true },
+            { key: 'used_at', label: '使用日時', sortable: true }
         ];
 
         // 管理者の場合は操作列を追加
@@ -358,6 +359,11 @@ class TicketsManager {
         // 列幅リサイズ機能を初期化
         if (window.ColumnResize) {
             ColumnResize.init(table, 'tickets-column-widths');
+        }
+
+        // ソート機能を初期化
+        if (window.TableSort) {
+            TableSort.init(table);
         }
     }
 

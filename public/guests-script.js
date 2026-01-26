@@ -418,6 +418,11 @@ class GuestsManager {
         if (window.ColumnResize) {
             ColumnResize.init(table, 'guests-column-widths');
         }
+
+        // ソート機能を初期化
+        if (window.TableSort) {
+            TableSort.init(table);
+        }
     }
 
     getSortIcon(column) {

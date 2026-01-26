@@ -460,6 +460,11 @@ class NotesManager {
         if (window.ColumnResize) {
             ColumnResize.init(table, 'notes-column-widths');
         }
+
+        // ソート機能を初期化
+        if (window.TableSort) {
+            TableSort.init(table);
+        }
     }
 
     createActionButtons(note) {

@@ -189,6 +189,11 @@ class OrdersManager {
         if (window.ColumnResize) {
             ColumnResize.init(table, 'orders-column-widths');
         }
+
+        // ソート機能を初期化
+        if (window.TableSort) {
+            TableSort.init(table);
+        }
     }
 
     updateResultSummary(orderCount, rowCount) {
@@ -378,6 +383,11 @@ class OrdersManager {
         // 列幅リサイズ機能を初期化
         if (window.ColumnResize) {
             ColumnResize.init(table, 'orders-column-widths');
+        }
+
+        // ソート機能を初期化
+        if (window.TableSort) {
+            TableSort.init(table);
         }
     }
 }

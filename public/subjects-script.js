@@ -433,6 +433,11 @@ class SubjectManager {
         if (window.ColumnResize) {
             ColumnResize.init(table, 'subjects-column-widths');
         }
+
+        // ソート機能を初期化
+        if (window.TableSort) {
+            TableSort.init(table);
+        }
     }
 
     async editSubject(id) {

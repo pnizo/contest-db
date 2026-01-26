@@ -611,6 +611,11 @@ class ScoresManager {
             ColumnResize.init(table, 'scores-column-widths');
         }
 
+        // ソート機能を初期化
+        if (window.TableSort && table) {
+            TableSort.init(table);
+        }
+
         // ソートイベントリスナーを追加
         this.addSortEventListeners();
     }

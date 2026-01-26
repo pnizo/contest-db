@@ -30,6 +30,7 @@ class Ticket {
       is_usable: row.isUsable ? 'TRUE' : 'FALSE',
       owner_shopify_id: row.ownerShopifyId,
       reserved_seat: row.reservedSeat,
+      used_at: row.usedAt,
       created_at: row.createdAt,
       updated_at: row.updatedAt,
       tags: row.tags || [],
@@ -245,6 +246,7 @@ class Ticket {
         reserved_seat: 'reservedSeat',
         financial_status: 'financialStatus',
         fulfillment_status: 'fulfillmentStatus',
+        used_at: 'usedAt',
       };
 
       const updateData = { updatedAt: new Date() };
@@ -286,12 +288,12 @@ class Ticket {
   }
 
   /**
-   * チェックイン実行（is_usableをfalseに更新）
+   * チェックイン実行（is_usableをfalseに更新し、used_atに現在時刻を記録）
    * @param {number} id - チケットID
    * @returns {Promise<Object>} 更新結果
    */
   async checkin(id) {
-    return this.updateById(id, { is_usable: 'FALSE' });
+    return this.updateById(id, { is_usable: 'FALSE', used_at: new Date() });
   }
 
   /**

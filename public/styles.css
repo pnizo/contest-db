@@ -1553,8 +1553,8 @@ input[type="file"]:hover {
 
 /* テーブル内スクロール用のスタイル */
 .table-scroll-container table {
-    width: 100%;
-    min-width: 1200px; /* 最小幅を設定して横スクロールを有効化 */
+    width: max-content; /* 内容に応じた幅で全項目を表示 */
+    min-width: 100%; /* 最低でもコンテナ幅は確保 */
     border-collapse: collapse;
     margin: 0;
 }
@@ -1632,7 +1632,8 @@ input[type="file"]:hover {
     }
     
     .table-scroll-container table {
-        min-width: 800px; /* モバイルではより小さい最小幅 */
+        width: max-content; /* モバイルでも内容に応じた幅 */
+        min-width: 100%;
     }
     
     .table-scroll-container th,
@@ -2319,4 +2320,30 @@ input[type="file"]:hover {
         flex-direction: column;
         gap: 10px;
     }
+}
+
+/* テーブルソート機能のスタイル */
+.data-table th.sortable {
+    cursor: pointer;
+    user-select: none;
+    transition: background-color 0.2s;
+}
+
+.data-table th.sortable:hover {
+    background-color: #e9ecef;
+}
+
+.data-table th.sortable.sorted {
+    background-color: #e3f2fd;
+}
+
+.data-table th.sortable .sort-indicator {
+    display: inline-block;
+    margin-left: 5px;
+    font-size: 12px;
+    transition: opacity 0.2s;
+}
+
+.data-table th.sortable:hover .sort-indicator {
+    opacity: 0.7 !important;
 }

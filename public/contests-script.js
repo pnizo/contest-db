@@ -376,6 +376,11 @@ class ContestsManager {
             ColumnResize.init(table, 'contests-column-widths');
         }
 
+        // ソート機能を初期化
+        if (window.TableSort) {
+            TableSort.init(table);
+        }
+
         // 保存された列幅を復元
         this.restoreColumnWidths(table);
     }
