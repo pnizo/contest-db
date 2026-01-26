@@ -1,157 +1,268 @@
-const BaseModel = require('./BaseModel');
+const { getDb } = require('../lib/db');
+const { members } = require('../lib/db/schema');
+const { eq, ilike, and, desc, asc, sql, isNotNull, ne } = require('drizzle-orm');
 
-class Member extends BaseModel {
-  constructor() {
-    super('Members');
+/**
+ * Memberモデル - Neon Postgres / Drizzle ORM版
+ */
+class Member {
+  /**
+   * DBのcamelCaseをAPI用のsnake_caseに変換
+   * @private
+   */
+  _toSnakeCase(row) {
+    if (!row) return null;
+    return {
+      id: row.id,
+      shopify_id: row.shopifyId,
+      email: row.email,
+      first_name: row.firstName,
+      last_name: row.lastName,
+      phone: row.phone,
+      tags: row.tags,
+      address1: row.address1,
+      address2: row.address2,
+      city: row.city,
+      province: row.province,
+      zip: row.zip,
+      country: row.country,
+      fwj_effectivedate: row.fwjEffectiveDate,
+      fwj_birthday: row.fwjBirthday,
+      fwj_card_no: row.fwjCardNo,
+      fwj_nationality: row.fwjNationality,
+      fwj_sex: row.fwjSex,
+      fwj_firstname: row.fwjFirstName,
+      fwj_lastname: row.fwjLastName,
+      fwj_kanafirstname: row.fwjKanaFirstName,
+      fwj_kanalastname: row.fwjKanaLastName,
+      fwj_height: row.fwjHeight,
+      fwj_weight: row.fwjWeight,
+      created_at: row.createdAt,
+      updated_at: row.updatedAt,
+    };
   }
 
-  // Override findAll to skip isValid filtering since Members sheet doesn't have isValid column
+  /**
+   * 全メンバーを取得（emailがnullでないレコードのみ）
+   * @returns {Promise<Array>} メンバー配列
+   */
   async findAll() {
     try {
-      await this.ensureInitialized();
-      const values = await this.getSheetsService().getValues(`${this.sheetName}!A:Z`);
-      if (values.length === 0) return [];
+      const db = getDb();
+      const rows = await db
+        .select()
+        .from(members)
+        .where(and(
+          isNotNull(members.email),
+          ne(members.email, '')
+        ))
+        .orderBy(desc(members.createdAt));
 
-      const headers = values[0];
-      const data = values.slice(1);
-
-      const allItems = data.map((row, index) => {
-        const obj = { _rowIndex: index + 2 };
-        headers.forEach((header, i) => {
-          obj[header] = row[i] || '';
-        });
-        return obj;
-      });
-
-      // Return all items with valid email
-      return allItems.filter(item => item.email && item.email.trim() !== '');
+      return rows.map(row => this._toSnakeCase(row));
     } catch (error) {
       console.error('Error in findAll:', error);
       return [];
     }
   }
 
-  // ページング付きで取得
+  /**
+   * ページング・フィルタリング・ソート付きでメンバーを取得
+   */
   async findWithPaging(page = 1, limit = 50, filters = {}, sortBy = 'created_at', sortOrder = 'desc') {
     try {
-      const values = await this.getSheetsService().getValues(`${this.sheetName}!A:Z`);
-      if (values.length === 0) {
-        return { data: [], total: 0, page, limit, totalPages: 0 };
-      }
+      const db = getDb();
 
-      const headers = values[0];
-      const data = values.slice(1);
+      // フィルタ条件を構築
+      const conditions = [
+        isNotNull(members.email),
+        ne(members.email, '')
+      ];
 
-      let allItems = data.map((row, index) => {
-        const obj = { _rowIndex: index + 2 };
-        headers.forEach((header, i) => {
-          obj[header] = row[i] || '';
-        });
-        return obj;
-      });
-
-      // emailが必須：空白のレコードは除外
-      allItems = allItems.filter(item => item.email && item.email.trim() !== '');
-
-      // フィルタリング適用
       if (filters.search) {
-        const searchTerm = filters.search.toLowerCase();
-        allItems = allItems.filter(item => {
-          const searchFields = [
-            item.shopify_id,
-            item.email,
-            item.first_name,
-            item.last_name,
-            item.phone
-          ];
-          return searchFields.some(field =>
-            field && field.toString().toLowerCase().includes(searchTerm)
-          );
-        });
+        const searchTerm = `%${filters.search}%`;
+        conditions.push(
+          sql`(
+            ${members.shopifyId} ILIKE ${searchTerm} OR
+            ${members.email} ILIKE ${searchTerm} OR
+            ${members.firstName} ILIKE ${searchTerm} OR
+            ${members.lastName} ILIKE ${searchTerm} OR
+            ${members.phone} ILIKE ${searchTerm} OR
+            ${members.fwjCardNo} ILIKE ${searchTerm} OR
+            ${members.fwjFirstName} ILIKE ${searchTerm} OR
+            ${members.fwjLastName} ILIKE ${searchTerm} OR
+            ${members.fwjKanaFirstName} ILIKE ${searchTerm} OR
+            ${members.fwjKanaLastName} ILIKE ${searchTerm}
+          )`
+        );
       }
 
-      // ソート処理
-      if (sortBy && allItems.length > 0) {
-        allItems.sort((a, b) => {
-          let aVal = a[sortBy] || '';
-          let bVal = b[sortBy] || '';
+      const whereClause = and(...conditions);
 
-          // 日付の場合は Date オブジェクトに変換
-          if (sortBy === 'created_at' || sortBy === 'updated_at') {
-            aVal = aVal ? new Date(aVal) : new Date(0);
-            bVal = bVal ? new Date(bVal) : new Date(0);
-          } else {
-            aVal = String(aVal).toLowerCase();
-            bVal = String(bVal).toLowerCase();
-          }
+      // ソートカラムをマップ
+      const sortColumnMap = {
+        created_at: members.createdAt,
+        updated_at: members.updatedAt,
+        email: members.email,
+        shopify_id: members.shopifyId,
+        first_name: members.firstName,
+        last_name: members.lastName,
+        fwj_card_no: members.fwjCardNo,
+      };
+      const sortColumn = sortColumnMap[sortBy] || members.createdAt;
+      const orderFn = sortOrder === 'asc' ? asc : desc;
 
-          if (aVal < bVal) {
-            return sortOrder === 'asc' ? -1 : 1;
-          }
-          if (aVal > bVal) {
-            return sortOrder === 'asc' ? 1 : -1;
-          }
-          return 0;
-        });
-      }
+      // 総件数を取得
+      const countResult = await db
+        .select({ count: sql`count(*)` })
+        .from(members)
+        .where(whereClause);
+      const total = parseInt(countResult[0].count, 10);
 
-      const total = allItems.length;
+      // データ取得
+      const offset = (page - 1) * limit;
+      const rows = await db
+        .select()
+        .from(members)
+        .where(whereClause)
+        .orderBy(orderFn(sortColumn))
+        .limit(limit)
+        .offset(offset);
+
+      const data = rows.map(row => this._toSnakeCase(row));
       const totalPages = Math.ceil(total / limit);
-      const startIndex = (page - 1) * limit;
-      const endIndex = startIndex + limit;
-      const pagedData = allItems.slice(startIndex, endIndex);
 
-      return { data: pagedData, total, page, limit, totalPages };
+      return { data, total, page, limit, totalPages };
     } catch (error) {
       console.error('Error in findWithPaging:', error);
       return { data: [], total: 0, page, limit, totalPages: 0 };
     }
   }
 
-  // Shopify IDで検索
+  /**
+   * Shopify IDでメンバーを検索
+   * @param {string} shopifyId - Shopify顧客ID
+   * @returns {Promise<Object|null>} メンバー、またはnull
+   */
   async findByShopifyId(shopifyId) {
-    const all = await this.findAll();
-    return all.find(member => member.shopify_id === String(shopifyId));
-  }
-
-  // 新規作成または更新（Shopifyからの同期用）
-  async upsertFromShopify(memberData) {
     try {
-      await this.ensureInitialized();
-      const values = await this.getSheetsService().getValues(`${this.sheetName}!A:Z`);
-      if (values.length === 0) {
-        throw new Error('ヘッダー行が見つかりません');
+      const db = getDb();
+      const rows = await db
+        .select()
+        .from(members)
+        .where(eq(members.shopifyId, String(shopifyId)));
+
+      if (rows.length === 0) {
+        return null;
       }
 
-      const headers = values[0];
+      return this._toSnakeCase(rows[0]);
+    } catch (error) {
+      console.error('Error in findByShopifyId:', error);
+      return null;
+    }
+  }
 
-      // 既存のメンバーを検索
-      const existingMember = await this.findByShopifyId(memberData.shopify_id);
+  /**
+   * Emailでメンバーを検索
+   * @param {string} email - メールアドレス
+   * @returns {Promise<Object|null>} メンバー、またはnull
+   */
+  async findByEmail(email) {
+    try {
+      const db = getDb();
+      const rows = await db
+        .select()
+        .from(members)
+        .where(eq(members.email, email));
 
-      if (existingMember) {
+      if (rows.length === 0) {
+        return null;
+      }
+
+      return this._toSnakeCase(rows[0]);
+    } catch (error) {
+      console.error('Error in findByEmail:', error);
+      return null;
+    }
+  }
+
+  /**
+   * FWJカード番号でメンバーを検索
+   * @param {string} cardNo - FWJカード番号
+   * @returns {Promise<Object|null>} メンバー、またはnull
+   */
+  async findByFwjCardNo(cardNo) {
+    try {
+      const db = getDb();
+      const rows = await db
+        .select()
+        .from(members)
+        .where(eq(members.fwjCardNo, cardNo));
+
+      if (rows.length === 0) {
+        return null;
+      }
+
+      return this._toSnakeCase(rows[0]);
+    } catch (error) {
+      console.error('Error in findByFwjCardNo:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Shopifyからのアップサート（新規作成または更新）
+   * @param {object} memberData - メンバーデータ（snake_case）
+   * @returns {Promise<Object>} 処理結果
+   */
+  async upsertFromShopify(memberData) {
+    try {
+      const db = getDb();
+
+      // snake_case → camelCase 変換
+      const insertData = {
+        shopifyId: memberData.shopify_id,
+        email: memberData.email,
+        firstName: memberData.first_name || null,
+        lastName: memberData.last_name || null,
+        phone: memberData.phone || null,
+        tags: memberData.tags || null,
+        address1: memberData.address1 || null,
+        address2: memberData.address2 || null,
+        city: memberData.city || null,
+        province: memberData.province || null,
+        zip: memberData.zip || null,
+        country: memberData.country || null,
+        fwjEffectiveDate: memberData.fwj_effectivedate || null,
+        fwjBirthday: memberData.fwj_birthday || null,
+        fwjCardNo: memberData.fwj_card_no || null,
+        fwjNationality: memberData.fwj_nationality || null,
+        fwjSex: memberData.fwj_sex || null,
+        fwjFirstName: memberData.fwj_firstname || null,
+        fwjLastName: memberData.fwj_lastname || null,
+        fwjKanaFirstName: memberData.fwj_kanafirstname || null,
+        fwjKanaLastName: memberData.fwj_kanalastname || null,
+        fwjHeight: memberData.fwj_height || null,
+        fwjWeight: memberData.fwj_weight || null,
+      };
+
+      // 既存チェック
+      const existing = await this.findByShopifyId(memberData.shopify_id);
+
+      if (existing) {
         // 更新
-        const rowIndex = existingMember._rowIndex;
-        const existingRowIndex = rowIndex - 2;
-        const existingRow = values[existingRowIndex + 1];
-
-        const updatedRow = headers.map((header, index) => {
-          if (memberData[header] !== undefined) {
-            return memberData[header];
-          }
-          return existingRow?.[index] || '';
-        });
-
-        await this.getSheetsService().updateValues(
-          `${this.sheetName}!A${rowIndex}:Z${rowIndex}`,
-          [updatedRow]
-        );
+        await db
+          .update(members)
+          .set({
+            ...insertData,
+            updatedAt: new Date(),
+          })
+          .where(eq(members.shopifyId, memberData.shopify_id));
 
         return { success: true, action: 'updated', message: 'FWJ会員情報を更新しました' };
       } else {
         // 新規作成
-        const newRow = headers.map(header => memberData[header] || '');
-        await this.getSheetsService().appendValues(`${this.sheetName}!A:Z`, [newRow]);
-
+        await db.insert(members).values(insertData);
         return { success: true, action: 'created', message: 'FWJ会員情報を追加しました' };
       }
     } catch (error) {
@@ -160,36 +271,55 @@ class Member extends BaseModel {
     }
   }
 
-  // 全てのメンバーをクリアして再同期（オプション）
+  /**
+   * 全てのメンバーをクリアして再同期
+   * @param {Array<object>} membersData - メンバーデータ配列（snake_case）
+   * @returns {Promise<Object>} 処理結果
+   */
   async clearAllAndSync(membersData) {
     try {
-      await this.ensureInitialized();
+      const db = getDb();
 
-      // ヘッダー行を取得
-      const values = await this.getSheetsService().getValues(`${this.sheetName}!A1:Z1`);
-      if (values.length === 0) {
-        throw new Error('ヘッダー行が見つかりません');
+      // 全削除
+      await db.delete(members);
+
+      // 一括挿入
+      if (membersData.length > 0) {
+        const insertRows = membersData.map(m => ({
+          shopifyId: m.shopify_id,
+          email: m.email,
+          firstName: m.first_name || null,
+          lastName: m.last_name || null,
+          phone: m.phone || null,
+          tags: m.tags || null,
+          address1: m.address1 || null,
+          address2: m.address2 || null,
+          city: m.city || null,
+          province: m.province || null,
+          zip: m.zip || null,
+          country: m.country || null,
+          fwjEffectiveDate: m.fwj_effectivedate || null,
+          fwjBirthday: m.fwj_birthday || null,
+          fwjCardNo: m.fwj_card_no || null,
+          fwjNationality: m.fwj_nationality || null,
+          fwjSex: m.fwj_sex || null,
+          fwjFirstName: m.fwj_firstname || null,
+          fwjLastName: m.fwj_lastname || null,
+          fwjKanaFirstName: m.fwj_kanafirstname || null,
+          fwjKanaLastName: m.fwj_kanalastname || null,
+          fwjHeight: m.fwj_height || null,
+          fwjWeight: m.fwj_weight || null,
+        }));
+
+        // バッチ挿入（500件ずつ）
+        const batchSize = 500;
+        for (let i = 0; i < insertRows.length; i += batchSize) {
+          const batch = insertRows.slice(i, i + batchSize);
+          await db.insert(members).values(batch);
+        }
       }
 
-      const headers = values[0];
-
-      // シート全体をクリア（ヘッダー以外）
-      const allData = await this.getSheetsService().getValues(`${this.sheetName}!A:Z`);
-      if (allData.length > 1) {
-        // Google Sheets APIのclearメソッドを使用してデータをクリア
-        await this.getSheetsService().clearValues(`${this.sheetName}!A2:Z${allData.length}`);
-      }
-
-      // 新しいデータを追加
-      const newRows = membersData.map(memberData =>
-        headers.map(header => memberData[header] || '')
-      );
-
-      if (newRows.length > 0) {
-        await this.getSheetsService().appendValues(`${this.sheetName}!A:Z`, newRows);
-      }
-
-      return { success: true, count: newRows.length, message: `${newRows.length}件のFWJ会員情報を同期しました` };
+      return { success: true, count: membersData.length, message: `${membersData.length}件のFWJ会員情報を同期しました` };
     } catch (error) {
       console.error('Error in clearAllAndSync:', error);
       throw error;

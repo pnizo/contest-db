@@ -936,6 +936,11 @@ class RegistrationsManager {
 
         container.innerHTML = '';
         container.appendChild(table);
+
+        // 列幅リサイズ機能を初期化
+        if (window.ColumnResize) {
+            ColumnResize.init(table, 'registrations-column-widths');
+        }
     }
 
     getSortIcon(column) {

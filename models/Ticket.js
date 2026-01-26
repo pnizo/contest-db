@@ -1,9 +1,39 @@
-const BaseModel = require('./BaseModel');
-const { generateUniqueId, generateTicketId } = require('../utils/generateId');
+const { getDb } = require('../lib/db');
+const { tickets, ticketTags } = require('../lib/db/schema');
+const { eq, ilike, and, desc, asc, sql, inArray } = require('drizzle-orm');
 
-class Ticket extends BaseModel {
-  constructor() {
-    super('Tickets');
+/**
+ * チケットモデル - Neon Postgres / Drizzle ORM版
+ */
+class Ticket {
+  /**
+   * DBのcamelCaseをAPI用のsnake_caseに変換
+   * @private
+   */
+  _toSnakeCase(row) {
+    if (!row) return null;
+    return {
+      id: row.id,
+      order_no: row.orderNo,
+      order_date: row.orderDate,
+      shopify_id: row.shopifyId,
+      full_name: row.fullName,
+      email: row.email,
+      total_price: row.totalPrice,
+      financial_status: row.financialStatus,
+      fulfillment_status: row.fulfillmentStatus,
+      product_name: row.productName,
+      variant: row.variant,
+      price: row.price,
+      line_item_id: row.lineItemId,
+      item_sub_no: row.itemSubNo,
+      is_usable: row.isUsable ? 'TRUE' : 'FALSE',
+      owner_shopify_id: row.ownerShopifyId,
+      reserved_seat: row.reservedSeat,
+      created_at: row.createdAt,
+      updated_at: row.updatedAt,
+      tags: row.tags || [],
+    };
   }
 
   /**
@@ -12,33 +42,33 @@ class Ticket extends BaseModel {
    */
   async getFilterOptions() {
     try {
-      const allTickets = await this.findAll();
+      const db = getDb();
 
       // 一意の商品名を取得
-      const productNames = [...new Set(
-        allTickets
-          .map(ticket => ticket.product_name)
-          .filter(name => name && name.trim() !== '')
-      )].sort();
+      const productNameRows = await db
+        .selectDistinct({ productName: tickets.productName })
+        .from(tickets)
+        .where(sql`${tickets.productName} IS NOT NULL AND ${tickets.productName} != ''`)
+        .orderBy(tickets.productName);
 
       // 一意の支払いステータスを取得
-      const financialStatuses = [...new Set(
-        allTickets
-          .map(ticket => ticket.financial_status)
-          .filter(status => status && status.trim() !== '')
-      )].sort();
+      const financialRows = await db
+        .selectDistinct({ financialStatus: tickets.financialStatus })
+        .from(tickets)
+        .where(sql`${tickets.financialStatus} IS NOT NULL AND ${tickets.financialStatus} != ''`)
+        .orderBy(tickets.financialStatus);
 
       // 一意の発送ステータスを取得
-      const fulfillmentStatuses = [...new Set(
-        allTickets
-          .map(ticket => ticket.fulfillment_status)
-          .filter(status => status && status.trim() !== '')
-      )].sort();
+      const fulfillmentRows = await db
+        .selectDistinct({ fulfillmentStatus: tickets.fulfillmentStatus })
+        .from(tickets)
+        .where(sql`${tickets.fulfillmentStatus} IS NOT NULL AND ${tickets.fulfillmentStatus} != ''`)
+        .orderBy(tickets.fulfillmentStatus);
 
       return {
-        productNames,
-        financialStatuses,
-        fulfillmentStatuses
+        productNames: productNameRows.map(r => r.productName),
+        financialStatuses: financialRows.map(r => r.financialStatus),
+        fulfillmentStatuses: fulfillmentRows.map(r => r.fulfillmentStatus),
       };
     } catch (error) {
       console.error('Error getting filter options:', error);
@@ -51,114 +81,107 @@ class Ticket extends BaseModel {
    */
   async findWithPaging(page = 1, limit = 50, filters = {}, sortBy = 'order_date', sortOrder = 'desc') {
     try {
-      const values = await this.getSheetsService().getValues(`${this.sheetName}!A:AZ`);
-      if (values.length === 0) {
-        return { data: [], total: 0, page, limit, totalPages: 0 };
-      }
+      const db = getDb();
 
-      const headers = values[0];
-      const data = values.slice(1);
+      // フィルタ条件を構築
+      const conditions = [];
 
-      let allItems = data.map((row, index) => {
-        const obj = { _rowIndex: index + 2 };
-        headers.forEach((header, i) => {
-          obj[header] = row[i] || '';
-        });
-        return obj;
-      });
-
-      // フィルタリング適用
       if (filters.product_name) {
-        allItems = allItems.filter(item =>
-          item.product_name && item.product_name.toLowerCase().includes(filters.product_name.toLowerCase())
-        );
+        conditions.push(ilike(tickets.productName, `%${filters.product_name}%`));
       }
       if (filters.financial_status) {
-        allItems = allItems.filter(item =>
-          item.financial_status === filters.financial_status
-        );
+        conditions.push(eq(tickets.financialStatus, filters.financial_status));
       }
       if (filters.fulfillment_status) {
-        allItems = allItems.filter(item =>
-          item.fulfillment_status === filters.fulfillment_status
-        );
+        conditions.push(eq(tickets.fulfillmentStatus, filters.fulfillment_status));
       }
       if (filters.valid_only === 'true') {
-        allItems = allItems.filter(item =>
-          item.is_usable === 'TRUE'
-        );
+        conditions.push(eq(tickets.isUsable, true));
       }
       if (filters.shopify_id_filter) {
         const filterValue = filters.shopify_id_filter.toString();
-        allItems = allItems.filter(item =>
-          (item.shopify_id && item.shopify_id.toString() === filterValue) ||
-          (item.owner_shopify_id && item.owner_shopify_id.toString() === filterValue)
+        conditions.push(
+          sql`(${tickets.shopifyId} = ${filterValue} OR ${tickets.ownerShopifyId} = ${filterValue})`
         );
       }
       if (filters.search) {
-        const searchTerm = filters.search.toLowerCase();
-        allItems = allItems.filter(item => {
-          const searchFields = [
-            item.full_name,
-            item.email,
-            item.order_no,
-            item.product_name,
-            item.reserved_seat
-          ];
-          return searchFields.some(field =>
-            field && field.toString().toLowerCase().includes(searchTerm)
-          );
-        });
+        const searchTerm = `%${filters.search}%`;
+        conditions.push(
+          sql`(
+            ${tickets.fullName} ILIKE ${searchTerm} OR
+            ${tickets.email} ILIKE ${searchTerm} OR
+            ${tickets.orderNo} ILIKE ${searchTerm} OR
+            ${tickets.productName} ILIKE ${searchTerm} OR
+            ${tickets.reservedSeat} ILIKE ${searchTerm}
+          )`
+        );
       }
       if (filters.startDate && filters.endDate) {
-        allItems = allItems.filter(item => {
-          if (!item.order_date) return false;
-          const itemDate = new Date(item.order_date);
-          const start = new Date(filters.startDate);
-          const end = new Date(filters.endDate);
-          return itemDate >= start && itemDate <= end;
-        });
+        conditions.push(
+          sql`${tickets.orderDate}::date >= ${filters.startDate}::date AND ${tickets.orderDate}::date <= ${filters.endDate}::date`
+        );
       }
 
-      // ソート処理
-      if (sortBy && allItems.length > 0) {
-        allItems.sort((a, b) => {
-          let aVal = a[sortBy] || '';
-          let bVal = b[sortBy] || '';
+      const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
-          // 日付フィールドの場合
-          if (sortBy === 'order_date') {
-            aVal = aVal ? new Date(aVal) : new Date(0);
-            bVal = bVal ? new Date(bVal) : new Date(0);
-          }
-          // 数値フィールドの場合
-          else if (['total_price', 'price'].includes(sortBy)) {
-            aVal = aVal === '' || aVal == null ? 0 : parseFloat(aVal) || 0;
-            bVal = bVal === '' || bVal == null ? 0 : parseFloat(bVal) || 0;
-          }
-          // 文字列の場合
-          else {
-            aVal = String(aVal).toLowerCase();
-            bVal = String(bVal).toLowerCase();
-          }
+      // ソートカラムをマップ
+      // order_dateは文字列型なので、日時型にキャストしてソート
+      const sortColumnMap = {
+        order_date: sql`${tickets.orderDate}::timestamp`,
+        order_no: tickets.orderNo,
+        product_name: tickets.productName,
+        full_name: tickets.fullName,
+        total_price: tickets.totalPrice,
+        price: tickets.price,
+      };
+      const sortColumn = sortColumnMap[sortBy] || sql`${tickets.orderDate}::timestamp`;
+      const orderFn = sortOrder === 'asc' ? asc : desc;
 
-          if (aVal < bVal) {
-            return sortOrder === 'asc' ? -1 : 1;
+      // 総件数を取得
+      const countResult = await db
+        .select({ count: sql`count(*)` })
+        .from(tickets)
+        .where(whereClause);
+      const total = parseInt(countResult[0].count, 10);
+
+      // データ取得
+      const offset = (page - 1) * limit;
+      let rows = await db
+        .select()
+        .from(tickets)
+        .where(whereClause)
+        .orderBy(orderFn(sortColumn))
+        .limit(limit)
+        .offset(offset);
+
+      // タグを取得
+      if (rows.length > 0) {
+        const ticketIds = rows.map(r => r.id);
+        const tagRows = await db
+          .select()
+          .from(ticketTags)
+          .where(inArray(ticketTags.ticketId, ticketIds))
+          .orderBy(ticketTags.sortOrder);
+
+        // タグをチケットにマップ
+        const tagMap = new Map();
+        tagRows.forEach(t => {
+          if (!tagMap.has(t.ticketId)) {
+            tagMap.set(t.ticketId, []);
           }
-          if (aVal > bVal) {
-            return sortOrder === 'asc' ? 1 : -1;
-          }
-          return 0;
+          tagMap.get(t.ticketId).push(t.tag);
         });
+
+        rows = rows.map(row => ({
+          ...row,
+          tags: tagMap.get(row.id) || [],
+        }));
       }
 
-      const total = allItems.length;
+      const data = rows.map(row => this._toSnakeCase(row));
       const totalPages = Math.ceil(total / limit);
-      const startIndex = (page - 1) * limit;
-      const endIndex = startIndex + limit;
-      const pagedData = allItems.slice(startIndex, endIndex);
 
-      return { data: pagedData, total, page, limit, totalPages };
+      return { data, total, page, limit, totalPages };
     } catch (error) {
       console.error('Error in findWithPaging:', error);
       return { data: [], total: 0, page, limit, totalPages: 0 };
@@ -166,198 +189,186 @@ class Ticket extends BaseModel {
   }
 
   /**
-   * 行インデックスでチケットを取得
-   * @param {number} rowIndex - スプレッドシートの行インデックス
+   * IDでチケットを取得
+   * @param {number} id - チケットID
    */
-  async findByRowIndex(rowIndex) {
+  async findById(id) {
     try {
-      await this.ensureInitialized();
-      const values = await this.getSheetsService().getValues(`${this.sheetName}!A${rowIndex}:AZ${rowIndex}`);
-      
-      if (!values || values.length === 0) {
+      const db = getDb();
+      const rows = await db.select().from(tickets).where(eq(tickets.id, parseInt(id, 10)));
+
+      if (rows.length === 0) {
         return null;
       }
 
-      const row = values[0];
-      const obj = { _rowIndex: rowIndex };
-      this.headers.forEach((header, i) => {
-        obj[header] = row[i] || '';
-      });
+      // タグを取得
+      const tagRows = await db
+        .select()
+        .from(ticketTags)
+        .where(eq(ticketTags.ticketId, rows[0].id))
+        .orderBy(ticketTags.sortOrder);
 
-      return obj;
+      const row = {
+        ...rows[0],
+        tags: tagRows.map(t => t.tag),
+      };
+
+      return this._toSnakeCase(row);
     } catch (error) {
-      console.error('Error in findByRowIndex:', error);
+      console.error('Error in findById:', error);
       return null;
     }
   }
 
   /**
-   * 行インデックスでチケットを更新
-   * @param {number} rowIndex - スプレッドシートの行インデックス
-   * @param {object} data - 更新データ
+   * チケットIDで検索（チェックイン用）
+   * @param {number} ticketId - 数値ID
+   * @returns {Promise<Object|null>} マッチしたチケット、またはnull
    */
-  async updateByRowIndex(rowIndex, data) {
+  async findByTicketId(ticketId) {
+    return this.findById(ticketId);
+  }
+
+  /**
+   * IDでチケットを更新
+   * @param {number} id - チケットID
+   * @param {object} data - 更新データ（snake_case）
+   */
+  async updateById(id, data) {
     try {
-      await this.ensureInitialized();
-      
-      // 現在の行データを取得
-      const currentData = await this.findByRowIndex(rowIndex);
-      if (!currentData) {
-        return { success: false, error: 'Ticket not found' };
+      const db = getDb();
+
+      // snake_case → camelCaseへの変換マップ
+      const fieldMap = {
+        is_usable: 'isUsable',
+        owner_shopify_id: 'ownerShopifyId',
+        reserved_seat: 'reservedSeat',
+        financial_status: 'financialStatus',
+        fulfillment_status: 'fulfillmentStatus',
+      };
+
+      const updateData = { updatedAt: new Date() };
+      for (const [snakeKey, value] of Object.entries(data)) {
+        const camelKey = fieldMap[snakeKey];
+        if (camelKey) {
+          // is_usable: 'TRUE'/'FALSE' → boolean 変換
+          if (snakeKey === 'is_usable') {
+            updateData[camelKey] = value === 'TRUE' || value === true;
+          } else {
+            updateData[camelKey] = value;
+          }
+        }
       }
 
-      // 更新データをマージ
-      const updatedRow = this.headers.map(header =>
-        data.hasOwnProperty(header) ? data[header] : currentData[header]
-      );
+      await db.update(tickets).set(updateData).where(eq(tickets.id, parseInt(id, 10)));
 
-      // 列数を計算（A列から始まる）
-      const endColumn = String.fromCharCode(64 + this.headers.length);
-      await this.getSheetsService().updateValues(
-        `${this.sheetName}!A${rowIndex}:${endColumn}${rowIndex}`,
-        [updatedRow]
-      );
-
-      return { success: true, data: { ...currentData, ...data } };
+      const updated = await this.findById(id);
+      return { success: true, data: updated };
     } catch (error) {
-      console.error('Error in updateByRowIndex:', error);
+      console.error('Error in updateById:', error);
       return { success: false, error: error.message };
     }
   }
 
   /**
-   * 行インデックスでチケットを削除
-   * @param {number} rowIndex - スプレッドシートの行インデックス
+   * IDでチケットを削除
+   * @param {number} id - チケットID
    */
-  async deleteByRowIndex(rowIndex) {
+  async deleteById(id) {
     try {
-      // Google Sheets APIは0ベースなので、rowIndex - 1が正しい
-      await this.getSheetsService().deleteRow(this.sheetName, rowIndex - 1);
+      const db = getDb();
+      await db.delete(tickets).where(eq(tickets.id, parseInt(id, 10)));
       return { success: true };
     } catch (error) {
-      console.error('Error in deleteByRowIndex:', error);
+      console.error('Error in deleteById:', error);
       return { success: false, error: error.message };
     }
   }
 
   /**
-   * Shopifyからインポートしたデータをシートに書き込む
-   * @param {Array<object>} tickets - チケットデータ配列
-   * @param {number} maxTags - 最大タグ数
+   * チェックイン実行（is_usableをfalseに更新）
+   * @param {number} id - チケットID
+   * @returns {Promise<Object>} 更新結果
    */
-
-  /**
-   * マージ用に既存の全チケットデータを取得（is_usable=FALSEも含む）
-   * @returns {Promise<Array>} 全チケットデータの配列
-   */
-  async _getAllTicketsForMerge() {
-    try {
-      await this.ensureInitialized();
-      const values = await this.getSheetsService().getValues(`${this.sheetName}!A:AH`);
-      if (!values || values.length === 0) return [];
-
-      const headers = values[0];
-      const data = values.slice(1);
-
-      return data.map((row, index) => {
-        const obj = { _rowIndex: index + 2 };
-        headers.forEach((header, i) => {
-          obj[header] = row[i] || '';
-        });
-        return obj;
-      });
-    } catch (error) {
-      console.error('Error in _getAllTicketsForMerge:', error);
-      return [];
-    }
+  async checkin(id) {
+    return this.updateById(id, { is_usable: 'FALSE' });
   }
 
-  async importTickets(tickets, maxTags = 0) {
+  /**
+   * ShopifyからインポートしたデータをDBに書き込む
+   * @param {Array<object>} ticketsData - チケットデータ配列
+   * @param {number} maxTags - 最大タグ数（未使用、互換性のため維持）
+   */
+  async importTickets(ticketsData, maxTags = 0) {
     try {
-      // 1. 既存データを取得（is_usable=FALSEも含めて全件）
-      const existingData = await this._getAllTicketsForMerge();
+      const db = getDb();
 
-      // 2. マッチング用Mapを作成（キー: order_no|shopify_id|line_item_id|item_sub_no）
+      // 1. 既存データを取得（キー: order_no|shopify_id|line_item_id|item_sub_no）
+      const existingRows = await db.select().from(tickets);
       const existingMap = new Map();
-      existingData.forEach(ticket => {
-        const key = `${ticket.order_no}|${ticket.shopify_id}|${ticket.line_item_id}|${ticket.item_sub_no}`;
+      existingRows.forEach(ticket => {
+        const key = `${ticket.orderNo}|${ticket.shopifyId}|${ticket.lineItemId}|${ticket.itemSubNo}`;
         existingMap.set(key, ticket);
       });
 
-      // 基本ヘッダー
-      const baseHeaders = [
-        'id', 'order_no', 'order_date', 'shopify_id', 'full_name', 'email',
-        'total_price', 'financial_status', 'fulfillment_status',
-        'product_name', 'variant', 'price', 'line_item_id',
-        'item_sub_no', 'owner_shopify_id', 'reserved_seat', 'is_usable'
-      ];
+      let imported = 0;
 
-      // タグヘッダーを追加
-      const tagHeaders = [];
-      for (let i = 1; i <= maxTags; i++) {
-        tagHeaders.push(`tag${i}`);
-      }
-      const headers = [...baseHeaders, ...tagHeaders];
-
-      // 3. 新しいデータと既存データをマージして行データを生成
-      const rows = tickets.map((ticket, index) => {
-        const key = `${ticket.baseData.order_no}|${ticket.baseData.shopify_id}|${ticket.baseData.line_item_id}|${ticket.baseData.item_sub_no}`;
+      // 2. 各チケットを処理
+      for (const ticketData of ticketsData) {
+        const baseData = ticketData.baseData;
+        const key = `${baseData.order_no}|${baseData.shopify_id}|${baseData.line_item_id}|${baseData.item_sub_no}`;
         const existing = existingMap.get(key);
 
-        let id, owner_shopify_id, reserved_seat, is_usable;
-
         if (existing) {
-          // 既存データがある場合：指定フィールドを引き継ぎ
-          id = existing.id;
-          owner_shopify_id = existing.owner_shopify_id || ticket.baseData.owner_shopify_id;
-          reserved_seat = existing.reserved_seat || ticket.baseData.reserved_seat;
-          // is_usable: 既存がFALSEなら維持、それ以外はShopifyの値
-          is_usable = existing.is_usable === 'FALSE' ? 'FALSE' : ticket.baseData.is_usable;
+          // 既存データの更新（is_usable=FALSE維持）
+          const isUsable = existing.isUsable === false ? false : (baseData.is_usable !== 'FALSE');
+
+          await db
+            .update(tickets)
+            .set({
+              totalPrice: baseData.total_price,
+              financialStatus: baseData.financial_status,
+              fulfillmentStatus: baseData.fulfillment_status,
+              isUsable,
+              updatedAt: new Date(),
+            })
+            .where(eq(tickets.id, existing.id));
+
+          // タグを更新
+          await this._updateTags(existing.id, ticketData.tags || []);
         } else {
-          // 新規データ（枝番増加分など）
-          id = generateTicketId();
-          owner_shopify_id = ticket.baseData.owner_shopify_id;
-          reserved_seat = ticket.baseData.reserved_seat;
-          is_usable = 'TRUE';  // 新規追加は常にTRUE
+          // 新規挿入
+          const insertResult = await db
+            .insert(tickets)
+            .values({
+              orderNo: baseData.order_no,
+              orderDate: baseData.order_date,
+              shopifyId: baseData.shopify_id,
+              fullName: baseData.full_name,
+              email: baseData.email,
+              totalPrice: baseData.total_price,
+              financialStatus: baseData.financial_status,
+              fulfillmentStatus: baseData.fulfillment_status,
+              productName: baseData.product_name,
+              variant: baseData.variant,
+              price: baseData.price,
+              lineItemId: baseData.line_item_id,
+              itemSubNo: parseInt(baseData.item_sub_no, 10) || 0,
+              isUsable: true,
+              ownerShopifyId: baseData.owner_shopify_id,
+              reservedSeat: baseData.reserved_seat || '',
+            })
+            .returning({ id: tickets.id });
+
+          // タグを挿入
+          if (insertResult[0] && ticketData.tags && ticketData.tags.length > 0) {
+            await this._updateTags(insertResult[0].id, ticketData.tags);
+          }
         }
+        imported++;
+      }
 
-        const baseData = [
-          id,
-          ticket.baseData.order_no,
-          ticket.baseData.order_date,
-          ticket.baseData.shopify_id,
-          ticket.baseData.full_name,
-          ticket.baseData.email,
-          ticket.baseData.total_price,
-          ticket.baseData.financial_status,
-          ticket.baseData.fulfillment_status,
-          ticket.baseData.product_name,
-          ticket.baseData.variant,
-          ticket.baseData.price,
-          ticket.baseData.line_item_id,
-          ticket.baseData.item_sub_no,
-          owner_shopify_id,
-          reserved_seat,
-          is_usable
-        ];
-
-        // タグをパディング
-        const paddedTags = [...(ticket.tags || [])];
-        while (paddedTags.length < maxTags) {
-          paddedTags.push('');
-        }
-
-        return [...baseData, ...paddedTags];
-      });
-
-      // 4. シートに書き込み
-      await this.getSheetsService().writeToSheet(this.sheetName, headers, rows);
-
-      // ヘッダーを更新
-      this.headers = headers;
-      this._initialized = true;
-
-      return { success: true, imported: tickets.length };
+      return { success: true, imported };
     } catch (error) {
       console.error('Error importing tickets:', error);
       return { success: false, error: error.message };
@@ -365,55 +376,108 @@ class Ticket extends BaseModel {
   }
 
   /**
+   * タグを更新
+   * @private
+   */
+  async _updateTags(ticketId, tags) {
+    const db = getDb();
+
+    // 既存タグを削除
+    await db.delete(ticketTags).where(eq(ticketTags.ticketId, ticketId));
+
+    // 新しいタグを挿入
+    if (tags && tags.length > 0) {
+      const tagValues = tags
+        .filter(tag => tag && tag.trim() !== '')
+        .map((tag, index) => ({
+          ticketId,
+          tag,
+          sortOrder: index,
+        }));
+
+      if (tagValues.length > 0) {
+        await db.insert(ticketTags).values(tagValues);
+      }
+    }
+  }
+
+  /**
    * Webhookからのアップサート処理
-   * 既存データがあれば更新、なければ追加
    * @param {Array} ticketDataArray - formatWebhookOrderForTicketから返されたデータ配列
    * @returns {Promise<Object>} 処理結果
    */
   async upsertFromWebhook(ticketDataArray) {
     try {
-      await this.ensureInitialized();
+      const db = getDb();
 
-      // 1. 既存データを取得（is_usable=FALSEも含めて全件）
-      const existingData = await this._getAllTicketsForMerge();
+      // 1. 既存データを取得
+      const existingRows = await db.select().from(tickets);
       const existingMap = new Map();
-      existingData.forEach(ticket => {
-        const key = `${ticket.order_no}|${ticket.shopify_id}|${ticket.line_item_id}|${ticket.item_sub_no}`;
+      existingRows.forEach(ticket => {
+        const key = `${ticket.orderNo}|${ticket.shopifyId}|${ticket.lineItemId}|${ticket.itemSubNo}`;
         existingMap.set(key, ticket);
       });
 
       const results = {
         added: 0,
         updated: 0,
-        skipped: 0
+        skipped: 0,
       };
 
       // 2. 各チケットを処理
       for (const ticketData of ticketDataArray) {
-        const key = `${ticketData.baseData.order_no}|${ticketData.baseData.shopify_id}|${ticketData.baseData.line_item_id}|${ticketData.baseData.item_sub_no}`;
+        const baseData = ticketData.baseData;
+        const key = `${baseData.order_no}|${baseData.shopify_id}|${baseData.line_item_id}|${baseData.item_sub_no}`;
         const existing = existingMap.get(key);
 
         if (existing) {
-          // 既存データがある場合
-          // is_usable=FALSEのレコードは変更しない（手動削除扱い維持）
-          if (existing.is_usable === 'FALSE') {
+          // is_usable=false のレコードは変更しない
+          if (existing.isUsable === false) {
             results.skipped++;
             continue;
           }
 
-          // 更新: financial_status, fulfillment_status のみ更新
-          const updateData = {
-            financial_status: ticketData.baseData.financial_status,
-            fulfillment_status: ticketData.baseData.fulfillment_status,
-            // is_usable: Shopifyからの値を反映（currentQuantityに基づく）
-            is_usable: ticketData.baseData.is_usable
-          };
+          // 更新
+          await db
+            .update(tickets)
+            .set({
+              financialStatus: baseData.financial_status,
+              fulfillmentStatus: baseData.fulfillment_status,
+              isUsable: baseData.is_usable !== 'FALSE',
+              updatedAt: new Date(),
+            })
+            .where(eq(tickets.id, existing.id));
 
-          await this.updateByRowIndex(existing._rowIndex, updateData);
           results.updated++;
         } else {
           // 新規追加
-          await this._appendSingleTicket(ticketData);
+          const insertResult = await db
+            .insert(tickets)
+            .values({
+              orderNo: baseData.order_no,
+              orderDate: baseData.order_date,
+              shopifyId: baseData.shopify_id,
+              fullName: baseData.full_name,
+              email: baseData.email,
+              totalPrice: baseData.total_price,
+              financialStatus: baseData.financial_status,
+              fulfillmentStatus: baseData.fulfillment_status,
+              productName: baseData.product_name,
+              variant: baseData.variant,
+              price: baseData.price,
+              lineItemId: baseData.line_item_id,
+              itemSubNo: parseInt(baseData.item_sub_no, 10) || 0,
+              isUsable: baseData.is_usable !== 'FALSE',
+              ownerShopifyId: baseData.owner_shopify_id,
+              reservedSeat: baseData.reserved_seat || '',
+            })
+            .returning({ id: tickets.id });
+
+          // タグを挿入
+          if (insertResult[0] && ticketData.tags && ticketData.tags.length > 0) {
+            await this._updateTags(insertResult[0].id, ticketData.tags);
+          }
+
           results.added++;
         }
       }
@@ -426,91 +490,32 @@ class Ticket extends BaseModel {
   }
 
   /**
-   * 単一のチケットを追加
-   * @private
-   * @param {Object} ticketData - チケットデータ（baseDataとtags）
-   */
-  async _appendSingleTicket(ticketData) {
-    await this.ensureInitialized();
-
-    const id = generateTicketId();
-    
-    // 基本データを配列に変換
-    const rowData = [
-      id,
-      ticketData.baseData.order_no,
-      ticketData.baseData.order_date,
-      ticketData.baseData.shopify_id,
-      ticketData.baseData.full_name,
-      ticketData.baseData.email,
-      ticketData.baseData.total_price,
-      ticketData.baseData.financial_status,
-      ticketData.baseData.fulfillment_status,
-      ticketData.baseData.product_name,
-      ticketData.baseData.variant,
-      ticketData.baseData.price,
-      ticketData.baseData.line_item_id,
-      ticketData.baseData.item_sub_no,
-      ticketData.baseData.owner_shopify_id,
-      ticketData.baseData.reserved_seat,
-      ticketData.baseData.is_usable
-    ];
-
-    // タグを追加（ヘッダーのtag列数に合わせる）
-    const tagCount = this.headers.filter(h => h.startsWith('tag')).length;
-    const tags = ticketData.tags || [];
-    for (let i = 0; i < tagCount; i++) {
-      rowData.push(tags[i] || '');
-    }
-
-    // シートに追加
-    await this.getSheetsService().appendValues(`${this.sheetName}!A:A`, [rowData]);
-  }
-
-  /**
-   * チケットIDで検索
-   * @param {number} ticketId - 数値ID
-   * @returns {Promise<Object|null>} マッチしたチケット、またはnull
-   */
-  async findByTicketId(ticketId) {
-    const allTickets = await this._getAllTicketsForMerge();
-    const ticketIdStr = ticketId.toString();
-    return allTickets.find(ticket =>
-      ticket.id && ticket.id.toString() === ticketIdStr
-    ) || null;
-  }
-
-  /**
-   * チェックイン実行（is_usableをFALSEに更新）
-   * @param {number} rowIndex - スプレッドシートの行インデックス
-   * @returns {Promise<Object>} 更新結果
-   */
-  async checkin(rowIndex) {
-    return this.updateByRowIndex(rowIndex, { is_usable: 'FALSE' });
-  }
-
-  /**
-   * 注文番号でキャンセル（is_usable=FALSE）
+   * 注文番号でキャンセル（is_usable=false）
    * @param {string} orderNo - 注文番号（例: #1001）
    * @returns {Promise<Object>} 処理結果
    */
   async cancelByOrderNo(orderNo) {
     try {
-      await this.ensureInitialized();
+      const db = getDb();
 
-      // 1. 該当する全レコードを取得
-      const existingData = await this._getAllTicketsForMerge();
-      const targetTickets = existingData.filter(ticket => ticket.order_no === orderNo);
+      // 該当するレコードを取得
+      const targetTickets = await db
+        .select()
+        .from(tickets)
+        .where(eq(tickets.orderNo, orderNo));
 
       if (targetTickets.length === 0) {
         return { success: true, cancelled: 0, message: 'No tickets found for this order' };
       }
 
-      // 2. 各レコードのis_usableをFALSEに更新
+      // is_usable=true のレコードのみ更新
       let cancelled = 0;
       for (const ticket of targetTickets) {
-        if (ticket.is_usable !== 'FALSE') {
-          await this.updateByRowIndex(ticket._rowIndex, { is_usable: 'FALSE' });
+        if (ticket.isUsable === true) {
+          await db
+            .update(tickets)
+            .set({ isUsable: false, updatedAt: new Date() })
+            .where(eq(tickets.id, ticket.id));
           cancelled++;
         }
       }

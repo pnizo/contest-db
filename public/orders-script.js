@@ -48,6 +48,7 @@ class OrdersManager {
     async init() {
         await this.checkAuthStatus();
         this.bindEvents();
+        await this.loadCurrentOrders();
     }
 
     async checkAuthStatus() {
@@ -101,14 +102,6 @@ class OrdersManager {
             }
         });
 
-        // エクスポートボタン
-        const exportBtn = document.getElementById('exportBtn');
-        if (exportBtn) {
-            exportBtn.addEventListener('click', () => {
-                this.exportToSheet();
-            });
-        }
-
         // ログアウト
         document.getElementById('logoutBtn').addEventListener('click', () => {
             this.logout();
@@ -131,11 +124,10 @@ class OrdersManager {
             if (result.success) {
                 this.currentTag = tag;
                 this.currentPaidOnly = paidOnly;
-                this.currentOrders = result.data;
-                this.currentHeaders = result.headers;
-                this.displayOrders(result.data, result.headers);
-                this.updateResultSummary(result.count, result.rowCount);
-                document.getElementById('searchResult').classList.remove('hidden');
+                this.showNotification(`${result.count}件の注文（${result.rowCount}行）を取得しました`, 'success');
+
+                // DBから再読み込みして表示（統一されたフォーマットで表示）
+                await this.loadCurrentOrders();
             } else {
                 console.error('Order search failed:', result);
                 this.showNotification(result.error || '検索に失敗しました', 'error');
@@ -192,54 +184,16 @@ class OrdersManager {
 
         container.innerHTML = '';
         container.appendChild(table);
+
+        // 列幅リサイズ機能を初期化
+        if (window.ColumnResize) {
+            ColumnResize.init(table, 'orders-column-widths');
+        }
     }
 
     updateResultSummary(orderCount, rowCount) {
         document.getElementById('resultCount').textContent =
             `${orderCount}件の注文（${rowCount}行）が見つかりました`;
-    }
-
-    async exportToSheet() {
-        if (!this.isAdmin) {
-            this.showNotification('管理者権限が必要です', 'error');
-            return;
-        }
-
-        if (!this.currentTag) {
-            this.showNotification('先に検索を実行してください', 'error');
-            return;
-        }
-
-        const exportBtn = document.getElementById('exportBtn');
-        const originalText = exportBtn.textContent;
-
-        try {
-            exportBtn.disabled = true;
-            exportBtn.textContent = '出力中...';
-
-            const response = await authFetch(`${this.apiUrl}/export`, {
-                method: 'POST',
-                body: JSON.stringify({
-                    tag: this.currentTag,
-                    paidOnly: this.currentPaidOnly
-                })
-            });
-
-            const result = await response.json();
-
-            if (result.success) {
-                this.showNotification(result.message, 'success');
-            } else {
-                console.error('Order export failed:', result);
-                this.showNotification(result.error || '出力に失敗しました', 'error');
-            }
-        } catch (error) {
-            console.error('Order export exception:', error);
-            this.showNotification(`出力中にエラーが発生しました: ${error.message}`, 'error');
-        } finally {
-            exportBtn.disabled = false;
-            exportBtn.textContent = originalText;
-        }
     }
 
     showNotification(message, type = 'info') {
@@ -265,6 +219,165 @@ class OrdersManager {
             console.error('Logout failed:', error);
             AuthToken.remove();
             window.location.href = '/';
+        }
+    }
+
+    async loadCurrentOrders() {
+        const container = document.getElementById('ordersTableContainer');
+        const dbInfoSection = document.getElementById('currentDbInfo');
+
+        try {
+            container.innerHTML = '<div class="loading">読み込み中...</div>';
+
+            const response = await authFetch(`${this.apiUrl}/current`);
+            const result = await response.json();
+
+            if (result.success) {
+                // DB情報を表示
+                this.displayDbInfo(result.totalOrders, result.latestExport);
+
+                // 現在のデータがあれば表示
+                if (result.orders && result.orders.data && result.orders.data.length > 0) {
+                    this.displayCurrentOrders(result.orders.data);
+                    this.updateResultSummary(result.orders.total, result.orders.total);
+                    document.getElementById('searchResult').classList.remove('hidden');
+                } else {
+                    container.innerHTML = '<div class="no-data">DBにデータがありません。タグを入力して検索してください</div>';
+                }
+            } else {
+                console.error('Load current orders failed:', result);
+                container.innerHTML = '<div class="no-data">タグを入力して検索してください</div>';
+            }
+        } catch (error) {
+            console.error('Load current orders exception:', error);
+            container.innerHTML = '<div class="no-data">タグを入力して検索してください</div>';
+        }
+    }
+
+    displayDbInfo(totalOrders, latestExport) {
+        const dbInfoSection = document.getElementById('currentDbInfo');
+        const orderCountEl = document.getElementById('dbOrderCount');
+        const exportDateEl = document.getElementById('dbExportDate');
+        const exportTagsEl = document.getElementById('dbExportTags');
+
+        orderCountEl.textContent = `${totalOrders}件`;
+
+        if (latestExport) {
+            const exportDate = new Date(latestExport.exportedAt);
+            exportDateEl.textContent = exportDate.toLocaleString('ja-JP');
+
+            if (latestExport.searchTags && latestExport.searchTags.length > 0) {
+                exportTagsEl.innerHTML = latestExport.searchTags
+                    .map(tag => `<span class="tag-badge clickable" data-tag="${this.escapeHtml(tag)}">${this.escapeHtml(tag)}</span>`)
+                    .join(' ');
+
+                // タグバッジにクリックイベントを追加
+                exportTagsEl.querySelectorAll('.tag-badge.clickable').forEach(badge => {
+                    badge.addEventListener('click', () => {
+                        this.addTagToSearch(badge.dataset.tag);
+                    });
+                });
+            } else {
+                exportTagsEl.textContent = '（タグ指定なし）';
+            }
+        } else {
+            exportDateEl.textContent = '-';
+            exportTagsEl.textContent = '-';
+        }
+
+        dbInfoSection.classList.remove('hidden');
+    }
+
+    escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    addTagToSearch(tag) {
+        const tagInput = document.getElementById('tagInput');
+        const currentValue = tagInput.value.trim();
+
+        // すでに同じタグが含まれているかチェック
+        const existingTags = currentValue.split(/[,\s]+/).filter(t => t.trim());
+        if (existingTags.includes(tag)) {
+            this.showNotification(`タグ「${tag}」は既に追加されています`, 'info');
+            return;
+        }
+
+        // タグを追加
+        if (currentValue) {
+            tagInput.value = `${currentValue}, ${tag}`;
+        } else {
+            tagInput.value = tag;
+        }
+
+        // 入力欄にフォーカス
+        tagInput.focus();
+        this.showNotification(`タグ「${tag}」を追加しました`, 'success');
+    }
+
+    displayCurrentOrders(orders) {
+        const container = document.getElementById('ordersTableContainer');
+
+        if (orders.length === 0) {
+            container.innerHTML = '<div class="no-data">DBにデータがありません</div>';
+            return;
+        }
+
+        const table = document.createElement('table');
+        table.className = 'data-table';
+
+        // ヘッダー作成
+        const headers = [
+            '注文番号', '注文日時', '顧客ID', '顧客名', 'メールアドレス',
+            '合計金額', '支払いステータス', '発送ステータス',
+            '商品名', 'バリエーション', '数量', '現在数量', '単価', 'タグ'
+        ];
+        const headerRow = document.createElement('tr');
+        headers.forEach(header => {
+            const th = document.createElement('th');
+            th.textContent = header;
+            headerRow.appendChild(th);
+        });
+        table.appendChild(headerRow);
+
+        // データ行作成
+        orders.forEach(order => {
+            const tr = document.createElement('tr');
+
+            const cells = [
+                order.order_no,
+                order.order_date,
+                order.shopify_id,
+                order.full_name,
+                order.email,
+                order.total_price ? `¥${Number(order.total_price).toLocaleString()}` : '',
+                order.financial_status,
+                order.fulfillment_status,
+                order.product_name,
+                order.variant,
+                order.quantity,
+                order.current_quantity,
+                order.price ? `¥${Number(order.price).toLocaleString()}` : '',
+                order.tags ? order.tags.join(', ') : ''
+            ];
+
+            cells.forEach(cell => {
+                const td = document.createElement('td');
+                td.textContent = cell;
+                tr.appendChild(td);
+            });
+
+            table.appendChild(tr);
+        });
+
+        container.innerHTML = '';
+        container.appendChild(table);
+
+        // 列幅リサイズ機能を初期化
+        if (window.ColumnResize) {
+            ColumnResize.init(table, 'orders-column-widths');
         }
     }
 }

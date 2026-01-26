@@ -354,6 +354,11 @@ class TicketsManager {
 
         container.innerHTML = '';
         container.appendChild(table);
+
+        // 列幅リサイズ機能を初期化
+        if (window.ColumnResize) {
+            ColumnResize.init(table, 'tickets-column-widths');
+        }
     }
 
     handleSort(column) {
@@ -415,7 +420,7 @@ class TicketsManager {
         document.getElementById('editIsUsable').checked = ticket.is_usable === 'TRUE';
         document.getElementById('editOwnerShopifyId').value = ticket.owner_shopify_id || '';
         document.getElementById('editReservedSeat').value = ticket.reserved_seat || '';
-        document.getElementById('editRowIndex').value = ticket._rowIndex;
+        document.getElementById('editRowIndex').value = ticket.id;
         document.getElementById('editModal').classList.remove('hidden');
     }
 
@@ -466,7 +471,7 @@ class TicketsManager {
     openDeleteModal(ticket) {
         document.getElementById('deleteOrderNo').textContent = ticket.order_no || '';
         document.getElementById('deleteProductName').textContent = ticket.product_name || '';
-        document.getElementById('deleteRowIndex').value = ticket._rowIndex;
+        document.getElementById('deleteRowIndex').value = ticket.id;
         document.getElementById('deleteModal').classList.remove('hidden');
     }
 

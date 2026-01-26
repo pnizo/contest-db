@@ -268,14 +268,14 @@ class ContestsManager {
         // ヘッダー作成
         const headerRow = document.createElement('tr');
         const headers = [
-            { key: 'contest_name', label: '大会名' },
             { key: 'contest_date', label: '開催日' },
+            { key: 'contest_name', label: '大会名' },
             { key: 'contest_place', label: '開催地' },
             { key: 'is_ready', label: '公開' },
             { key: '_actions', label: '操作' }
         ];
 
-        headers.forEach(header => {
+        headers.forEach((header, index) => {
             const th = document.createElement('th');
             if (header.key === '_actions' || header.key === 'is_ready') {
                 th.textContent = header.label;
@@ -288,8 +288,22 @@ class ContestsManager {
                 th.className = 'sortable';
                 th.setAttribute('data-column', header.key);
                 th.innerHTML = `${header.label}${this.getSortIcon(header.key)}`;
-                th.addEventListener('click', () => this.sortBy(header.key));
+                th.addEventListener('click', (e) => {
+                    // リサイズハンドルのクリックはソートしない
+                    if (!e.target.classList.contains('resize-handle')) {
+                        this.sortBy(header.key);
+                    }
+                });
             }
+
+            // リサイズハンドルを追加（最後の列以外）
+            if (index < headers.length - 1) {
+                const resizeHandle = document.createElement('div');
+                resizeHandle.className = 'resize-handle';
+                resizeHandle.addEventListener('mousedown', (e) => this.initResize(e, th, table));
+                th.appendChild(resizeHandle);
+            }
+
             headerRow.appendChild(th);
         });
 
@@ -356,6 +370,81 @@ class ContestsManager {
 
         container.innerHTML = '';
         container.appendChild(table);
+
+        // 列幅リサイズ機能を初期化
+        if (window.ColumnResize) {
+            ColumnResize.init(table, 'contests-column-widths');
+        }
+
+        // 保存された列幅を復元
+        this.restoreColumnWidths(table);
+    }
+
+    // 列リサイズの初期化
+    initResize(e, th, table) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        const startX = e.pageX;
+        const startWidth = th.offsetWidth;
+        const resizeHandle = e.target;
+        const columnIndex = Array.from(th.parentNode.children).indexOf(th);
+
+        resizeHandle.classList.add('resizing');
+        table.classList.add('resizing');
+
+        const doResize = (e) => {
+            const newWidth = startWidth + (e.pageX - startX);
+            if (newWidth >= 50) { // 最小幅50px
+                th.style.width = newWidth + 'px';
+                th.style.minWidth = newWidth + 'px';
+            }
+        };
+
+        const stopResize = () => {
+            resizeHandle.classList.remove('resizing');
+            table.classList.remove('resizing');
+            document.removeEventListener('mousemove', doResize);
+            document.removeEventListener('mouseup', stopResize);
+
+            // 列幅をlocalStorageに保存
+            this.saveColumnWidths(table);
+        };
+
+        document.addEventListener('mousemove', doResize);
+        document.addEventListener('mouseup', stopResize);
+    }
+
+    // 列幅をlocalStorageに保存
+    saveColumnWidths(table) {
+        const headers = table.querySelectorAll('th');
+        const widths = {};
+        headers.forEach((th, index) => {
+            if (th.style.width) {
+                widths[index] = th.style.width;
+            }
+        });
+        localStorage.setItem('contestsColumnWidths', JSON.stringify(widths));
+    }
+
+    // 列幅をlocalStorageから復元
+    restoreColumnWidths(table) {
+        const savedWidths = localStorage.getItem('contestsColumnWidths');
+        if (savedWidths) {
+            try {
+                const widths = JSON.parse(savedWidths);
+                const headers = table.querySelectorAll('th');
+                Object.keys(widths).forEach(index => {
+                    const th = headers[parseInt(index)];
+                    if (th) {
+                        th.style.width = widths[index];
+                        th.style.minWidth = widths[index];
+                    }
+                });
+            } catch (e) {
+                console.error('Failed to restore column widths:', e);
+            }
+        }
     }
 
     getSortIcon(column) {
@@ -505,7 +594,7 @@ class ContestsManager {
             let response;
             if (this.editingContest) {
                 // 更新
-                const url = `${this.apiUrl}/${this.editingContest._rowIndex}`;
+                const url = `${this.apiUrl}/${this.editingContest.id}`;
                 console.log('Updating contest - URL:', url);
                 console.log('Method: PUT');
                 
@@ -578,7 +667,7 @@ class ContestsManager {
         if (!this.deletingContest) return;
 
         try {
-            const response = await authFetch(`${this.apiUrl}/${this.deletingContest._rowIndex}`, {
+            const response = await authFetch(`${this.apiUrl}/${this.deletingContest.id}`, {
                 method: 'DELETE'
             });
 

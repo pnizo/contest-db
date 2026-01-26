@@ -190,7 +190,7 @@ class NotesManager {
         });
 
         // 検索ボタンの有効/無効を制御する入力監視
-        ['contestName', 'playerNo', 'fwjCardNo', 'npcMemberNo'].forEach(id => {
+        ['contestName', 'playerNo', 'fwjCardNo'].forEach(id => {
             document.getElementById(id).addEventListener('input', () => {
                 console.log(`Input event triggered on field: ${id}`);
                 this.updateSearchButtonState();
@@ -455,6 +455,11 @@ class NotesManager {
 
         container.innerHTML = '';
         container.appendChild(table);
+
+        // 列幅リサイズ機能を初期化
+        if (window.ColumnResize) {
+            ColumnResize.init(table, 'notes-column-widths');
+        }
     }
 
     createActionButtons(note) {
@@ -585,16 +590,14 @@ class NotesManager {
         const contestName = document.getElementById('contestName').value.trim();
         const playerNo = document.getElementById('playerNo').value.trim();
         const fwjCardNo = document.getElementById('fwjCardNo').value.trim();
-        const npcMemberNo = document.getElementById('npcMemberNo').value.trim();
 
         const hasContest = contestName !== '';
-        const hasAnyNumber = playerNo !== '' || fwjCardNo !== '' || npcMemberNo !== '';
+        const hasAnyNumber = playerNo !== '' || fwjCardNo !== '';
 
         console.log('=== updateSearchButtonState DEBUG ===');
         console.log('contestName:', contestName);
         console.log('playerNo:', playerNo);
         console.log('fwjCardNo:', fwjCardNo);
-        console.log('npcMemberNo:', npcMemberNo);
         console.log('hasContest:', hasContest);
         console.log('hasAnyNumber:', hasAnyNumber);
         console.log('Button should be enabled:', hasContest && hasAnyNumber);
@@ -610,17 +613,16 @@ class NotesManager {
         const contestName = document.getElementById('contestName').value.trim();
         const playerNo = document.getElementById('playerNo').value.trim();
         const fwjCardNo = document.getElementById('fwjCardNo').value.trim();
-        const npcMemberNo = document.getElementById('npcMemberNo').value.trim();
 
         console.log('Search parameters:');
         console.log('  contestName:', contestName);
         console.log('  playerNo:', playerNo);
         console.log('  fwjCardNo:', fwjCardNo);
-        console.log('  npcMemberNo:', npcMemberNo);
 
-        if (!contestName || (!playerNo && !fwjCardNo && !npcMemberNo)) {
+        // バリデーション: 大会名と（ゼッケン番号またはFWJカード番号）が必要
+        if (!contestName || (!playerNo && !fwjCardNo)) {
             console.log('ERROR: Missing required fields');
-            this.showNotification('検索には大会名といずれかの番号が必要です', 'error');
+            this.showNotification('検索には大会名とゼッケン番号またはFWJカード番号が必要です', 'error');
             return;
         }
 
@@ -630,10 +632,14 @@ class NotesManager {
                 contest_name: contestName
             });
 
-            // 番号パラメータを追加
-            if (playerNo) params.append('player_no', playerNo);
-            if (fwjCardNo) params.append('fwj_card_no', fwjCardNo);
-            if (npcMemberNo) params.append('npc_member_no', npcMemberNo);
+            // 検索条件: ゼッケン番号を優先、なければFWJカード番号を使用
+            if (playerNo) {
+                params.append('player_no', playerNo);
+                console.log('Searching by player_no:', playerNo);
+            } else if (fwjCardNo) {
+                params.append('fwj_card_no', fwjCardNo);
+                console.log('Searching by fwj_card_no (fallback):', fwjCardNo);
+            }
 
             const apiUrl = `/api/registrations/search/by-number?${params}`;
             console.log('API URL:', apiUrl);
@@ -671,10 +677,6 @@ class NotesManager {
                 document.getElementById('fwjCardNo').value = foundRecord.fwj_card_no;
                 console.log('Set fwjCardNo:', foundRecord.fwj_card_no);
             }
-            if (foundRecord.npc_member_no) {
-                document.getElementById('npcMemberNo').value = foundRecord.npc_member_no;
-                console.log('Set npcMemberNo:', foundRecord.npc_member_no);
-            }
             if (foundRecord.name_ja) {
                 document.getElementById('nameJa').value = foundRecord.name_ja;
                 console.log('Set nameJa:', foundRecord.name_ja);
@@ -683,7 +685,10 @@ class NotesManager {
                 document.getElementById('email').value = foundRecord.email;
                 console.log('Set email:', foundRecord.email);
             }
-            // 出場登録データにはphoneフィールドがないので設定しない
+            if (foundRecord.phone) {
+                document.getElementById('phone').value = foundRecord.phone;
+                console.log('Set phone:', foundRecord.phone);
+            }
 
             console.log('SUCCESS: Form populated with registration data');
             this.showNotification('出場登録データから情報を取得しました', 'success');
@@ -724,7 +729,6 @@ class NotesManager {
                 document.getElementById('noteType').value = note.type || '';
                 document.getElementById('playerNo').value = note.player_no || '';
                 document.getElementById('fwjCardNo').value = note.fwj_card_no || '';
-                document.getElementById('npcMemberNo').value = note.npc_member_no || '';
                 document.getElementById('email').value = note.email || '';
                 document.getElementById('phone').value = note.phone || '';
                 document.getElementById('noteDetail').value = note.note || '';

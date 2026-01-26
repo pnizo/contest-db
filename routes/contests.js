@@ -78,11 +78,15 @@ router.get('/', async (req, res) => {
   }
 });
 
-// 特定のコンテスト取得（行インデックス）
-router.get('/:rowIndex', async (req, res) => {
+// 特定のコンテスト取得（ID）
+router.get('/:id', async (req, res) => {
   try {
-    const rowIndex = parseInt(req.params.rowIndex);
-    const contest = await contestModel.findByRowIndex(rowIndex);
+    const id = parseInt(req.params.id);
+    if (isNaN(id) || id < 1) {
+      return res.status(400).json({ success: false, error: '無効なIDです' });
+    }
+
+    const contest = await contestModel.findById(id);
 
     if (!contest) {
       return res.status(404).json({ success: false, error: '大会情報が見つかりません' });
@@ -114,9 +118,13 @@ router.post('/', async (req, res) => {
 });
 
 // コンテスト更新
-router.put('/:rowIndex', async (req, res) => {
+router.put('/:id', async (req, res) => {
   try {
-    const rowIndex = parseInt(req.params.rowIndex);
+    const id = parseInt(req.params.id);
+    if (isNaN(id) || id < 1) {
+      return res.status(400).json({ success: false, error: '無効なIDです' });
+    }
+
     const contestData = req.body;
 
     // 必須フィールドチェック
@@ -124,7 +132,7 @@ router.put('/:rowIndex', async (req, res) => {
       return res.status(400).json({ success: false, error: '大会名は必須です' });
     }
 
-    const result = await contestModel.update(rowIndex, contestData);
+    const result = await contestModel.update(id, contestData);
     res.json(result);
   } catch (error) {
     console.error('Error updating contest:', error);
@@ -133,18 +141,23 @@ router.put('/:rowIndex', async (req, res) => {
 });
 
 // コンテスト削除
-router.delete('/:rowIndex', async (req, res) => {
+router.delete('/:id', async (req, res) => {
   try {
-    const rowIndex = parseInt(req.params.rowIndex);
+    const id = parseInt(req.params.id);
+    if (isNaN(id) || id < 1) {
+      return res.status(400).json({ success: false, error: '無効なIDです' });
+    }
 
     // 存在確認
-    const contest = await contestModel.findByRowIndex(rowIndex);
+    const contest = await contestModel.findById(id);
     if (!contest) {
       return res.status(404).json({ success: false, error: '大会情報が見つかりません' });
     }
 
-    // 行を削除
-    await contestModel.getSheetsService().deleteRow(contestModel.sheetName, rowIndex - 1);
+    const result = await contestModel.deleteById(id);
+    if (!result.success) {
+      return res.status(400).json(result);
+    }
 
     res.json({ success: true, message: '大会情報を削除しました' });
   } catch (error) {

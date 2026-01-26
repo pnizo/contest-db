@@ -3,7 +3,7 @@ const Registration = require('../models/Registration');
 const Subject = require('../models/Subject');
 const Note = require('../models/Note');
 const Member = require('../models/Member');
-const SheetsService = require('../config/sheets');
+const Order = require('../models/Order');
 const { requireAuth, requireAdmin, checkAuth } = require('../middleware/auth');
 const { parseFlexibleDate, formatToISODate, calculateAge } = require('../utils/dateUtils');
 const wanakana = require('wanakana');
@@ -13,7 +13,7 @@ const registrationModel = new Registration();
 const subjectModel = new Subject();
 const noteModel = new Note();
 const memberModel = new Member();
-const sheetsService = new SheetsService();
+const orderModel = new Order();
 
 // 氏名を正規化する関数（スペースを除去）
 function normalizeNameJa(nameJa) {
@@ -583,7 +583,7 @@ router.put('/:id', requireAdmin, async (req, res) => {
   }
 });
 
-// POST /import-shopify - OrdersシートとMembersシートからRegistrationsを作成
+// POST /import-shopify - OrdersテーブルとMembersテーブルからRegistrationsを作成
 router.post('/import-shopify', requireAdmin, async (req, res) => {
   try {
     const { contestDate, contestName } = req.body;
@@ -597,29 +597,20 @@ router.post('/import-shopify', requireAdmin, async (req, res) => {
 
     console.log(`Starting Shopify import for ${contestName} (${contestDate})`);
 
-    // Ordersシートから全データを取得
-    const ordersData = await sheetsService.getOrdersData();
-    console.log(`Loaded ${ordersData.length} order rows from Orders sheet`);
+    // Ordersテーブルから全データを取得
+    const ordersData = await orderModel.findAll();
+    console.log(`Loaded ${ordersData.length} order rows from Orders table`);
 
     if (ordersData.length === 0) {
       return res.status(400).json({
         success: false,
-        error: 'Ordersシートにデータがありません'
+        error: 'Ordersテーブルにデータがありません'
       });
     }
 
-    // 既存のRegistrationsデータを取得
+    // 既存のRegistrationsデータを取得（player_no引き継ぎ用）
     const existingRegistrations = await registrationModel.findByContestAndDate(contestName, contestDate);
-    console.log(`Loaded ${existingRegistrations.length} existing registrations for ${contestName} (${contestDate})`);
-
-    // 重複チェック用Set: fwj_card_no + class_name
-    const existingEntryKeys = new Set();
-    existingRegistrations.forEach(reg => {
-      if (reg.fwj_card_no && reg.class_name) {
-        const key = `${reg.fwj_card_no}_${reg.class_name}`;
-        existingEntryKeys.add(key);
-      }
-    });
+    console.log(`Found ${existingRegistrations.length} existing registrations for ${contestName} (${contestDate})`);
 
     // player_no引き継ぎ用Map: fwj_card_no → player_no
     const existingPlayerNoMap = new Map();
@@ -629,9 +620,25 @@ router.post('/import-shopify', requireAdmin, async (req, res) => {
       }
     });
 
-    // Membersの全データを取得（findByShopifyIdが全件取得するため効率化）
+    // 新規player_no用: 既存のplayer_no最大値を計算
+    let playerNoCounter = 1;
+    existingRegistrations.forEach(reg => {
+      const pn = parseInt(reg.player_no, 10);
+      if (!isNaN(pn) && pn >= playerNoCounter) {
+        playerNoCounter = pn + 1;
+      }
+    });
+
+    // 既存データを削除（インポート前に削除）
+    if (existingRegistrations.length > 0) {
+      console.log(`Deleting ${existingRegistrations.length} existing registrations...`);
+      await registrationModel.deleteByContestAndDate(contestName, contestDate);
+      console.log(`Deleted ${existingRegistrations.length} existing registrations`);
+    }
+
+    // Membersの全データを取得
     const allMembers = await memberModel.findAll();
-    console.log(`Loaded ${allMembers.length} members from Members sheet`);
+    console.log(`Loaded ${allMembers.length} members from Members table`);
 
     // shopify_idでMembersをMapに変換（高速ルックアップ用）
     const membersMap = new Map();
@@ -641,19 +648,10 @@ router.post('/import-shopify', requireAdmin, async (req, res) => {
       }
     });
 
-    // 変換結果（新規データのみ）
+    // 変換結果
     const newRegistrations = [];
     const skippedOrders = [];
     const memberNotFoundOrders = [];
-
-    // 新規player_no用: 既存のplayer_no最大値を計算
-    let playerNoCounter = 1;
-    existingRegistrations.forEach(reg => {
-      const pn = parseInt(reg.player_no, 10);
-      if (!isNaN(pn) && pn >= playerNoCounter) {
-        playerNoCounter = pn + 1;
-      }
-    });
 
     // 新規データ用のplayer_noマップ（同じfwj_card_noには同じplayer_noを付与）
     const newPlayerNoMap = new Map();
@@ -686,18 +684,6 @@ router.post('/import-shopify', requireAdmin, async (req, res) => {
         className = className.replace(contestName, '').trim();
         // 先頭や末尾の不要な記号を除去
         className = className.replace(/^[\s\-–—:：]+|[\s\-–—:：]+$/g, '').trim();
-      }
-
-      // 重複チェック: 同じ fwj_card_no + class_name のエントリーが既存の場合はスキップ
-      const entryKey = `${shopifyId}_${className}`;
-      if (existingEntryKeys.has(entryKey)) {
-        skippedOrders.push({
-          reason: '既存エントリーと重複',
-          order: order.order_no || 'unknown',
-          shopify_id: shopifyId,
-          class_name: className
-        });
-        continue;
       }
 
       // 年齢を計算（fwj_birthday と contestDate から）
@@ -766,10 +752,7 @@ router.post('/import-shopify', requireAdmin, async (req, res) => {
       }
     }
 
-    // 既存データと新規データをマージ
-    const allRegistrations = [...existingRegistrations, ...newRegistrations];
-
-    if (allRegistrations.length === 0) {
+    if (newRegistrations.length === 0) {
       return res.status(400).json({
         success: false,
         error: 'インポート可能なデータがありませんでした'
@@ -832,7 +815,7 @@ router.post('/import-shopify', requireAdmin, async (req, res) => {
     }
 
     // 全データを2段階優先度ソート
-    allRegistrations.sort((a, b) => {
+    newRegistrations.sort((a, b) => {
       const keyA = getCustomSortKey(a.class_name || '');
       const keyB = getCustomSortKey(b.class_name || '');
 
@@ -858,20 +841,13 @@ router.post('/import-shopify', requireAdmin, async (req, res) => {
     });
 
     // 全データにsort_indexを付与（player_noは既に設定済み）
-    allRegistrations.forEach((reg, index) => {
+    newRegistrations.forEach((reg, index) => {
       // sort_index: 1から連番で振り直し
       reg.sort_index = String(index + 1);
     });
 
-    // 既存データを物理削除
-    if (existingRegistrations.length > 0) {
-      console.log(`Deleting ${existingRegistrations.length} existing registrations...`);
-      await registrationModel.deleteByContestAndDate(contestName, contestDate);
-      console.log(`Deleted ${existingRegistrations.length} existing registrations`);
-    }
-
-    // 全データをbatchImportで追加
-    const result = await registrationModel.batchImport(allRegistrations, contestDate, contestName);
+    // 新規データをbatchImportで追加
+    const result = await registrationModel.batchImport(newRegistrations, contestDate, contestName);
 
     if (!result.success) {
       return res.status(400).json({
@@ -884,13 +860,12 @@ router.post('/import-shopify', requireAdmin, async (req, res) => {
     const responseData = {
       total: ordersData.length,
       imported: result.data.imported,
-      existing: existingRegistrations.length,
-      newRecords: newRegistrations.length,
+      deleted: existingRegistrations.length,
       skipped: skippedOrders.length,
       memberNotFound: memberNotFoundOrders.length,
       contestDate,
       contestName,
-      message: `${result.data.imported}件のRegistrationをインポートしました（既存: ${existingRegistrations.length}件、新規: ${newRegistrations.length}件）`
+      message: `${existingRegistrations.length}件を削除し、${result.data.imported}件をインポートしました`
     };
 
     // Memberが見つからなかったレコードがある場合は警告メッセージを追加
@@ -900,7 +875,7 @@ router.post('/import-shopify', requireAdmin, async (req, res) => {
       );
     }
 
-    console.log(`Shopify import completed: ${result.data.imported} imported (existing: ${existingRegistrations.length}, new: ${newRegistrations.length}), ${skippedOrders.length} skipped, ${memberNotFoundOrders.length} member not found`);
+    console.log(`Shopify import completed: deleted ${existingRegistrations.length}, imported ${result.data.imported}, skipped ${skippedOrders.length}, member not found ${memberNotFoundOrders.length}`);
 
     res.json({
       success: true,
@@ -948,18 +923,24 @@ router.post('/import-contest-order', requireAdmin, async (req, res) => {
       });
     }
 
-    // CSVのclass_nameから大会名を除去する関数
+    // CSVのclass_nameから大会名を除去し、文字を正規化する関数
     const normalizeClassName = (className, contestName) => {
       if (!className) return '';
       let normalized = className.trim();
-      
+
       // 大会名が先頭にある場合は除去
       if (normalized.startsWith(contestName)) {
         normalized = normalized.substring(contestName.length);
         // 区切り文字（" - ", " ", "-" など）を除去
         normalized = normalized.replace(/^[\s\-–—]+/, '').trim();
       }
-      
+
+      // 文字の正規化: 全角チルダ→半角チルダ、全角ハイフン類→半角ハイフン
+      normalized = normalized
+        .replace(/～/g, '~')           // 全角チルダ → 半角チルダ
+        .replace(/[－ー―]/g, '-')      // 全角ハイフン類 → 半角ハイフン
+        .replace(/\s+/g, ' ');         // 連続スペースを単一スペースに
+
       return normalized;
     };
 

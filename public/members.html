@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FWJ会員情報 - スプレッドシートDB</title>
+    <title>FWJ会員検索 - FWJコンテストDB</title>
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -32,11 +32,17 @@
                     </div>
 
                     <div class="nav-dropdown">
-                        <button class="nav-link dropdown-toggle active">入場管理 <span class="dropdown-arrow">▼</span></button>
+                        <button class="nav-link dropdown-toggle">入場管理 <span class="dropdown-arrow">▼</span></button>
                         <div class="dropdown-menu">
                             <a href="/guests" class="dropdown-item">関係者チケット</a>
                             <a href="/tickets" class="dropdown-item">チケット管理</a>
-                            <a href="/members" class="dropdown-item active">FWJ会員情報</a>
+                        </div>
+                    </div>
+
+                    <div class="nav-dropdown">
+                        <button class="nav-link dropdown-toggle active">Shopify検索 <span class="dropdown-arrow">▼</span></button>
+                        <div class="dropdown-menu">
+                            <a href="/members" class="dropdown-item active">FWJ会員検索</a>
                             <a href="/orders" class="dropdown-item">注文検索</a>
                         </div>
                     </div>
@@ -48,7 +54,7 @@
 
         <main class="members-main">
             <section class="members-section">
-                <h2>FWJ会員情報（Shopify連携）</h2>
+                <h2>FWJ会員検索（Shopify連携）</h2>
                 <div class="section-controls">
                     <div class="controls">
                         <div class="search-container">
@@ -82,6 +88,7 @@
         <div id="notification" class="notification hidden"></div>
     </div>
 
+    <script src="column-resize.js"></script>
     <script src="members-script.js"></script>
 </body>
 </html>

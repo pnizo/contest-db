@@ -258,7 +258,7 @@ class SubjectManager {
                 const message = result.restored ? '認定者が復元されました' : successMessage;
                 this.showNotification(message, 'success');
                 this.closeSubjectModal();
-                this.loadSubjects();
+                await this.loadSubjects();
             } else {
                 this.showNotification(result.errors ? result.errors.join(', ') : result.error, 'error');
             }
@@ -269,7 +269,7 @@ class SubjectManager {
 
     async loadSubjects() {
         console.log('=== loadSubjects START ===');
-        const container = document.getElementById('subjectsContainer');
+        const container = document.getElementById('subjectsTableContainer');
         container.innerHTML = '<div class="loading">読み込み中...</div>';
 
         try {
@@ -324,53 +324,115 @@ class SubjectManager {
     }
 
     renderSubjects(subjects) {
-        const container = document.getElementById('subjectsContainer');
-        
+        const container = document.getElementById('subjectsTableContainer');
+
         if (subjects.length === 0) {
-            container.innerHTML = '<div class="empty-state">認定者が見つかりません</div>';
+            container.innerHTML = '<div class="no-data">認定者が見つかりません</div>';
             return;
         }
 
-        const subjectsHtml = subjects.map(subject => {
-            const isDeleted = subject.isValid === 'FALSE';
-            const statusBadge = isDeleted ? 
-                '<span class="status-badge deleted">削除済み</span>' : '';
-            
-            const actions = isDeleted ? `
-                <button class="restore-btn" onclick="subjectManager.restoreSubject('${subject.id}')">
-                    復元
-                </button>
-                <button class="delete-btn" onclick="subjectManager.permanentDeleteSubject('${subject.id}')">
-                    完全削除
-                </button>
-            ` : `
-                <button class="edit-btn" onclick="subjectManager.editSubject('${subject.id}')">
-                    編集
-                </button>
-                <button class="delete-btn" onclick="subjectManager.deleteSubject('${subject.id}')">
-                    削除
-                </button>
-            `;
-            
-            return `
-                <div class="user-card ${isDeleted ? 'deleted' : ''}">
-                    <div class="user-info">
-                        <div class="user-details">
-                            <h3>${this.escapeHtml(subject.name_ja || '')} ${statusBadge}</h3>
-                            <p><strong>英語名:</strong> ${this.escapeHtml(subject.first_name || '')} ${this.escapeHtml(subject.last_name || '')}</p>
-                            <p><strong>FWJカード番号:</strong> ${this.escapeHtml(subject.fwj_card_no || '')}</p>
-                            ${subject.npc_member_no ? `<p><strong>NPCメンバー番号:</strong> ${this.escapeHtml(subject.npc_member_no)}</p>` : ''}
-                            ${subject.note ? `<p><strong>備考:</strong> ${this.escapeHtml(subject.note)}</p>` : ''}
-                        </div>
-                        <div class="user-actions">
-                            ${actions}
-                        </div>
-                    </div>
-                </div>
-            `;
-        }).join('');
+        const table = document.createElement('table');
+        table.className = 'data-table';
 
-        container.innerHTML = subjectsHtml;
+        // ヘッダー作成
+        const headers = [
+            { key: 'fwj_card_no', label: 'FWJカード番号' },
+            { key: 'name_ja', label: '日本語名' },
+            { key: 'name_en', label: '英語名' },
+            { key: 'npc_member_no', label: 'NPCメンバー番号' },
+            { key: 'note', label: '備考' },
+            { key: '_actions', label: '操作' }
+        ];
+
+        const headerRow = document.createElement('tr');
+        headers.forEach(header => {
+            const th = document.createElement('th');
+            th.textContent = header.label;
+            if (header.key === '_actions') {
+                th.className = 'actions-header';
+            }
+            headerRow.appendChild(th);
+        });
+        table.appendChild(headerRow);
+
+        // データ行作成
+        subjects.forEach(subject => {
+            const row = document.createElement('tr');
+            const isDeleted = subject.isValid === 'FALSE';
+
+            if (isDeleted) {
+                row.classList.add('deleted-row');
+            }
+
+            headers.forEach(header => {
+                const td = document.createElement('td');
+
+                if (header.key === '_actions') {
+                    const actionsDiv = document.createElement('div');
+                    actionsDiv.className = 'row-actions';
+
+                    if (isDeleted) {
+                        const restoreBtn = document.createElement('button');
+                        restoreBtn.className = 'btn-small btn-edit';
+                        restoreBtn.textContent = '復元';
+                        restoreBtn.addEventListener('click', () => this.restoreSubject(subject.id));
+                        actionsDiv.appendChild(restoreBtn);
+
+                        const deleteBtn = document.createElement('button');
+                        deleteBtn.className = 'btn-small btn-delete';
+                        deleteBtn.textContent = '完全削除';
+                        deleteBtn.addEventListener('click', () => this.permanentDeleteSubject(subject.id));
+                        actionsDiv.appendChild(deleteBtn);
+                    } else {
+                        const editBtn = document.createElement('button');
+                        editBtn.className = 'btn-small btn-edit';
+                        editBtn.textContent = '編集';
+                        editBtn.addEventListener('click', () => this.editSubject(subject.id));
+                        actionsDiv.appendChild(editBtn);
+
+                        const deleteBtn = document.createElement('button');
+                        deleteBtn.className = 'btn-small btn-delete';
+                        deleteBtn.textContent = '削除';
+                        deleteBtn.addEventListener('click', () => this.deleteSubject(subject.id));
+                        actionsDiv.appendChild(deleteBtn);
+                    }
+
+                    td.appendChild(actionsDiv);
+                } else if (header.key === 'name_ja') {
+                    td.textContent = subject.name_ja || '';
+                    if (isDeleted) {
+                        const badge = document.createElement('span');
+                        badge.className = 'status-badge deleted';
+                        badge.textContent = '削除済み';
+                        badge.style.marginLeft = '8px';
+                        td.appendChild(badge);
+                    }
+                } else if (header.key === 'name_en') {
+                    td.textContent = `${subject.first_name || ''} ${subject.last_name || ''}`.trim();
+                } else if (header.key === 'note') {
+                    td.textContent = subject.note || '';
+                    td.title = subject.note || ''; // ホバーで全文表示
+                    td.style.maxWidth = '200px';
+                    td.style.overflow = 'hidden';
+                    td.style.textOverflow = 'ellipsis';
+                    td.style.whiteSpace = 'nowrap';
+                } else {
+                    td.textContent = subject[header.key] || '';
+                }
+
+                row.appendChild(td);
+            });
+
+            table.appendChild(row);
+        });
+
+        container.innerHTML = '';
+        container.appendChild(table);
+
+        // 列幅リサイズ機能を初期化
+        if (window.ColumnResize) {
+            ColumnResize.init(table, 'subjects-column-widths');
+        }
     }
 
     async editSubject(id) {
@@ -404,7 +466,7 @@ class SubjectManager {
 
             if (result.success) {
                 this.showNotification('認定者が論理削除されました', 'success');
-                this.loadSubjects();
+                await this.loadSubjects();
             } else {
                 this.showNotification(result.error, 'error');
             }
@@ -427,7 +489,7 @@ class SubjectManager {
 
             if (result.success) {
                 this.showNotification('認定者が復元されました', 'success');
-                this.loadSubjects();
+                await this.loadSubjects();
             } else {
                 this.showNotification(result.error, 'error');
             }
@@ -450,7 +512,7 @@ class SubjectManager {
 
             if (result.success) {
                 this.showNotification('認定者が完全に削除されました', 'success');
-                this.loadSubjects();
+                await this.loadSubjects();
             } else {
                 this.showNotification(result.error, 'error');
             }

@@ -55,7 +55,7 @@ router.put('/:id/restore', requireAdmin, async (req, res) => {
 
 router.delete('/:id/permanent', requireAdmin, async (req, res) => {
   try {
-    const result = await userModel.delete(req.params.id);
+    const result = await userModel.deleteById(req.params.id);
     
     if (result.success) {
       res.json({ success: true, message: 'ユーザーを完全に削除しました' });

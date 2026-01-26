@@ -413,6 +413,11 @@ class GuestsManager {
 
         container.innerHTML = '';
         container.appendChild(table);
+
+        // 列幅リサイズ機能を初期化
+        if (window.ColumnResize) {
+            ColumnResize.init(table, 'guests-column-widths');
+        }
     }
 
     getSortIcon(column) {
@@ -581,7 +586,7 @@ class GuestsManager {
             let response;
             if (this.editingGuest) {
                 // 更新
-                response = await authFetch(`${this.apiUrl}/${this.editingGuest._rowIndex}`, {
+                response = await authFetch(`${this.apiUrl}/${this.editingGuest.id}`, {
                     method: 'PUT',
                     body: JSON.stringify(guestData)
                 });
@@ -628,7 +633,7 @@ class GuestsManager {
         if (!this.deletingGuest) return;
 
         try {
-            const response = await authFetch(`${this.apiUrl}/${this.deletingGuest._rowIndex}`, {
+            const response = await authFetch(`${this.apiUrl}/${this.deletingGuest.id}`, {
                 method: 'DELETE'
             });
 
@@ -701,7 +706,7 @@ class GuestsManager {
                 'note': guest['note']
             };
 
-            const response = await authFetch(`${this.apiUrl}/${guest._rowIndex}`, {
+            const response = await authFetch(`${this.apiUrl}/${guest.id}`, {
                 method: 'PUT',
                 body: JSON.stringify(guestData)
             });

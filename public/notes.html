@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>特記事項 - スプレッドシートDB</title>
+    <title>特記事項 - FWJコンテストDB</title>
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -36,7 +36,13 @@
                         <div class="dropdown-menu">
                             <a href="/guests" class="dropdown-item">関係者チケット</a>
                             <a href="/tickets" class="dropdown-item">チケット管理</a>
-                            <a href="/members" class="dropdown-item">FWJ会員情報</a>
+                        </div>
+                    </div>
+
+                    <div class="nav-dropdown">
+                        <button class="nav-link dropdown-toggle">Shopify検索 <span class="dropdown-arrow">▼</span></button>
+                        <div class="dropdown-menu">
+                            <a href="/members" class="dropdown-item">FWJ会員検索</a>
                             <a href="/orders" class="dropdown-item">注文検索</a>
                         </div>
                     </div>
@@ -137,18 +143,11 @@
                     </div>
 
                     <div class="form-row">
-                        <div class="form-group">
-                            <label for="npcMemberNo">NPC Worldwide 会員番号:</label>
-                            <input type="text" id="npcMemberNo" name="npc_member_no" placeholder="NPC会員番号">
-                        </div>
-                    </div>
-
-                    <div class="form-row">
                         <div class="form-group full-width">
                             <button type="button" id="searchRegistrationBtn" class="btn btn-secondary" disabled>
                                 出場登録データから検索して自動入力
                             </button>
-                            <small>大会名といずれかの番号（ゼッケン、FWJカード、NPC Worldwide会員）を入力すると検索できます</small>
+                            <small>大会名とゼッケン番号またはFWJカード番号を入力すると検索できます</small>
                         </div>
                     </div>
 
@@ -204,6 +203,7 @@
         </div>
     </div>
 
+    <script src="column-resize.js"></script>
     <script src="notes-script.js"></script>
 </body>
 </html>

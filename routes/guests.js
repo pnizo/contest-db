@@ -43,11 +43,15 @@ router.get('/', async (req, res) => {
   }
 });
 
-// 特定のゲスト取得
-router.get('/:rowIndex', async (req, res) => {
+// 特定のゲスト取得（ID）
+router.get('/:id', async (req, res) => {
   try {
-    const rowIndex = parseInt(req.params.rowIndex);
-    const guest = await guestModel.findByRowIndex(rowIndex);
+    const id = parseInt(req.params.id);
+    if (isNaN(id) || id < 1) {
+      return res.status(400).json({ success: false, error: '無効なIDです' });
+    }
+
+    const guest = await guestModel.findById(id);
 
     if (!guest) {
       return res.status(404).json({ success: false, error: 'ゲストが見つかりません' });
@@ -79,9 +83,13 @@ router.post('/', async (req, res) => {
 });
 
 // ゲスト更新
-router.put('/:rowIndex', async (req, res) => {
+router.put('/:id', async (req, res) => {
   try {
-    const rowIndex = parseInt(req.params.rowIndex);
+    const id = parseInt(req.params.id);
+    if (isNaN(id) || id < 1) {
+      return res.status(400).json({ success: false, error: '無効なIDです' });
+    }
+
     const guestData = req.body;
 
     // 必須フィールドチェック
@@ -89,7 +97,7 @@ router.put('/:rowIndex', async (req, res) => {
       return res.status(400).json({ success: false, error: '代表者氏名は必須です' });
     }
 
-    const result = await guestModel.update(rowIndex, guestData);
+    const result = await guestModel.update(id, guestData);
     res.json(result);
   } catch (error) {
     console.error('Error updating guest:', error);
@@ -97,23 +105,50 @@ router.put('/:rowIndex', async (req, res) => {
   }
 });
 
-// ゲスト削除
-router.delete('/:rowIndex', async (req, res) => {
+// ゲスト削除（論理削除）
+router.delete('/:id', async (req, res) => {
   try {
-    const rowIndex = parseInt(req.params.rowIndex);
+    const id = parseInt(req.params.id);
+    if (isNaN(id) || id < 1) {
+      return res.status(400).json({ success: false, error: '無効なIDです' });
+    }
 
     // 存在確認
-    const guest = await guestModel.findByRowIndex(rowIndex);
+    const guest = await guestModel.findById(id);
     if (!guest) {
       return res.status(404).json({ success: false, error: 'ゲストが見つかりません' });
     }
 
-    // 行を削除
-    await guestModel.getSheetsService().deleteRow(guestModel.sheetName, rowIndex - 1);
+    const result = await guestModel.deleteById(id);
+    if (!result.success) {
+      return res.status(400).json(result);
+    }
 
     res.json({ success: true, message: 'ゲストレコードを削除しました' });
   } catch (error) {
     console.error('Error deleting guest:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// チェックイン状態更新
+router.put('/:id/checkin', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    if (isNaN(id) || id < 1) {
+      return res.status(400).json({ success: false, error: '無効なIDです' });
+    }
+
+    const { is_checked_in } = req.body;
+    const result = await guestModel.updateCheckinStatus(id, is_checked_in === true || is_checked_in === 'TRUE');
+
+    if (!result.success) {
+      return res.status(400).json(result);
+    }
+
+    res.json({ success: true, message: 'チェックイン状態を更新しました' });
+  } catch (error) {
+    console.error('Error updating checkin status:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });

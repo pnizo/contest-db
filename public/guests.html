@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>関係者チケット - スプレッドシートDB</title>
+    <title>関係者チケット - FWJコンテストDB</title>
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -36,7 +36,13 @@
                         <div class="dropdown-menu">
                             <a href="/guests" class="dropdown-item active">関係者チケット</a>
                             <a href="/tickets" class="dropdown-item">チケット管理</a>
-                            <a href="/members" class="dropdown-item">FWJ会員情報</a>
+                        </div>
+                    </div>
+
+                    <div class="nav-dropdown">
+                        <button class="nav-link dropdown-toggle">Shopify検索 <span class="dropdown-arrow">▼</span></button>
+                        <div class="dropdown-menu">
+                            <a href="/members" class="dropdown-item">FWJ会員検索</a>
                             <a href="/orders" class="dropdown-item">注文検索</a>
                         </div>
                     </div>
@@ -132,7 +138,6 @@
                             <label for="edit_group_type">団体/個人</label>
                             <select id="edit_group_type" name="group_type" class="filter-select">
                                 <option value="">選択してください</option>
-                                <option value="IFBB PRO">IFBB PRO</option>
                                 <option value="団体">団体</option>
                                 <option value="個人">個人</option>
                             </select>
@@ -142,7 +147,6 @@
                             <select id="edit_pass_type" name="pass_type" class="filter-select">
                                 <option value="">選択してください</option>
                                 <option value="関係者パス">関係者パス</option>
-                                <option value="IFBB Proパス">IFBB Proパス</option>
                                 <option value="撮影者パス">撮影者パス</option>
                                 <option value="出展者パス">出展者パス</option>
                                 <option value="GUESTパス">GUESTパス</option>
@@ -172,7 +176,6 @@
                             <label for="edit_request_type">申請種別</label>
                             <select id="edit_request_type" name="request_type" class="filter-select">
                                 <option value="">選択してください</option>
-                                <option value="IFBB Pro">IFBB Pro</option>
                                 <option value="メディア">メディア</option>
                                 <option value="出展者">出展者</option>
                                 <option value="招待">招待</option>
@@ -237,6 +240,7 @@
         </div>
     </div>
 
+    <script src="column-resize.js"></script>
     <script src="guests-script.js"></script>
 </body>
 </html>

@@ -1,34 +1,188 @@
-const BaseModel = require('./BaseModel');
+const { getDb } = require('../lib/db');
+const { notes } = require('../lib/db/schema');
+const { eq, and, or, ilike, gte, lte, desc, asc, sql } = require('drizzle-orm');
 
-class Note extends BaseModel {
+class Note {
   constructor() {
-    super('Notes');
+    // Drizzle ORM使用
+  }
+
+  // DB行データをAPIレスポンス形式に変換
+  _toResponse(row) {
+    if (!row) return null;
+    return {
+      id: row.id,
+      contest_date: row.contestDate || '',
+      contest_name: row.contestName || '',
+      name_ja: row.nameJa || '',
+      type: row.type || '',
+      player_no: row.playerNo || '',
+      fwj_card_no: row.fwjCardNo || '',
+      npc_member_no: row.npcMemberNo || '',
+      first_name: row.firstName || '',
+      last_name: row.lastName || '',
+      email: row.email || '',
+      phone: row.phone || '',
+      note: row.note || '',
+      isValid: row.isValid ? 'TRUE' : 'FALSE',
+      createdAt: row.createdAt ? row.createdAt.toISOString() : '',
+      updatedAt: row.updatedAt ? row.updatedAt.toISOString() : '',
+      deletedAt: row.deletedAt ? row.deletedAt.toISOString() : '',
+      restoredAt: row.restoredAt ? row.restoredAt.toISOString() : '',
+    };
+  }
+
+  async findAll() {
+    const db = getDb();
+    const rows = await db
+      .select()
+      .from(notes)
+      .where(eq(notes.isValid, true))
+      .orderBy(desc(notes.contestDate));
+
+    return rows.map(row => this._toResponse(row));
+  }
+
+  async findAllIncludingDeleted() {
+    const db = getDb();
+    const rows = await db
+      .select()
+      .from(notes)
+      .orderBy(desc(notes.contestDate));
+
+    return rows.map(row => this._toResponse(row));
+  }
+
+  async findById(id) {
+    const db = getDb();
+    const rows = await db
+      .select()
+      .from(notes)
+      .where(eq(notes.id, parseInt(id)));
+
+    if (rows.length === 0) return null;
+    return this._toResponse(rows[0]);
   }
 
   async findByContestAndDate(contestName, contestDate) {
-    const all = await this.findAll();
-    return all.filter(note =>
-      note.contest_name === contestName &&
-      note.contest_date === contestDate
-    );
+    const db = getDb();
+    const rows = await db
+      .select()
+      .from(notes)
+      .where(and(
+        eq(notes.contestName, contestName),
+        eq(notes.contestDate, contestDate),
+        eq(notes.isValid, true)
+      ))
+      .orderBy(desc(notes.createdAt));
+
+    return rows.map(row => this._toResponse(row));
   }
 
   async findByFwjCardNo(fwjCardNo) {
-    const all = await this.findAll();
-    return all.filter(note => note.fwj_card_no === fwjCardNo);
+    const db = getDb();
+    const rows = await db
+      .select()
+      .from(notes)
+      .where(and(
+        eq(notes.fwjCardNo, fwjCardNo),
+        eq(notes.isValid, true)
+      ))
+      .orderBy(desc(notes.contestDate));
+
+    return rows.map(row => this._toResponse(row));
   }
 
   async findByType(type) {
-    const all = await this.findAll();
-    return all.filter(note =>
-      note.type &&
-      note.type.toLowerCase().includes(type.toLowerCase())
-    );
+    const db = getDb();
+    const rows = await db
+      .select()
+      .from(notes)
+      .where(and(
+        ilike(notes.type, `%${type}%`),
+        eq(notes.isValid, true)
+      ))
+      .orderBy(desc(notes.contestDate));
+
+    return rows.map(row => this._toResponse(row));
   }
 
   async findAllActive() {
-    const all = await this.findAllIncludingDeleted();
-    return all.filter(note => note.isValid !== 'FALSE');
+    return await this.findAll();
+  }
+
+  async findWithPaging(page = 1, limit = 50, filters = {}, sortBy = 'contest_date', sortOrder = 'desc') {
+    const db = getDb();
+
+    let conditions = [eq(notes.isValid, true)];
+
+    // フィルター条件
+    if (filters.fwj_card_no) {
+      conditions.push(eq(notes.fwjCardNo, filters.fwj_card_no));
+    }
+    if (filters.contest_name) {
+      conditions.push(eq(notes.contestName, filters.contest_name));
+    }
+    if (filters.type) {
+      conditions.push(eq(notes.type, filters.type));
+    }
+    if (filters.startDate) {
+      conditions.push(gte(notes.contestDate, filters.startDate));
+    }
+    if (filters.endDate) {
+      conditions.push(lte(notes.contestDate, filters.endDate));
+    }
+    if (filters.search) {
+      const searchTerm = `%${filters.search}%`;
+      conditions.push(
+        or(
+          ilike(notes.nameJa, searchTerm),
+          ilike(notes.contestName, searchTerm),
+          ilike(notes.fwjCardNo, searchTerm),
+          ilike(notes.note, searchTerm)
+        )
+      );
+    }
+
+    // ソートカラムのマッピング
+    const sortColumnMap = {
+      'contest_date': notes.contestDate,
+      'contest_name': notes.contestName,
+      'name_ja': notes.nameJa,
+      'type': notes.type,
+      'player_no': notes.playerNo,
+      'fwj_card_no': notes.fwjCardNo,
+      'npc_member_no': notes.npcMemberNo,
+      'note': notes.note,
+    };
+
+    const sortColumn = sortColumnMap[sortBy] || notes.contestDate;
+    const orderFn = sortOrder === 'asc' ? asc : desc;
+
+    // 総数を取得
+    const countResult = await db
+      .select({ count: sql`count(*)` })
+      .from(notes)
+      .where(and(...conditions));
+
+    const total = parseInt(countResult[0].count);
+
+    // データを取得
+    const rows = await db
+      .select()
+      .from(notes)
+      .where(and(...conditions))
+      .orderBy(orderFn(sortColumn))
+      .limit(limit)
+      .offset((page - 1) * limit);
+
+    return {
+      data: rows.map(row => this._toResponse(row)),
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit),
+    };
   }
 
   async validateNote(noteData) {
@@ -56,27 +210,6 @@ class Note extends BaseModel {
       errors.push('特記事項のタイプは必須です');
     }
 
-    // IDの生成
-    if (!noteData.id) {
-      noteData.id = Date.now().toString() + Math.random().toString(36).substr(2, 9);
-    }
-
-    // デフォルト値の設定
-    noteData.player_no = noteData.player_no || '';
-    noteData.fwj_card_no = noteData.fwj_card_no || '';
-    noteData.npc_member_no = noteData.npc_member_no || '';
-    noteData.first_name = noteData.first_name || '';
-    noteData.last_name = noteData.last_name || '';
-    noteData.email = noteData.email || '';
-    noteData.phone = noteData.phone || '';
-    noteData.note = noteData.note || '';
-
-    noteData.createdAt = noteData.createdAt || new Date().toISOString();
-    noteData.isValid = noteData.isValid || 'TRUE';
-    noteData.updatedAt = noteData.updatedAt || new Date().toISOString();
-    noteData.deletedAt = noteData.deletedAt || '';
-    noteData.restoredAt = noteData.restoredAt || '';
-
     return { isValid: errors.length === 0, errors, noteData };
   }
 
@@ -89,6 +222,89 @@ class Note extends BaseModel {
     return await this.create(validation.noteData);
   }
 
+  async create(data) {
+    const db = getDb();
+
+    try {
+      const now = new Date();
+      const insertData = {
+        contestDate: data.contest_date,
+        contestName: data.contest_name,
+        nameJa: data.name_ja,
+        type: data.type,
+        playerNo: data.player_no || null,
+        fwjCardNo: data.fwj_card_no || null,
+        npcMemberNo: data.npc_member_no || null,
+        firstName: data.first_name || null,
+        lastName: data.last_name || null,
+        email: data.email || null,
+        phone: data.phone || null,
+        note: data.note || null,
+        isValid: true,
+        createdAt: now,
+        updatedAt: now,
+      };
+
+      const result = await db
+        .insert(notes)
+        .values(insertData)
+        .returning();
+
+      return { success: true, data: this._toResponse(result[0]) };
+    } catch (error) {
+      console.error('Note create error:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  async update(id, data) {
+    const db = getDb();
+
+    try {
+      const updateData = {
+        updatedAt: new Date(),
+      };
+
+      if (data.contest_date !== undefined) updateData.contestDate = data.contest_date;
+      if (data.contest_name !== undefined) updateData.contestName = data.contest_name;
+      if (data.name_ja !== undefined) updateData.nameJa = data.name_ja;
+      if (data.type !== undefined) updateData.type = data.type;
+      if (data.player_no !== undefined) updateData.playerNo = data.player_no || null;
+      if (data.fwj_card_no !== undefined) updateData.fwjCardNo = data.fwj_card_no || null;
+      if (data.npc_member_no !== undefined) updateData.npcMemberNo = data.npc_member_no || null;
+      if (data.first_name !== undefined) updateData.firstName = data.first_name || null;
+      if (data.last_name !== undefined) updateData.lastName = data.last_name || null;
+      if (data.email !== undefined) updateData.email = data.email || null;
+      if (data.phone !== undefined) updateData.phone = data.phone || null;
+      if (data.note !== undefined) updateData.note = data.note || null;
+
+      if (data.isValid !== undefined) {
+        updateData.isValid = data.isValid === 'TRUE' || data.isValid === true;
+      }
+      if (data.deletedAt !== undefined) {
+        updateData.deletedAt = data.deletedAt ? new Date(data.deletedAt) : null;
+      }
+      if (data.restoredAt !== undefined) {
+        updateData.restoredAt = data.restoredAt ? new Date(data.restoredAt) : null;
+      }
+
+      const result = await db
+        .update(notes)
+        .set(updateData)
+        .where(eq(notes.id, parseInt(id)))
+        .returning();
+
+      if (result.length === 0) {
+        return { success: false, error: '特記事項が見つかりません' };
+      }
+
+      return { success: true, data: this._toResponse(result[0]) };
+    } catch (error) {
+      console.error('Note update error:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
   async softDelete(id) {
     const note = await this.findById(id);
     if (!note) {
@@ -99,33 +315,52 @@ class Note extends BaseModel {
       return { success: false, error: '特記事項は既に削除されています' };
     }
 
-    const updateData = {
+    return await this.update(id, {
       isValid: 'FALSE',
       deletedAt: new Date().toISOString()
-    };
-
-    return await this.update(id, updateData);
+    });
   }
 
   async restore(id) {
-    const allNotes = await this.findAllIncludingDeleted();
-    const note = allNotes.find(n => n.id === id);
+    const db = getDb();
+    const rows = await db
+      .select()
+      .from(notes)
+      .where(eq(notes.id, parseInt(id)));
 
-    if (!note) {
+    if (rows.length === 0) {
       return { success: false, error: '特記事項が見つかりません' };
     }
 
-    if (note.isValid !== 'FALSE') {
+    const note = rows[0];
+    if (note.isValid) {
       return { success: false, error: '特記事項は削除されていません' };
     }
 
-    const updateData = {
+    return await this.update(id, {
       isValid: 'TRUE',
-      restoredAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    };
+      restoredAt: new Date().toISOString()
+    });
+  }
 
-    return await this.update(id, updateData);
+  async delete(id) {
+    const db = getDb();
+
+    try {
+      const result = await db
+        .delete(notes)
+        .where(eq(notes.id, parseInt(id)))
+        .returning();
+
+      if (result.length === 0) {
+        return { success: false, error: '特記事項が見つかりません' };
+      }
+
+      return { success: true };
+    } catch (error) {
+      console.error('Note delete error:', error);
+      return { success: false, error: error.message };
+    }
   }
 }
 

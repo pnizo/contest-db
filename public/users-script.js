@@ -244,7 +244,7 @@ class UserManager {
 
     async loadUsers() {
         console.log('=== loadUsers START ===');
-        const container = document.getElementById('usersContainer');
+        const container = document.getElementById('usersTableContainer');
         container.innerHTML = '<div class="loading">読み込み中...</div>';
 
         try {
@@ -280,67 +280,120 @@ class UserManager {
     }
 
     renderUsers(users) {
-        const container = document.getElementById('usersContainer');
-        
+        const container = document.getElementById('usersTableContainer');
+
         if (users.length === 0) {
-            container.innerHTML = '<div class="empty-state">ユーザーが見つかりません</div>';
+            container.innerHTML = '<div class="no-data">ユーザーが見つかりません</div>';
             return;
         }
 
-        const usersHtml = users.map(user => {
-            const isDeleted = user.isValid === 'FALSE';
-            const statusBadge = isDeleted ? 
-                '<span class="status-badge deleted">削除済み</span>' : '';
-            
-            let actions = '';
-            
-            if (this.isAdmin) {
-                // 管理者の場合：すべてのボタンを表示
-                actions = isDeleted ? `
-                    <button class="restore-btn" onclick="userManager.restoreUser('${user.id}')">
-                        復元
-                    </button>
-                    <button class="delete-btn" onclick="userManager.permanentDeleteUser('${user.id}')">
-                        完全削除
-                    </button>
-                ` : `
-                    <button class="edit-btn" onclick="userManager.editUser('${user.id}')">
-                        編集
-                    </button>
-                    <button class="delete-btn" onclick="userManager.deleteUser('${user.id}')">
-                        削除
-                    </button>
-                `;
-            } else {
-                // 一般ユーザーの場合：自分の情報なので編集ボタンのみ表示
-                if (!isDeleted) {
-                    actions = `
-                        <button class="edit-btn" onclick="userManager.editUser('${user.id}')">
-                            編集
-                        </button>
-                    `;
-                }
-            }
-            
-            return `
-                <div class="user-card ${isDeleted ? 'deleted' : ''}">
-                    <div class="user-info">
-                        <div class="user-details">
-                            <h3>${this.escapeHtml(user.name)} ${statusBadge}</h3>
-                            <p><strong>メール:</strong> ${this.escapeHtml(user.email)}</p>
-                            <p><strong>役割:</strong> ${this.escapeHtml(user.role || 'user')}</p>
-                            <p><strong>作成日:</strong> ${user.createdAt ? new Date(user.createdAt).toLocaleDateString('ja-JP') : '不明'}</p>
-                            ${isDeleted && user.deletedAt ? `<p><strong>削除日:</strong> ${new Date(user.deletedAt).toLocaleDateString('ja-JP')}</p>` : ''}
-                        </div>
-                        <div class="user-actions">
-                            ${actions}
-                        </div>
-                    </div>
-                </div>
-            `;
-        }).join('');
+        const table = document.createElement('table');
+        table.className = 'data-table';
 
-        container.innerHTML = usersHtml;
+        // ヘッダー作成
+        const headers = [
+            { key: 'name', label: '名前' },
+            { key: 'email', label: 'メール' },
+            { key: 'role', label: '役割' },
+            { key: 'createdAt', label: '作成日' },
+            { key: '_actions', label: '操作' }
+        ];
+
+        const headerRow = document.createElement('tr');
+        headers.forEach(header => {
+            const th = document.createElement('th');
+            th.textContent = header.label;
+            if (header.key === '_actions') {
+                th.className = 'actions-header';
+            }
+            headerRow.appendChild(th);
+        });
+        table.appendChild(headerRow);
+
+        // データ行作成
+        users.forEach(user => {
+            const row = document.createElement('tr');
+            const isDeleted = user.isValid === 'FALSE';
+
+            if (isDeleted) {
+                row.classList.add('deleted-row');
+            }
+
+            headers.forEach(header => {
+                const td = document.createElement('td');
+
+                if (header.key === '_actions') {
+                    const actionsDiv = document.createElement('div');
+                    actionsDiv.className = 'row-actions';
+
+                    if (this.isAdmin) {
+                        if (isDeleted) {
+                            const restoreBtn = document.createElement('button');
+                            restoreBtn.className = 'btn-small btn-edit';
+                            restoreBtn.textContent = '復元';
+                            restoreBtn.addEventListener('click', () => this.restoreUser(user.id));
+                            actionsDiv.appendChild(restoreBtn);
+
+                            const deleteBtn = document.createElement('button');
+                            deleteBtn.className = 'btn-small btn-delete';
+                            deleteBtn.textContent = '完全削除';
+                            deleteBtn.addEventListener('click', () => this.permanentDeleteUser(user.id));
+                            actionsDiv.appendChild(deleteBtn);
+                        } else {
+                            const editBtn = document.createElement('button');
+                            editBtn.className = 'btn-small btn-edit';
+                            editBtn.textContent = '編集';
+                            editBtn.addEventListener('click', () => this.editUser(user.id));
+                            actionsDiv.appendChild(editBtn);
+
+                            const deleteBtn = document.createElement('button');
+                            deleteBtn.className = 'btn-small btn-delete';
+                            deleteBtn.textContent = '削除';
+                            deleteBtn.addEventListener('click', () => this.deleteUser(user.id));
+                            actionsDiv.appendChild(deleteBtn);
+                        }
+                    } else if (!isDeleted) {
+                        const editBtn = document.createElement('button');
+                        editBtn.className = 'btn-small btn-edit';
+                        editBtn.textContent = '編集';
+                        editBtn.addEventListener('click', () => this.editUser(user.id));
+                        actionsDiv.appendChild(editBtn);
+                    }
+
+                    td.appendChild(actionsDiv);
+                } else if (header.key === 'name') {
+                    td.textContent = user.name || '';
+                    if (isDeleted) {
+                        const badge = document.createElement('span');
+                        badge.className = 'status-badge deleted';
+                        badge.textContent = '削除済み';
+                        badge.style.marginLeft = '8px';
+                        td.appendChild(badge);
+                    }
+                } else if (header.key === 'role') {
+                    const roleBadge = document.createElement('span');
+                    roleBadge.className = `role-badge ${user.role || 'user'}`;
+                    roleBadge.textContent = user.role === 'admin' ? '管理者' : 'ユーザー';
+                    td.appendChild(roleBadge);
+                } else if (header.key === 'createdAt') {
+                    td.textContent = user.createdAt ? new Date(user.createdAt).toLocaleDateString('ja-JP') : '';
+                } else {
+                    td.textContent = user[header.key] || '';
+                }
+
+                row.appendChild(td);
+            });
+
+            table.appendChild(row);
+        });
+
+        container.innerHTML = '';
+        container.appendChild(table);
+
+        // 列幅リサイズ機能を初期化
+        if (window.ColumnResize) {
+            ColumnResize.init(table, 'users-column-widths');
+        }
     }
 
     async editUser(id) {

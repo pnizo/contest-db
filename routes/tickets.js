@@ -79,18 +79,18 @@ router.get('/', async (req, res) => {
   }
 });
 
-// GET /:rowIndex - 特定チケット取得
-router.get('/:rowIndex', async (req, res) => {
+// GET /:id - 特定チケット取得
+router.get('/:id', async (req, res) => {
   try {
-    const rowIndex = parseInt(req.params.rowIndex);
-    if (isNaN(rowIndex) || rowIndex < 2) {
+    const id = parseInt(req.params.id);
+    if (isNaN(id) || id < 1) {
       return res.status(400).json({
         success: false,
-        error: '無効な行インデックスです'
+        error: '無効なIDです'
       });
     }
 
-    const ticket = await ticketModel.findByRowIndex(rowIndex);
+    const ticket = await ticketModel.findById(id);
     if (!ticket) {
       return res.status(404).json({
         success: false,
@@ -105,14 +105,14 @@ router.get('/:rowIndex', async (req, res) => {
   }
 });
 
-// PUT /:rowIndex - チケット更新（管理者のみ）
-router.put('/:rowIndex', requireAdmin, async (req, res) => {
+// PUT /:id - チケット更新（管理者のみ）
+router.put('/:id', requireAdmin, async (req, res) => {
   try {
-    const rowIndex = parseInt(req.params.rowIndex);
-    if (isNaN(rowIndex) || rowIndex < 2) {
+    const id = parseInt(req.params.id);
+    if (isNaN(id) || id < 1) {
       return res.status(400).json({
         success: false,
-        error: '無効な行インデックスです'
+        error: '無効なIDです'
       });
     }
 
@@ -132,7 +132,7 @@ router.put('/:rowIndex', requireAdmin, async (req, res) => {
       });
     }
 
-    const result = await ticketModel.updateByRowIndex(rowIndex, updateData);
+    const result = await ticketModel.updateById(id, updateData);
     if (!result.success) {
       return res.status(400).json(result);
     }
@@ -144,18 +144,18 @@ router.put('/:rowIndex', requireAdmin, async (req, res) => {
   }
 });
 
-// DELETE /:rowIndex - チケット削除（管理者のみ）
-router.delete('/:rowIndex', requireAdmin, async (req, res) => {
+// DELETE /:id - チケット削除（管理者のみ）
+router.delete('/:id', requireAdmin, async (req, res) => {
   try {
-    const rowIndex = parseInt(req.params.rowIndex);
-    if (isNaN(rowIndex) || rowIndex < 2) {
+    const id = parseInt(req.params.id);
+    if (isNaN(id) || id < 1) {
       return res.status(400).json({
         success: false,
-        error: '無効な行インデックスです'
+        error: '無効なIDです'
       });
     }
 
-    const result = await ticketModel.deleteByRowIndex(rowIndex);
+    const result = await ticketModel.deleteById(id);
     if (!result.success) {
       return res.status(400).json(result);
     }

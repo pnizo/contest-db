@@ -516,7 +516,7 @@ router.post('/import', requireAuth, async (req, res) => {
   }
 });
 
-// 複数のNPCJ番号の成績データをテキスト形式で取得
+// 複数のFWJカード番号の成績データをテキスト形式で取得
 router.get('/text/multiple', async (req, res) => {
   try {
     const { fwjNos, id } = req.query;
@@ -533,10 +533,10 @@ router.get('/text/multiple', async (req, res) => {
     
     // fwjNosによる絞り込み
     if (fwjNos) {
-      const npcjList = fwjNos.split(',').map(n => n.trim()).filter(n => n);
-      if (npcjList.length > 0) {
+      const fwjList = fwjNos.split(',').map(n => n.trim()).filter(n => n);
+      if (fwjList.length > 0) {
         const fwjScores = allScores.filter(score => 
-          score.fwj_card_no && npcjList.includes(score.fwj_card_no.toString())
+          score.fwj_card_no && fwjList.includes(score.fwj_card_no.toString())
         );
         targetScores = targetScores.concat(fwjScores);
       }
@@ -545,7 +545,7 @@ router.get('/text/multiple', async (req, res) => {
     // idによる絞り込み（単一IDのみ）
     if (id) {
       const idScore = allScores.find(score => 
-        score.id && score.id.toString() === id.toString()
+        score.fwj_card_no && score.fwj_card_no.toString() === id.toString()
       );
       if (idScore) {
         targetScores = targetScores.concat([idScore]);

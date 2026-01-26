@@ -181,7 +181,7 @@ class MembersManager {
         const container = document.getElementById('membersTableContainer');
 
         if (members.length === 0) {
-            container.innerHTML = '<div class="no-data">FWJ会員情報が見つかりません</div>';
+            container.innerHTML = '<div class="no-data">FWJ会員検索が見つかりません</div>';
             return;
         }
 
@@ -246,6 +246,11 @@ class MembersManager {
 
         container.innerHTML = '';
         container.appendChild(table);
+
+        // 列幅リサイズ機能を初期化
+        if (window.ColumnResize) {
+            ColumnResize.init(table, 'members-column-widths');
+        }
     }
 
     getSortIcon(column) {

@@ -1,77 +1,256 @@
-const BaseModel = require('./BaseModel');
+const { getDb } = require('../lib/db');
+const { scores } = require('../lib/db/schema');
+const { eq, and, or, ilike, gte, lte, desc, asc, sql } = require('drizzle-orm');
 
-class Score extends BaseModel {
-  constructor() { 
-    super('Scores');
+class Score {
+  constructor() {
+    // Drizzle ORM使用
+  }
+
+  // DB行データをAPIレスポンス形式に変換
+  _toResponse(row) {
+    if (!row) return null;
+    return {
+      id: row.id,
+      fwj_card_no: row.fwjCardNo || '',
+      contest_date: row.contestDate || '',
+      contest_name: row.contestName || '',
+      contest_place: row.contestPlace || '',
+      category_name: row.categoryName || '',
+      placing: row.placing || '',
+      player_no: row.playerNo || '',
+      player_name: row.playerName || '',
+      isValid: row.isValid ? 'TRUE' : 'FALSE',
+      createdAt: row.createdAt ? row.createdAt.toISOString() : '',
+      updatedAt: row.updatedAt ? row.updatedAt.toISOString() : '',
+      deletedAt: row.deletedAt ? row.deletedAt.toISOString() : '',
+      restoredAt: row.restoredAt ? row.restoredAt.toISOString() : '',
+    };
+  }
+
+  async findAll() {
+    const db = getDb();
+    const rows = await db
+      .select()
+      .from(scores)
+      .where(eq(scores.isValid, true))
+      .orderBy(desc(scores.contestDate));
+
+    return rows.map(row => this._toResponse(row));
+  }
+
+  async findAllIncludingDeleted() {
+    const db = getDb();
+    const rows = await db
+      .select()
+      .from(scores)
+      .orderBy(desc(scores.contestDate));
+
+    return rows.map(row => this._toResponse(row));
+  }
+
+  async findById(id) {
+    const db = getDb();
+    const rows = await db
+      .select()
+      .from(scores)
+      .where(eq(scores.id, parseInt(id)));
+
+    if (rows.length === 0) return null;
+    return this._toResponse(rows[0]);
   }
 
   async findByFwjNo(fwjNo) {
-    const all = await this.findAll();
-    return all.filter(score => score.fwj_card_no === fwjNo);
+    const db = getDb();
+    const rows = await db
+      .select()
+      .from(scores)
+      .where(and(
+        eq(scores.fwjCardNo, fwjNo),
+        eq(scores.isValid, true)
+      ))
+      .orderBy(desc(scores.contestDate));
+
+    return rows.map(row => this._toResponse(row));
   }
 
   async findByContest(contestName) {
-    const all = await this.findAll();
-    return all.filter(score => 
-      score.contest_name && 
-      score.contest_name.toLowerCase().includes(contestName.toLowerCase())
-    );
+    const db = getDb();
+    const rows = await db
+      .select()
+      .from(scores)
+      .where(and(
+        ilike(scores.contestName, `%${contestName}%`),
+        eq(scores.isValid, true)
+      ))
+      .orderBy(desc(scores.contestDate));
+
+    return rows.map(row => this._toResponse(row));
   }
 
   async findByCategory(categoryName) {
-    const all = await this.findAll();
-    return all.filter(score => 
-      score.category_name && 
-      score.category_name.toLowerCase().includes(categoryName.toLowerCase())
-    );
+    const db = getDb();
+    const rows = await db
+      .select()
+      .from(scores)
+      .where(and(
+        ilike(scores.categoryName, `%${categoryName}%`),
+        eq(scores.isValid, true)
+      ))
+      .orderBy(desc(scores.contestDate));
+
+    return rows.map(row => this._toResponse(row));
   }
 
   async findByPlayerName(playerName) {
-    const all = await this.findAll();
-    return all.filter(score => 
-      score.player_name && 
-      score.player_name.toLowerCase().includes(playerName.toLowerCase())
-    );
+    const db = getDb();
+    const rows = await db
+      .select()
+      .from(scores)
+      .where(and(
+        ilike(scores.playerName, `%${playerName}%`),
+        eq(scores.isValid, true)
+      ))
+      .orderBy(desc(scores.contestDate));
+
+    return rows.map(row => this._toResponse(row));
   }
 
   async findByDateRange(startDate, endDate) {
-    const all = await this.findAll();
-    return all.filter(score => {
-      if (!score.contest_date) return false;
-      const scoreDate = new Date(score.contest_date);
-      const start = new Date(startDate);
-      const end = new Date(endDate);
-      return scoreDate >= start && scoreDate <= end;
-    });
+    const db = getDb();
+    const rows = await db
+      .select()
+      .from(scores)
+      .where(and(
+        gte(scores.contestDate, startDate),
+        lte(scores.contestDate, endDate),
+        eq(scores.isValid, true)
+      ))
+      .orderBy(desc(scores.contestDate));
+
+    return rows.map(row => this._toResponse(row));
   }
 
   // 複合キーでの検索
   async findByCompositeKey(fwjNo, contestDate, contestName, categoryName) {
-    const all = await this.findAllIncludingDeleted();
-    return all.find(score => 
-      score.fwj_card_no === fwjNo &&
-      score.contest_date === contestDate &&
-      score.contest_name === contestName &&
-      score.category_name === categoryName
-    );
+    const db = getDb();
+    const rows = await db
+      .select()
+      .from(scores)
+      .where(and(
+        eq(scores.fwjCardNo, fwjNo),
+        eq(scores.contestDate, contestDate),
+        eq(scores.contestName, contestName),
+        eq(scores.categoryName, categoryName)
+      ));
+
+    if (rows.length === 0) return null;
+    return this._toResponse(rows[0]);
+  }
+
+  async findWithPaging(page = 1, limit = 50, filters = {}, sortBy = 'contest_date', sortOrder = 'desc') {
+    const db = getDb();
+
+    let conditions = [eq(scores.isValid, true)];
+
+    // フィルター条件
+    if (filters.fwj_card_no) {
+      conditions.push(eq(scores.fwjCardNo, filters.fwj_card_no));
+    }
+    if (filters.contest_name) {
+      conditions.push(eq(scores.contestName, filters.contest_name));
+    }
+    if (filters.category_name) {
+      conditions.push(eq(scores.categoryName, filters.category_name));
+    }
+    if (filters.startDate) {
+      conditions.push(gte(scores.contestDate, filters.startDate));
+    }
+    if (filters.endDate) {
+      conditions.push(lte(scores.contestDate, filters.endDate));
+    }
+    if (filters.search) {
+      const searchTerm = `%${filters.search}%`;
+      conditions.push(
+        or(
+          ilike(scores.playerName, searchTerm),
+          ilike(scores.contestName, searchTerm),
+          ilike(scores.categoryName, searchTerm),
+          ilike(scores.fwjCardNo, searchTerm)
+        )
+      );
+    }
+
+    // 総数を取得
+    const countResult = await db
+      .select({ count: sql`count(*)` })
+      .from(scores)
+      .where(and(...conditions));
+
+    const total = parseInt(countResult[0].count);
+
+    // 数値ソートが必要なカラム
+    const numericSortColumns = ['placing', 'player_no'];
+
+    // ソート式を構築
+    let orderByExpr;
+    if (numericSortColumns.includes(sortBy)) {
+      // 数値としてソート（NULLや空文字は最後に）
+      // "placing"は予約語なのでクォートが必要
+      const columnName = sortBy === 'placing' ? '"placing"' : 'player_no';
+      if (sortOrder === 'asc') {
+        orderByExpr = sql`NULLIF(${sql.raw(columnName)}, '')::INTEGER ASC NULLS LAST`;
+      } else {
+        orderByExpr = sql`NULLIF(${sql.raw(columnName)}, '')::INTEGER DESC NULLS LAST`;
+      }
+    } else {
+      // 通常のソート
+      const sortColumnMap = {
+        'contest_date': scores.contestDate,
+        'contest_name': scores.contestName,
+        'category_name': scores.categoryName,
+        'player_name': scores.playerName,
+        'fwj_card_no': scores.fwjCardNo,
+      };
+      const sortColumn = sortColumnMap[sortBy] || scores.contestDate;
+      const orderFn = sortOrder === 'asc' ? asc : desc;
+      orderByExpr = orderFn(sortColumn);
+    }
+
+    // データを取得
+    const rows = await db
+      .select()
+      .from(scores)
+      .where(and(...conditions))
+      .orderBy(orderByExpr)
+      .limit(limit)
+      .offset((page - 1) * limit);
+
+    return {
+      data: rows.map(row => this._toResponse(row)),
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit),
+    };
   }
 
   async validateScore(scoreData) {
     const errors = [];
-    
+
     // 複合キーの検証
     if (!scoreData.fwj_card_no || scoreData.fwj_card_no.trim() === '') {
       errors.push('FWJカード番号は必須です');
     }
-    
+
     if (!scoreData.contest_name || scoreData.contest_name.trim() === '') {
       errors.push('大会名は必須です');
     }
-    
+
     if (!scoreData.category_name || scoreData.category_name.trim() === '') {
       errors.push('カテゴリー名は必須です');
     }
-    
+
     if (!scoreData.contest_date) {
       errors.push('開催日は必須です');
     } else {
@@ -89,17 +268,6 @@ class Score extends BaseModel {
       }
     }
 
-    
-    if (!scoreData.id) {
-      scoreData.id = Date.now().toString();
-    }
-    
-    scoreData.createdAt = scoreData.createdAt || new Date().toISOString();
-    scoreData.isValid = scoreData.isValid || 'TRUE';
-    scoreData.updatedAt = scoreData.updatedAt || new Date().toISOString();
-    scoreData.deletedAt = scoreData.deletedAt || '';
-    scoreData.restoredAt = scoreData.restoredAt || '';
-    
     return { isValid: errors.length === 0, errors, scoreData };
   }
 
@@ -109,7 +277,7 @@ class Score extends BaseModel {
       scoreData.fwj_card_no = scoreData.npcj_no;
       delete scoreData.npcj_no;
     }
-    
+
     const validation = await this.validateScore(scoreData);
     if (!validation.isValid) {
       return { success: false, errors: validation.errors };
@@ -125,12 +293,11 @@ class Score extends BaseModel {
 
     if (existingDeletedScore && existingDeletedScore.isValid === 'FALSE') {
       // 削除済みデータを復元
-      validation.scoreData.id = existingDeletedScore.id;
-      validation.scoreData.isValid = 'TRUE';
-      validation.scoreData.updatedAt = new Date().toISOString();
-      validation.scoreData.restoredAt = new Date().toISOString();
-      
-      const result = await this.update(existingDeletedScore.id, validation.scoreData);
+      const result = await this.update(existingDeletedScore.id, {
+        ...validation.scoreData,
+        isValid: 'TRUE',
+        restoredAt: new Date().toISOString()
+      });
       if (result.success) {
         return { success: true, data: result.data, restored: true };
       }
@@ -138,6 +305,81 @@ class Score extends BaseModel {
     }
 
     return await this.create(validation.scoreData);
+  }
+
+  async create(data) {
+    const db = getDb();
+
+    try {
+      const now = new Date();
+      const insertData = {
+        fwjCardNo: data.fwj_card_no,
+        contestDate: data.contest_date,
+        contestName: data.contest_name,
+        contestPlace: data.contest_place || null,
+        categoryName: data.category_name,
+        placing: data.placing || null,
+        playerNo: data.player_no || null,
+        playerName: data.player_name || null,
+        isValid: true,
+        createdAt: now,
+        updatedAt: now,
+      };
+
+      const result = await db
+        .insert(scores)
+        .values(insertData)
+        .returning();
+
+      return { success: true, data: this._toResponse(result[0]) };
+    } catch (error) {
+      console.error('Score create error:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  async update(id, data) {
+    const db = getDb();
+
+    try {
+      const updateData = {
+        updatedAt: new Date(),
+      };
+
+      if (data.fwj_card_no !== undefined) updateData.fwjCardNo = data.fwj_card_no;
+      if (data.contest_date !== undefined) updateData.contestDate = data.contest_date;
+      if (data.contest_name !== undefined) updateData.contestName = data.contest_name;
+      if (data.contest_place !== undefined) updateData.contestPlace = data.contest_place || null;
+      if (data.category_name !== undefined) updateData.categoryName = data.category_name;
+      if (data.placing !== undefined) updateData.placing = data.placing || null;
+      if (data.player_no !== undefined) updateData.playerNo = data.player_no || null;
+      if (data.player_name !== undefined) updateData.playerName = data.player_name || null;
+
+      if (data.isValid !== undefined) {
+        updateData.isValid = data.isValid === 'TRUE' || data.isValid === true;
+      }
+      if (data.deletedAt !== undefined) {
+        updateData.deletedAt = data.deletedAt ? new Date(data.deletedAt) : null;
+      }
+      if (data.restoredAt !== undefined) {
+        updateData.restoredAt = data.restoredAt ? new Date(data.restoredAt) : null;
+      }
+
+      const result = await db
+        .update(scores)
+        .set(updateData)
+        .where(eq(scores.id, parseInt(id)))
+        .returning();
+
+      if (result.length === 0) {
+        return { success: false, error: '成績が見つかりません' };
+      }
+
+      return { success: true, data: this._toResponse(result[0]) };
+    } catch (error) {
+      console.error('Score update error:', error);
+      return { success: false, error: error.message };
+    }
   }
 
   async softDelete(id) {
@@ -150,12 +392,30 @@ class Score extends BaseModel {
       return { success: false, error: '成績は既に削除されています' };
     }
 
-    const updateData = {
+    return await this.update(id, {
       isValid: 'FALSE',
       deletedAt: new Date().toISOString()
-    };
+    });
+  }
 
-    return await this.update(id, updateData);
+  async delete(id) {
+    const db = getDb();
+
+    try {
+      const result = await db
+        .delete(scores)
+        .where(eq(scores.id, parseInt(id)))
+        .returning();
+
+      if (result.length === 0) {
+        return { success: false, error: '成績が見つかりません' };
+      }
+
+      return { success: true };
+    } catch (error) {
+      console.error('Score delete error:', error);
+      return { success: false, error: error.message };
+    }
   }
 
   validateHeaders(csvData) {
@@ -163,11 +423,10 @@ class Score extends BaseModel {
       return { isValid: false, error: 'データが空です' };
     }
 
-    // 全てのヘッダーが必須（FWJ移行対応でfwj_card_noを標準とする）
     const requiredHeaders = [
       'fwj_card_no',
       'contest_date',
-      'contest_name', 
+      'contest_name',
       'contest_place',
       'category_name',
       'placing',
@@ -175,24 +434,20 @@ class Score extends BaseModel {
       'player_name'
     ];
 
-    // 最初の行からヘッダーを取得
     const firstRow = csvData[0];
     const headers = Object.keys(firstRow);
-    
+
     console.log('CSV headers found:', headers);
     console.log('Required headers:', requiredHeaders);
 
-    // 必須ヘッダーの検証
-    const missingRequired = requiredHeaders.filter(required => 
+    const missingRequired = requiredHeaders.filter(required =>
       !headers.find(header => header.trim().toLowerCase() === required.trim().toLowerCase())
     );
 
     // NPCJ番号からFWJ番号への移行対応
     if (missingRequired.includes('fwj_card_no')) {
-      // fwj_card_noが見つからない場合、npcj_noで代替可能かチェック
       const hasFwjNo = headers.some(header => header.trim() === 'npcj_no');
       if (hasFwjNo) {
-        // npcj_noがある場合は、fwj_card_noの不足をリストから除外
         const index = missingRequired.indexOf('fwj_card_no');
         missingRequired.splice(index, 1);
         console.log('Using npcj_no as substitute for fwj_card_no');
@@ -215,105 +470,31 @@ class Score extends BaseModel {
   async batchImport(csvData) {
     try {
       console.log(`Starting batch import with ${csvData.length} records`);
-      
-      // データが配列でない、または空の場合はエラー
+
       if (!Array.isArray(csvData) || csvData.length === 0) {
         return { success: false, error: 'インポートするデータがありません' };
       }
 
-      // Google Sheets APIを初期化
-      await this.ensureInitialized();
+      const db = getDb();
+      const now = new Date();
 
-      // データがすでに構造化されている場合（オブジェクトの配列）はそのまま使用
-      // データの形式を確認
-      const firstItem = csvData[0];
-      const isStructured = typeof firstItem === 'object' && 
-                          !Array.isArray(firstItem) &&
-                          ('contest_date' in firstItem || 'fwj_card_no' in firstItem);
+      // バルクインサート用のデータを準備
+      const insertData = csvData.map(row => ({
+        fwjCardNo: row.fwj_card_no || '',
+        contestDate: row.contest_date || '',
+        contestName: row.contest_name || '',
+        contestPlace: row.contest_place || null,
+        categoryName: row.category_name || '',
+        placing: row.placing || null,
+        playerNo: row.player_no || null,
+        playerName: row.player_name || null,
+        isValid: true,
+        createdAt: now,
+        updatedAt: now,
+      }));
 
-      let rows;
-
-      if (isStructured) {
-        // 構造化されたデータ（routes/scores.jsから渡される形式）
-        console.log('Processing structured data');
-        rows = csvData.map(row => {
-          const now = new Date().toISOString();
-          return [
-            Date.now().toString() + Math.random().toString(36).substr(2, 9), // id (unique)
-            row.fwj_card_no || '',
-            row.contest_date || '',
-            row.contest_name || '',
-            row.contest_place || '',
-            row.category_name || '',
-            row.placing || '',
-            row.player_no || '',
-            row.player_name || '',
-            now, // createdAt
-            'TRUE', // isValid
-            '', // deletedAt
-            now, // updatedAt
-            '' // restoredAt
-          ];
-        });
-      } else {
-        // 従来のCSV形式（ヘッダー検証あり）
-        console.log('Processing CSV-style data with header validation');
-        const headerValidation = this.validateHeaders(csvData);
-        if (!headerValidation.isValid) {
-          return {
-            success: false,
-            error: headerValidation.error
-          };
-        }
-
-        rows = csvData.map(row => {
-          const now = new Date().toISOString();
-
-          // ヘッダーを小文字に変換してアクセス
-          const normalizedRow = {};
-          for (const key in row) {
-            normalizedRow[key.toLowerCase()] = row[key];
-          }
-
-          // CSVのnpcj_noをfwj_card_noにマッピング
-          const fwjNo = normalizedRow.fwj_card_no || normalizedRow.npcj_no || '';
-
-          return [
-            Date.now().toString() + Math.random().toString(36).substr(2, 9), // id (unique)
-            fwjNo,
-            normalizedRow.contest_date || '',
-            normalizedRow.contest_name || '',
-            normalizedRow.contest_place || '',
-            normalizedRow.category_name || '',
-            normalizedRow.placing || '',
-            normalizedRow.player_no || '',
-            normalizedRow.player_name || '',
-            now, // createdAt
-            'TRUE', // isValid
-            '', // deletedAt
-            now, // updatedAt
-            '' // restoredAt
-          ];
-        });
-      }
-
-      if (rows.length === 0) {
-        return { success: false, error: 'インポートするデータがありません' };
-      }
-
-      console.log(`Appending ${rows.length} rows to Google Sheets`);
-
-      // Google Sheets APIを使用してバッチ追記
-      const sheets = this.sheetsService.sheets;
-      const response = await sheets.spreadsheets.values.append({
-        spreadsheetId: this.sheetsService.spreadsheetId,
-        range: `${this.sheetName}!A:N`,
-        valueInputOption: 'RAW',
-        insertDataOption: 'INSERT_ROWS',
-        requestBody: {
-          values: rows
-        }
-      });
+      // バルクインサート
+      await db.insert(scores).values(insertData);
 
       console.log('Import completed successfully');
 
@@ -321,8 +502,7 @@ class Score extends BaseModel {
         success: true,
         data: {
           total: csvData.length,
-          imported: rows.length,
-          range: response.data.updates.updatedRange
+          imported: insertData.length,
         }
       };
 
@@ -331,7 +511,6 @@ class Score extends BaseModel {
       return { success: false, error: error.message };
     }
   }
-
 }
 
 module.exports = Score;

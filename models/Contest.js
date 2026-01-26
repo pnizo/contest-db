@@ -1,239 +1,285 @@
-const BaseModel = require('./BaseModel');
-const { generateUniqueId } = require('../utils/generateId');
+const { getDb } = require('../lib/db');
+const { contests } = require('../lib/db/schema');
+const { eq, ilike, and, desc, asc, sql, gte, lte } = require('drizzle-orm');
 
-class Contest extends BaseModel {
-  constructor() {
-    super('Contests');
+/**
+ * コンテストモデル - Neon Postgres / Drizzle ORM版
+ */
+class Contest {
+  /**
+   * DBのcamelCaseをAPI用のsnake_caseに変換
+   * @private
+   */
+  _toSnakeCase(row) {
+    if (!row) return null;
+    return {
+      id: row.id,
+      contest_name: row.contestName,
+      contest_date: row.contestDate,
+      contest_place: row.contestPlace,
+      is_ready: row.isReady,
+      created_at: row.createdAt,
+      updated_at: row.updatedAt,
+    };
   }
 
-  // Override findAll to skip isValid filtering since Contests sheet doesn't have isValid column
+  /**
+   * 全コンテストを取得
+   */
   async findAll() {
     try {
-      await this.ensureInitialized();
-      const values = await this.getSheetsService().getValues(`${this.sheetName}!A:AD`);
-      if (values.length === 0) return [];
+      const db = getDb();
+      const rows = await db
+        .select()
+        .from(contests)
+        .where(sql`${contests.contestName} IS NOT NULL AND ${contests.contestName} != ''`);
 
-      const headers = values[0];
-      const data = values.slice(1);
-
-      const allItems = data.map((row, index) => {
-        const obj = { _rowIndex: index + 2 };
-        headers.forEach((header, i) => {
-          obj[header] = row[i] || '';
-        });
-        return obj;
-      });
-
-      // Don't filter by isValid for Contests sheet - return all items with valid contest_name
-      return allItems.filter(item => item.contest_name && item.contest_name.trim() !== '');
+      return rows.map(row => this._toSnakeCase(row));
     } catch (error) {
       console.error('Error in findAll:', error);
       return [];
     }
   }
 
-  // ページング付きで取得
+  /**
+   * ページング・フィルタリング・ソート付きでコンテストを取得
+   */
   async findWithPaging(page = 1, limit = 50, filters = {}, sortBy = 'contest_date', sortOrder = 'desc') {
     try {
-      const values = await this.getSheetsService().getValues(`${this.sheetName}!A:AD`);
-      if (values.length === 0) {
-        return { data: [], total: 0, page, limit, totalPages: 0 };
-      }
+      const db = getDb();
 
-      const headers = values[0];
-      const data = values.slice(1);
+      // フィルタ条件を構築
+      const conditions = [
+        sql`${contests.contestName} IS NOT NULL AND ${contests.contestName} != ''`
+      ];
 
-      let allItems = data.map((row, index) => {
-        const obj = { _rowIndex: index + 2 };
-        headers.forEach((header, i) => {
-          obj[header] = row[i] || '';
-        });
-        return obj;
-      });
-
-      // contest_nameが必須：空白のレコードは除外
-      allItems = allItems.filter(item => item.contest_name && item.contest_name.trim() !== '');
-
-      // フィルタリング適用
       if (filters.contest_name) {
-        allItems = allItems.filter(item =>
-          item.contest_name && item.contest_name.toLowerCase().includes(filters.contest_name.toLowerCase())
-        );
+        conditions.push(ilike(contests.contestName, `%${filters.contest_name}%`));
       }
       if (filters.contest_place) {
-        allItems = allItems.filter(item =>
-          item.contest_place && item.contest_place.toLowerCase().includes(filters.contest_place.toLowerCase())
-        );
+        conditions.push(ilike(contests.contestPlace, `%${filters.contest_place}%`));
       }
       if (filters.search) {
-        const searchTerm = filters.search.toLowerCase();
-        allItems = allItems.filter(item => {
-          const searchFields = [
-            item.contest_name,
-            item.contest_place
-          ];
-          return searchFields.some(field =>
-            field && field.toString().toLowerCase().includes(searchTerm)
-          );
-        });
+        const searchTerm = `%${filters.search}%`;
+        conditions.push(
+          sql`(
+            ${contests.contestName} ILIKE ${searchTerm} OR
+            ${contests.contestPlace} ILIKE ${searchTerm}
+          )`
+        );
       }
       if (filters.startDate && filters.endDate) {
-        allItems = allItems.filter(item => {
-          if (!item.contest_date) return false;
-          const itemDate = new Date(item.contest_date);
-          const start = new Date(filters.startDate);
-          const end = new Date(filters.endDate);
-          return itemDate >= start && itemDate <= end;
-        });
+        conditions.push(gte(contests.contestDate, filters.startDate));
+        conditions.push(lte(contests.contestDate, filters.endDate));
       }
 
-      // ソート処理
-      if (sortBy && allItems.length > 0) {
-        allItems.sort((a, b) => {
-          let aVal = a[sortBy] || '';
-          let bVal = b[sortBy] || '';
+      const whereClause = and(...conditions);
 
-          // 日付の場合は Date オブジェクトに変換
-          if (sortBy === 'contest_date') {
-            aVal = aVal ? new Date(aVal) : new Date(0);
-            bVal = bVal ? new Date(bVal) : new Date(0);
-          } else {
-            aVal = String(aVal).toLowerCase();
-            bVal = String(bVal).toLowerCase();
-          }
+      // ソートカラムをマップ
+      const sortColumnMap = {
+        contest_date: contests.contestDate,
+        contest_name: contests.contestName,
+        contest_place: contests.contestPlace,
+      };
+      const sortColumn = sortColumnMap[sortBy] || contests.contestDate;
+      const orderFn = sortOrder === 'asc' ? asc : desc;
 
-          if (aVal < bVal) {
-            return sortOrder === 'asc' ? -1 : 1;
-          }
-          if (aVal > bVal) {
-            return sortOrder === 'asc' ? 1 : -1;
-          }
-          return 0;
-        });
-      }
+      // 総件数を取得
+      const countResult = await db
+        .select({ count: sql`count(*)` })
+        .from(contests)
+        .where(whereClause);
+      const total = parseInt(countResult[0].count, 10);
 
-      const total = allItems.length;
+      // データ取得
+      const offset = (page - 1) * limit;
+      const rows = await db
+        .select()
+        .from(contests)
+        .where(whereClause)
+        .orderBy(orderFn(sortColumn))
+        .limit(limit)
+        .offset(offset);
+
+      const data = rows.map(row => this._toSnakeCase(row));
       const totalPages = Math.ceil(total / limit);
-      const startIndex = (page - 1) * limit;
-      const endIndex = startIndex + limit;
-      const pagedData = allItems.slice(startIndex, endIndex);
 
-      return { data: pagedData, total, page, limit, totalPages };
+      return { data, total, page, limit, totalPages };
     } catch (error) {
       console.error('Error in findWithPaging:', error);
       return { data: [], total: 0, page, limit, totalPages: 0 };
     }
   }
 
+  /**
+   * コンテスト名で検索
+   */
   async findByName(contestName) {
-    const all = await this.findAll();
-    return all.find(contest => contest.contest_name === contestName);
-  }
-
-  async findByRowIndex(rowIndex) {
     try {
-      const allContests = await this.findAll();
-      return allContests.find(contest => contest._rowIndex === rowIndex) || null;
+      const db = getDb();
+      const rows = await db
+        .select()
+        .from(contests)
+        .where(eq(contests.contestName, contestName));
+
+      if (rows.length === 0) {
+        return null;
+      }
+
+      return this._toSnakeCase(rows[0]);
     } catch (error) {
-      console.error('Error in Contest.findByRowIndex:', error);
+      console.error('Error in findByName:', error);
       return null;
     }
   }
 
+  /**
+   * IDでコンテストを取得
+   */
+  async findById(id) {
+    try {
+      const db = getDb();
+      const rows = await db
+        .select()
+        .from(contests)
+        .where(eq(contests.id, parseInt(id, 10)));
+
+      if (rows.length === 0) {
+        return null;
+      }
+
+      return this._toSnakeCase(rows[0]);
+    } catch (error) {
+      console.error('Error in findById:', error);
+      return null;
+    }
+  }
+
+  /**
+   * 日付範囲でコンテストを検索
+   */
   async findByDateRange(startDate, endDate) {
-    const all = await this.findAll();
-    return all.filter(contest => {
-      if (!contest.contest_date) return false;
-      const contestDate = new Date(contest.contest_date);
-      const start = new Date(startDate);
-      const end = new Date(endDate);
-      return contestDate >= start && contestDate <= end;
-    });
+    try {
+      const db = getDb();
+      const rows = await db
+        .select()
+        .from(contests)
+        .where(
+          and(
+            gte(contests.contestDate, startDate),
+            lte(contests.contestDate, endDate),
+            sql`${contests.contestName} IS NOT NULL AND ${contests.contestName} != ''`
+          )
+        )
+        .orderBy(desc(contests.contestDate));
+
+      return rows.map(row => this._toSnakeCase(row));
+    } catch (error) {
+      console.error('Error in findByDateRange:', error);
+      return [];
+    }
   }
 
-  // 開催日順にソートされたコンテスト一覧を取得
+  /**
+   * 開催日順にソートされたコンテスト一覧を取得
+   */
   async findAllSorted(order = 'desc') {
-    const all = await this.findAll();
-    return all.sort((a, b) => {
-      const dateA = new Date(a.contest_date);
-      const dateB = new Date(b.contest_date);
-      return order === 'desc' ? dateB - dateA : dateA - dateB;
-    });
+    try {
+      const db = getDb();
+      const orderFn = order === 'asc' ? asc : desc;
+      const rows = await db
+        .select()
+        .from(contests)
+        .where(sql`${contests.contestName} IS NOT NULL AND ${contests.contestName} != ''`)
+        .orderBy(orderFn(contests.contestDate));
+
+      return rows.map(row => this._toSnakeCase(row));
+    } catch (error) {
+      console.error('Error in findAllSorted:', error);
+      return [];
+    }
   }
 
-  // 今日以降のコンテストを取得
+  /**
+   * 今日以降のコンテストを取得
+   */
   async findUpcoming() {
-    const all = await this.findAll();
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    try {
+      const db = getDb();
+      const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD形式
 
-    return all
-      .filter(contest => {
-        if (!contest.contest_date) return false;
-        const contestDate = new Date(contest.contest_date);
-        return contestDate >= today;
-      })
-      .sort((a, b) => new Date(a.contest_date) - new Date(b.contest_date));
+      const rows = await db
+        .select()
+        .from(contests)
+        .where(
+          and(
+            gte(contests.contestDate, today),
+            sql`${contests.contestName} IS NOT NULL AND ${contests.contestName} != ''`
+          )
+        )
+        .orderBy(asc(contests.contestDate));
+
+      return rows.map(row => this._toSnakeCase(row));
+    } catch (error) {
+      console.error('Error in findUpcoming:', error);
+      return [];
+    }
   }
 
-  // 新規作成
+  /**
+   * 新規作成
+   */
   async create(contestData) {
     try {
-      await this.ensureInitialized();
-      const values = await this.getSheetsService().getValues(`${this.sheetName}!A:AD`);
-      if (values.length === 0) {
-        throw new Error('ヘッダー行が見つかりません');
-      }
+      const db = getDb();
 
-      const headers = values[0];
+      const insertResult = await db
+        .insert(contests)
+        .values({
+          contestName: contestData.contest_name,
+          contestDate: contestData.contest_date,
+          contestPlace: contestData.contest_place || '',
+          isReady: contestData.is_ready === true || contestData.is_ready === 'true',
+        })
+        .returning({ id: contests.id });
 
-      // IDが存在しない場合は生成
-      if (!contestData.id) {
-        contestData.id = generateUniqueId();
-      }
-
-      // 有効なフィールドのみを含む行データを作成
-      const newRow = headers.map(header => contestData[header] || '');
-
-      // 新しい行を追加
-      await this.getSheetsService().appendValues(`${this.sheetName}!A:AD`, [newRow]);
-
-      return { success: true, message: '大会情報を追加しました' };
+      return { 
+        success: true, 
+        message: '大会情報を追加しました',
+        id: insertResult[0]?.id 
+      };
     } catch (error) {
       console.error('Error in Contest.create:', error);
       throw error;
     }
   }
 
-  // 更新
-  async update(rowIndex, contestData) {
+  /**
+   * IDで更新
+   */
+  async update(id, contestData) {
     try {
-      await this.ensureInitialized();
-      const values = await this.getSheetsService().getValues(`${this.sheetName}!A:AD`);
-      if (values.length === 0) {
-        throw new Error('ヘッダー行が見つかりません');
+      const db = getDb();
+
+      const updateData = { updatedAt: new Date() };
+
+      if (contestData.contest_name !== undefined) {
+        updateData.contestName = contestData.contest_name;
+      }
+      if (contestData.contest_date !== undefined) {
+        updateData.contestDate = contestData.contest_date;
+      }
+      if (contestData.contest_place !== undefined) {
+        updateData.contestPlace = contestData.contest_place;
+      }
+      if (contestData.is_ready !== undefined) {
+        updateData.isReady = contestData.is_ready === true || contestData.is_ready === 'true';
       }
 
-      const headers = values[0];
-      
-      // 既存の行データを取得（行インデックスは1から始まるが、配列は0から始まるので調整）
-      const existingRowIndex = rowIndex - 2; // ヘッダー行を除く
-      const existingRow = values[existingRowIndex + 1]; // +1 for header row
-
-      // 更新する行データを作成（既存値を保持し、提供された値で上書き）
-      const updatedRow = headers.map((header, index) => {
-        if (contestData[header] !== undefined) {
-          return contestData[header];
-        }
-        // 既存の値を保持
-        return existingRow?.[index] || '';
-      });
-
-      // 行を更新
-      await this.getSheetsService().updateValues(
-        `${this.sheetName}!A${rowIndex}:AD${rowIndex}`,
-        [updatedRow]
-      );
+      await db
+        .update(contests)
+        .set(updateData)
+        .where(eq(contests.id, parseInt(id, 10)));
 
       return { success: true, message: '大会情報を更新しました' };
     } catch (error) {
@@ -242,12 +288,33 @@ class Contest extends BaseModel {
     }
   }
 
-  // 開催地一覧を取得
+  /**
+   * IDで削除
+   */
+  async deleteById(id) {
+    try {
+      const db = getDb();
+      await db.delete(contests).where(eq(contests.id, parseInt(id, 10)));
+      return { success: true };
+    } catch (error) {
+      console.error('Error in deleteById:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * 開催地一覧を取得
+   */
   async getPlaces() {
     try {
-      const allContests = await this.findAll();
-      const places = [...new Set(allContests.map(c => c.contest_place).filter(Boolean))];
-      return places.sort();
+      const db = getDb();
+      const rows = await db
+        .selectDistinct({ contestPlace: contests.contestPlace })
+        .from(contests)
+        .where(sql`${contests.contestPlace} IS NOT NULL AND ${contests.contestPlace} != ''`)
+        .orderBy(contests.contestPlace);
+
+      return rows.map(r => r.contestPlace);
     } catch (error) {
       console.error('Error in getPlaces:', error);
       return [];

@@ -29,7 +29,7 @@ router.get('/', async (req, res) => {
   }
 });
 
-// ShopifyからFWJ会員情報を同期（管理者のみ）
+// ShopifyからFWJ会員情報を取得（管理者のみ）
 router.post('/sync', requireAdmin, async (req, res) => {
   try {
     console.log('Starting Shopify sync...');

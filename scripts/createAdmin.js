@@ -1,3 +1,4 @@
+require('dotenv').config();
 const bcrypt = require('bcrypt');
 const User = require('../models/User');
 
@@ -53,8 +54,8 @@ async function createAdminUser() {
         console.error('❌ エラーが発生しました:', error.message);
         console.error('\n以下を確認してください:');
         console.error('1. .env ファイルが正しく設定されているか');
-        console.error('2. Googleスプレッドシートのアクセス権限');
-        console.error('3. スプレッドシートのヘッダー行が正しいか');
+        console.error('2. DATABASE_URL 環境変数が設定されているか');
+        console.error('3. Neon Postgres データベースに接続できるか');
     }
 }
 

@@ -1,61 +1,217 @@
-const BaseModel = require('./BaseModel');
+const { getDb } = require('../lib/db');
+const { registrations } = require('../lib/db/schema');
+const { eq, and, or, ilike, gte, lte, desc, asc, sql } = require('drizzle-orm');
 
-class Registration extends BaseModel {
+class Registration {
   constructor() {
-    super('Registrations');
+    // Drizzle ORM使用
+  }
+
+  // DB行データをAPIレスポンス形式に変換
+  _toResponse(row) {
+    if (!row) return null;
+    return {
+      id: row.id,
+      contest_date: row.contestDate || '',
+      contest_name: row.contestName || '',
+      player_no: row.playerNo || '',
+      name_ja: row.nameJa || '',
+      name_ja_kana: row.nameJaKana || '',
+      fwj_card_no: row.fwjCardNo || '',
+      first_name: row.firstName || '',
+      last_name: row.lastName || '',
+      email: row.email || '',
+      phone: row.phone || '',
+      country: row.country || '',
+      age: row.age || '',
+      class_name: row.className || '',
+      sort_index: row.sortIndex || '',
+      score_card: row.scoreCard || '',
+      contest_order: row.contestOrder || '',
+      height: row.height || '',
+      weight: row.weight || '',
+      occupation: row.occupation || '',
+      instagram: row.instagram || '',
+      biography: row.biography || '',
+      isValid: row.isValid ? 'TRUE' : 'FALSE',
+      createdAt: row.createdAt ? row.createdAt.toISOString() : '',
+      updatedAt: row.updatedAt ? row.updatedAt.toISOString() : '',
+      deletedAt: row.deletedAt ? row.deletedAt.toISOString() : '',
+      restoredAt: row.restoredAt ? row.restoredAt.toISOString() : '',
+    };
+  }
+
+  async findAll() {
+    const db = getDb();
+    const rows = await db
+      .select()
+      .from(registrations)
+      .where(eq(registrations.isValid, true))
+      .orderBy(desc(registrations.contestDate));
+
+    return rows.map(row => this._toResponse(row));
+  }
+
+  async findAllIncludingDeleted() {
+    const db = getDb();
+    const rows = await db
+      .select()
+      .from(registrations)
+      .orderBy(desc(registrations.contestDate));
+
+    return rows.map(row => this._toResponse(row));
+  }
+
+  async findById(id) {
+    const db = getDb();
+    const rows = await db
+      .select()
+      .from(registrations)
+      .where(eq(registrations.id, parseInt(id)));
+
+    if (rows.length === 0) return null;
+    return this._toResponse(rows[0]);
   }
 
   async findByContestAndDate(contestName, contestDate) {
-    const all = await this.findAll();
-    return all.filter(registration =>
-      registration.contest_name === contestName &&
-      registration.contest_date === contestDate
-    );
+    const db = getDb();
+    const rows = await db
+      .select()
+      .from(registrations)
+      .where(and(
+        eq(registrations.contestName, contestName),
+        eq(registrations.contestDate, contestDate),
+        eq(registrations.isValid, true)
+      ))
+      .orderBy(asc(registrations.playerNo));
+
+    return rows.map(row => this._toResponse(row));
   }
 
   async deleteByContestAndDate(contestName, contestDate) {
-    await this.ensureInitialized();
+    const db = getDb();
 
-    // 全データを取得（削除済み含む）
-    const allData = await this.getSheetsService().getValues(`${this.sheetName}!A:AA`);
-    if (!allData || allData.length <= 1) return { deleted: 0 };
+    const result = await db
+      .delete(registrations)
+      .where(and(
+        eq(registrations.contestName, contestName),
+        eq(registrations.contestDate, contestDate)
+      ))
+      .returning();
 
-    const headers = allData[0];
-    const contestNameIdx = headers.indexOf('contest_name');
-    const contestDateIdx = headers.indexOf('contest_date');
-
-    // 対象行のインデックスを収集（0始まり、ヘッダー行=0）
-    const rowIndicesToDelete = [];
-    for (let i = 1; i < allData.length; i++) {
-      const row = allData[i];
-      if (row[contestNameIdx] === contestName && row[contestDateIdx] === contestDate) {
-        rowIndicesToDelete.push(i); // スプレッドシートの行インデックス（0始まり）
-      }
-    }
-
-    if (rowIndicesToDelete.length > 0) {
-      await this.getSheetsService().deleteRows(this.sheetName, rowIndicesToDelete);
-    }
-
-    return { deleted: rowIndicesToDelete.length };
+    return { deleted: result.length };
   }
 
   async findByFwjCard(fwjCard) {
-    const all = await this.findAll();
-    return all.filter(registration => registration.fwj_card === fwjCard);
+    const db = getDb();
+    const rows = await db
+      .select()
+      .from(registrations)
+      .where(and(
+        eq(registrations.fwjCardNo, fwjCard),
+        eq(registrations.isValid, true)
+      ))
+      .orderBy(desc(registrations.contestDate));
+
+    return rows.map(row => this._toResponse(row));
   }
 
   async findByClass(className) {
-    const all = await this.findAll();
-    return all.filter(registration => 
-      registration.class && 
-      registration.class.toLowerCase().includes(className.toLowerCase())
-    );
+    const db = getDb();
+    const rows = await db
+      .select()
+      .from(registrations)
+      .where(and(
+        ilike(registrations.className, `%${className}%`),
+        eq(registrations.isValid, true)
+      ))
+      .orderBy(desc(registrations.contestDate));
+
+    return rows.map(row => this._toResponse(row));
+  }
+
+  async findWithPaging(page = 1, limit = 50, filters = {}, sortBy = 'contest_date', sortOrder = 'desc') {
+    const db = getDb();
+
+    let conditions = [eq(registrations.isValid, true)];
+
+    // フィルター条件
+    if (filters.contest_date) {
+      conditions.push(eq(registrations.contestDate, filters.contest_date));
+    }
+    if (filters.contest_name) {
+      conditions.push(eq(registrations.contestName, filters.contest_name));
+    }
+    if (filters.class_name) {
+      conditions.push(ilike(registrations.className, `%${filters.class_name}%`));
+    }
+    if (filters.fwj_card_no) {
+      conditions.push(eq(registrations.fwjCardNo, filters.fwj_card_no));
+    }
+    if (filters.country) {
+      conditions.push(ilike(registrations.country, `%${filters.country}%`));
+    }
+    if (filters.startDate) {
+      conditions.push(gte(registrations.contestDate, filters.startDate));
+    }
+    if (filters.endDate) {
+      conditions.push(lte(registrations.contestDate, filters.endDate));
+    }
+    if (filters.search) {
+      const searchTerm = `%${filters.search}%`;
+      conditions.push(
+        or(
+          ilike(registrations.nameJa, searchTerm),
+          ilike(registrations.firstName, searchTerm),
+          ilike(registrations.lastName, searchTerm),
+          ilike(registrations.fwjCardNo, searchTerm)
+        )
+      );
+    }
+
+    // ソートカラムのマッピング
+    const sortColumnMap = {
+      'contest_date': registrations.contestDate,
+      'contest_name': registrations.contestName,
+      'player_no': registrations.playerNo,
+      'name_ja': registrations.nameJa,
+      'class_name': registrations.className,
+      'fwj_card_no': registrations.fwjCardNo,
+      'country': registrations.country,
+    };
+
+    const sortColumn = sortColumnMap[sortBy] || registrations.contestDate;
+    const orderFn = sortOrder === 'asc' ? asc : desc;
+
+    // 総数を取得
+    const countResult = await db
+      .select({ count: sql`count(*)` })
+      .from(registrations)
+      .where(and(...conditions));
+
+    const total = parseInt(countResult[0].count);
+
+    // データを取得
+    const rows = await db
+      .select()
+      .from(registrations)
+      .where(and(...conditions))
+      .orderBy(orderFn(sortColumn))
+      .limit(limit)
+      .offset((page - 1) * limit);
+
+    return {
+      data: rows.map(row => this._toResponse(row)),
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit),
+    };
   }
 
   async validateRegistration(registrationData) {
     const errors = [];
-    
+
     // 必須フィールドの検証
     if (!registrationData.contest_date) {
       errors.push('大会開催日は必須です');
@@ -70,29 +226,14 @@ class Registration extends BaseModel {
       errors.push('大会名は必須です');
     }
 
-    if (!registrationData.athlete_number) {
+    if (!registrationData.player_no) {
       errors.push('Athlete #は必須です');
     }
 
-    if (!registrationData.name || registrationData.name.trim() === '') {
+    if (!registrationData.name_ja || registrationData.name_ja.trim() === '') {
       errors.push('氏名は必須です');
     }
 
-    if (!registrationData.fwj_card_no) {
-      errors.push('FWJカードは必須です');
-    }
-
-    // IDの生成
-    if (!registrationData.id) {
-      registrationData.id = Date.now().toString() + Math.random().toString(36).substr(2, 9);
-    }
-    
-    registrationData.createdAt = registrationData.createdAt || new Date().toISOString();
-    registrationData.isValid = registrationData.isValid || 'TRUE';
-    registrationData.updatedAt = registrationData.updatedAt || new Date().toISOString();
-    registrationData.deletedAt = registrationData.deletedAt || '';
-    registrationData.restoredAt = registrationData.restoredAt || '';
-    
     return { isValid: errors.length === 0, errors, registrationData };
   }
 
@@ -105,6 +246,108 @@ class Registration extends BaseModel {
     return await this.create(validation.registrationData);
   }
 
+  async create(data) {
+    const db = getDb();
+
+    try {
+      const now = new Date();
+      const insertData = {
+        contestDate: data.contest_date,
+        contestName: data.contest_name,
+        playerNo: data.player_no || null,
+        nameJa: data.name_ja || null,
+        nameJaKana: data.name_ja_kana || null,
+        fwjCardNo: data.fwj_card_no || null,
+        firstName: data.first_name || null,
+        lastName: data.last_name || null,
+        email: data.email || null,
+        phone: data.phone || null,
+        country: data.country || null,
+        age: data.age || null,
+        className: data.class_name || null,
+        sortIndex: data.sort_index || null,
+        scoreCard: data.score_card || null,
+        contestOrder: data.contest_order || null,
+        height: data.height || null,
+        weight: data.weight || null,
+        occupation: data.occupation || null,
+        instagram: data.instagram || null,
+        biography: data.biography || null,
+        isValid: true,
+        createdAt: now,
+        updatedAt: now,
+      };
+
+      const result = await db
+        .insert(registrations)
+        .values(insertData)
+        .returning();
+
+      return { success: true, data: this._toResponse(result[0]) };
+    } catch (error) {
+      console.error('Registration create error:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  async update(id, data) {
+    const db = getDb();
+
+    try {
+      const updateData = {
+        updatedAt: new Date(),
+      };
+
+      // 更新可能なフィールド
+      if (data.contest_date !== undefined) updateData.contestDate = data.contest_date;
+      if (data.contest_name !== undefined) updateData.contestName = data.contest_name;
+      if (data.player_no !== undefined) updateData.playerNo = data.player_no || null;
+      if (data.name_ja !== undefined) updateData.nameJa = data.name_ja || null;
+      if (data.name_ja_kana !== undefined) updateData.nameJaKana = data.name_ja_kana || null;
+      if (data.fwj_card_no !== undefined) updateData.fwjCardNo = data.fwj_card_no || null;
+      if (data.first_name !== undefined) updateData.firstName = data.first_name || null;
+      if (data.last_name !== undefined) updateData.lastName = data.last_name || null;
+      if (data.email !== undefined) updateData.email = data.email || null;
+      if (data.phone !== undefined) updateData.phone = data.phone || null;
+      if (data.country !== undefined) updateData.country = data.country || null;
+      if (data.age !== undefined) updateData.age = data.age || null;
+      if (data.class_name !== undefined) updateData.className = data.class_name || null;
+      if (data.sort_index !== undefined) updateData.sortIndex = data.sort_index || null;
+      if (data.score_card !== undefined) updateData.scoreCard = data.score_card || null;
+      if (data.contest_order !== undefined) updateData.contestOrder = data.contest_order || null;
+      if (data.height !== undefined) updateData.height = data.height || null;
+      if (data.weight !== undefined) updateData.weight = data.weight || null;
+      if (data.occupation !== undefined) updateData.occupation = data.occupation || null;
+      if (data.instagram !== undefined) updateData.instagram = data.instagram || null;
+      if (data.biography !== undefined) updateData.biography = data.biography || null;
+
+      if (data.isValid !== undefined) {
+        updateData.isValid = data.isValid === 'TRUE' || data.isValid === true;
+      }
+      if (data.deletedAt !== undefined) {
+        updateData.deletedAt = data.deletedAt ? new Date(data.deletedAt) : null;
+      }
+      if (data.restoredAt !== undefined) {
+        updateData.restoredAt = data.restoredAt ? new Date(data.restoredAt) : null;
+      }
+
+      const result = await db
+        .update(registrations)
+        .set(updateData)
+        .where(eq(registrations.id, parseInt(id)))
+        .returning();
+
+      if (result.length === 0) {
+        return { success: false, error: '登録データが見つかりません' };
+      }
+
+      return { success: true, data: this._toResponse(result[0]) };
+    } catch (error) {
+      console.error('Registration update error:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
   async softDelete(id) {
     const registration = await this.findById(id);
     if (!registration) {
@@ -115,202 +358,104 @@ class Registration extends BaseModel {
       return { success: false, error: '登録データは既に削除されています' };
     }
 
-    const updateData = {
+    return await this.update(id, {
       isValid: 'FALSE',
       deletedAt: new Date().toISOString()
-    };
+    });
+  }
 
-    return await this.update(id, updateData);
+  async delete(id) {
+    const db = getDb();
+
+    try {
+      const result = await db
+        .delete(registrations)
+        .where(eq(registrations.id, parseInt(id)))
+        .returning();
+
+      if (result.length === 0) {
+        return { success: false, error: '登録データが見つかりません' };
+      }
+
+      return { success: true };
+    } catch (error) {
+      console.error('Registration delete error:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  async getById(id) {
+    const record = await this.findById(id);
+    if (!record) {
+      return { success: false, error: 'レコードが見つかりません' };
+    }
+    return { success: true, data: record };
   }
 
   async batchImport(csvData, contestDate, contestName) {
     try {
-      console.log('Starting batch import with sheet name:', this.sheetName);
-      await this.ensureInitialized();
+      console.log(`Starting batch import with ${csvData.length} records`);
 
-      // CSVデータをスプレッドシート行形式に変換（バッチ処理でAPIリクエスト数を削減）
-      const rows = csvData.map(row => {
-        const now = new Date().toISOString();
-        // 既存IDがあればそれを使用、なければ新規生成
-        const id = row.id || (Date.now().toString() + Math.random().toString(36).substr(2, 9));
+      if (!Array.isArray(csvData) || csvData.length === 0) {
+        return { success: false, error: 'インポートするデータがありません' };
+      }
 
+      const db = getDb();
+      const now = new Date();
+
+      // バルクインサート用のデータを準備
+      const insertData = csvData.map(row => {
         // ヘッダーを小文字に変換してアクセス
         const normalizedRow = {};
         for (const key in row) {
           normalizedRow[key.toLowerCase()] = row[key];
         }
 
-        return [
-          id, // id (A列)
-          contestDate, // contest_date (B列)
-          contestName, // contest_name (C列)
-          normalizedRow['player_no'] || '', // player_no (D列)
-          normalizedRow['name_ja'] || '', // name_ja (E列)
-          normalizedRow['name_ja_kana'] || '', // name_ja_kana (F列)
-          normalizedRow['fwj_card_no'] || '', // fwj_card_no (G列)
-          normalizedRow['first_name']?.trim() || '', // first_name (H列)
-          normalizedRow['last_name']?.trim() || '', // last_name (I列)
-          normalizedRow['email'] || '', // email (J列)
-          normalizedRow['phone'] || '', // phone (K列)
-          normalizedRow['country'] || '', // country (L列)
-          normalizedRow['age'] || '', // age (M列)
-          normalizedRow['class_name'] || '', // class_name (N列)
-          normalizedRow['sort_index'] || '', // sort_index (O列)
-          normalizedRow['score_card'] || '', // score_card (P列)
-          normalizedRow['contest_order'] || '', // contest_order (Q列)
-          normalizedRow['height'] || '', // height (R列)
-          normalizedRow['weight'] || '', // weight (S列)
-          normalizedRow['occupation'] || '', // occupation (T列)
-          normalizedRow['instagram'] || '', // instagram (U列)
-          normalizedRow['biography'] || '', // biography (V列)
-          now, // createdAt (W列)
-          'TRUE', // isValid (X列)
-          '', // deletedAt (Y列)
-          now, // updatedAt (Z列)
-          '' // restoredAt (AA列)
-        ];
+        return {
+          contestDate: contestDate,
+          contestName: contestName,
+          playerNo: normalizedRow['player_no'] || null,
+          nameJa: normalizedRow['name_ja'] || null,
+          nameJaKana: normalizedRow['name_ja_kana'] || null,
+          fwjCardNo: normalizedRow['fwj_card_no'] || null,
+          firstName: normalizedRow['first_name']?.trim() || null,
+          lastName: normalizedRow['last_name']?.trim() || null,
+          email: normalizedRow['email'] || null,
+          phone: normalizedRow['phone'] || null,
+          country: normalizedRow['country'] || null,
+          age: normalizedRow['age'] || null,
+          className: normalizedRow['class_name'] || null,
+          sortIndex: normalizedRow['sort_index'] || null,
+          scoreCard: normalizedRow['score_card'] || null,
+          contestOrder: normalizedRow['contest_order'] || null,
+          height: normalizedRow['height'] || null,
+          weight: normalizedRow['weight'] || null,
+          occupation: normalizedRow['occupation'] || null,
+          instagram: normalizedRow['instagram'] || null,
+          biography: normalizedRow['biography'] || null,
+          isValid: true,
+          createdAt: now,
+          updatedAt: now,
+        };
       });
 
-      if (rows.length === 0) {
-        return { success: false, error: 'インポートするデータがありません' };
-      }
+      // バルクインサート
+      await db.insert(registrations).values(insertData);
 
-      console.log(`Appending ${rows.length} new records to sheet`);
-
-      // バッチサイズを制限してAPI制限を回避
-      const batchSize = 100;
-      let imported = 0;
-      const errors = [];
-
-      // 全レコードを新規追加
-      for (let i = 0; i < rows.length; i += batchSize) {
-        const batch = rows.slice(i, i + batchSize);
-
-        try {
-          if (i > 0) {
-            console.log(`Waiting 2 seconds before next batch (processed ${i} rows)...`);
-            await new Promise(resolve => setTimeout(resolve, 2000));
-          }
-
-          console.log(`Processing batch ${Math.floor(i/batchSize) + 1}, rows ${i + 1}-${Math.min(i + batchSize, rows.length)}`);
-          await this.getSheetsService().appendValues(`${this.sheetName}!A:AA`, batch);
-          imported += batch.length;
-
-        } catch (batchError) {
-          console.error(`Error in batch ${Math.floor(i/batchSize) + 1}:`, batchError);
-          errors.push(`Batch ${Math.floor(i/batchSize) + 1}: ${batchError.message}`);
-
-          if (batchError.status === 429) {
-            console.log('Rate limit hit, waiting 10 seconds...');
-            await new Promise(resolve => setTimeout(resolve, 10000));
-          }
-        }
-      }
+      console.log('Import completed successfully');
 
       return {
         success: true,
         data: {
           total: csvData.length,
-          imported: imported,
+          imported: insertData.length,
           contestDate: contestDate,
           contestName: contestName,
-          errors: errors.length > 0 ? errors : undefined
         }
       };
 
     } catch (error) {
-      console.error('Registration batch import error:', error);
-      return { success: false, error: error.message };
-    }
-  }
-
-  async getById(id) {
-    try {
-      const allRecords = await this.findAll();
-      const record = allRecords.find(r => r.id === id);
-
-      if (!record) {
-        return { success: false, error: 'レコードが見つかりません' };
-      }
-
-      return { success: true, data: record };
-    } catch (error) {
-      console.error('Get by ID error:', error);
-      return { success: false, error: error.message };
-    }
-  }
-
-  async update(id, updateData) {
-    try {
-      const allRecords = await this.findAll();
-      const recordIndex = allRecords.findIndex(r => r.id === id);
-
-      if (recordIndex === -1) {
-        return { success: false, error: 'レコードが見つかりません' };
-      }
-
-      const record = allRecords[recordIndex];
-
-      // 更新可能なフィールド
-      const updatableFields = [
-        'player_no', 'name_ja', 'name_ja_kana', 'fwj_card_no',
-        'first_name', 'last_name',
-        'email', 'phone', 'country', 'age',
-        'class_name', 'sort_index', 'score_card', 'contest_order',
-        'height', 'weight', 'occupation',
-        'instagram', 'biography'
-      ];
-
-      // フィールドを更新
-      updatableFields.forEach(field => {
-        if (updateData.hasOwnProperty(field)) {
-          record[field] = updateData[field];
-        }
-      });
-
-      // updatedAtを更新
-      record.updatedAt = new Date().toISOString();
-
-      // Google Sheetsに書き込み
-      const rowNumber = recordIndex + 2; // ヘッダー行を考慮
-      const values = [[
-        record.id,
-        record.contest_date,
-        record.contest_name,
-        record.player_no || '',
-        record.name_ja || '',
-        record.name_ja_kana || '',
-        record.fwj_card_no || '',
-        record.first_name || '',
-        record.last_name || '',
-        record.email || '',
-        record.phone || '',
-        record.country || '',
-        record.age || '',
-        record.class_name || '',
-        record.sort_index || '',
-        record.score_card || '',
-        record.contest_order || '',
-        record.height || '',
-        record.weight || '',
-        record.occupation || '',
-        record.instagram || '',
-        record.biography || '',
-        record.createdAt,
-        record.isValid,
-        record.deletedAt || '',
-        record.updatedAt,
-        record.restoredAt || ''
-      ]];
-
-      await this.getSheetsService().updateValues(
-        `${this.sheetName}!A${rowNumber}:AA${rowNumber}`,
-        values
-      );
-
-      return { success: true, data: record };
-    } catch (error) {
-      console.error('Update error:', error);
+      console.error('Batch import error:', error);
       return { success: false, error: error.message };
     }
   }

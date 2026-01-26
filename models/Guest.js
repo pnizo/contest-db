@@ -1,344 +1,328 @@
-const BaseModel = require('./BaseModel');
+const { getDb } = require('../lib/db');
+const { guests, contests } = require('../lib/db/schema');
+const { eq, ilike, and, desc, asc, sql } = require('drizzle-orm');
 
-class Guest extends BaseModel {
-  constructor() {
-    super('Guests');
-    this.contestModel = null;
+/**
+ * ゲストモデル - Neon Postgres / Drizzle ORM版
+ */
+class Guest {
+  /**
+   * DBのcamelCaseをAPI用のsnake_caseに変換
+   * @private
+   */
+  _toSnakeCase(row) {
+    if (!row) return null;
+    return {
+      id: row.id,
+      contest_date: row.contestDate,
+      contest_name: row.contestName,
+      ticket_type: row.ticketType,
+      group_type: row.groupType,
+      name_ja: row.nameJa,
+      pass_type: row.passType,
+      company_ja: row.companyJa,
+      request_type: row.requestType,
+      ticket_count: row.ticketCount,
+      is_checked_in: row.isCheckedIn,
+      note: row.note,
+      email: row.email,
+      phone: row.phone,
+      contact_person: row.contactPerson,
+      is_pre_notified: row.isPreNotified,
+      is_post_mailed: row.isPostMailed,
+      isValid: row.isValid,
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
+      deletedAt: row.deletedAt,
+      restoredAt: row.restoredAt,
+    };
   }
 
-  // Contest モデルの遅延初期化
-  getContestModel() {
-    if (!this.contestModel) {
-      const Contest = require('./Contest');
-      this.contestModel = new Contest();
-    }
-    return this.contestModel;
-  }
-
-  // 有効なフィールドのみを取得（name_jaが必須）
+  /**
+   * 全ゲストを取得（有効なレコードのみ）
+   */
   async findAll() {
     try {
-      await this.ensureInitialized();
-      const values = await this.getSheetsService().getValues(`${this.sheetName}!A:Z`);
-      if (values.length === 0) return [];
+      const db = getDb();
+      const rows = await db
+        .select()
+        .from(guests)
+        .where(
+          and(
+            eq(guests.isValid, true),
+            sql`${guests.nameJa} IS NOT NULL AND ${guests.nameJa} != ''`
+          )
+        );
 
-      const headers = values[0];
-      const data = values.slice(1);
-
-      // 有効なフィールドのマッピング
-      const validFields = [
-        'id',
-        'contest_date',
-        'contest_name',
-        'ticket_type',
-        'group_type',
-        'name_ja',
-        'pass_type',
-        'company_ja',
-        'request_type',
-        'ticket_count',
-        'is_checked_in',
-        'note',
-        'email',
-        'phone',
-        'contact_person',
-        'is_pre_notified',
-        'is_post_mailed',
-        'createdAt',
-        'isValid',
-        'deletedAt',
-        'updatedAt',
-        'restoredAt'
-      ];
-
-      const allItems = data.map((row, index) => {
-        const obj = { _rowIndex: index + 2 };
-        headers.forEach((header, i) => {
-          // 有効なフィールドのみを含める
-          if (validFields.includes(header)) {
-            obj[header] = row[i] || '';
-          }
-        });
-        return obj;
-      });
-
-      // name_jaが必須：空白のレコードは除外
-      // isValidがFALSEのレコードも除外
-      return allItems.filter(item => 
-        item['name_ja'] && 
-        item['name_ja'].trim() !== '' &&
-        item['isValid'] !== 'FALSE'
-      );
+      return rows.map(row => this._toSnakeCase(row));
     } catch (error) {
       console.error('Error in Guest.findAll:', error);
       return [];
     }
   }
 
-  // ページング付きで取得
+  /**
+   * ページング・フィルタリング・ソート付きでゲストを取得
+   */
   async findWithPaging(page = 1, limit = 50, filters = {}, sortBy = 'contest_name', sortOrder = 'asc') {
     try {
-      const values = await this.getSheetsService().getValues(`${this.sheetName}!A:Z`);
-      if (values.length === 0) {
-        return { data: [], total: 0, page, limit, totalPages: 0 };
-      }
+      const db = getDb();
 
-      const headers = values[0];
-      const data = values.slice(1);
-
-      // 有効なフィールドのマッピング
-      const validFields = [
-        'id',
-        'contest_date',
-        'contest_name',
-        'ticket_type',
-        'group_type',
-        'name_ja',
-        'pass_type',
-        'company_ja',
-        'request_type',
-        'ticket_count',
-        'is_checked_in',
-        'note',
-        'email',
-        'phone',
-        'contact_person',
-        'is_pre_notified',
-        'is_post_mailed',
-        'createdAt',
-        'isValid',
-        'deletedAt',
-        'updatedAt',
-        'restoredAt'
+      // フィルタ条件を構築
+      const conditions = [
+        eq(guests.isValid, true),
+        sql`${guests.nameJa} IS NOT NULL AND ${guests.nameJa} != ''`
       ];
 
-      let allItems = data.map((row, index) => {
-        const obj = { _rowIndex: index + 2 };
-        headers.forEach((header, i) => {
-          if (validFields.includes(header)) {
-            obj[header] = row[i] || '';
-          }
-        });
-        return obj;
-      });
-
-      // name_jaが必須：空白のレコードは除外
-      // isValidがFALSEのレコードも除外
-      allItems = allItems.filter(item => 
-        item['name_ja'] && 
-        item['name_ja'].trim() !== '' &&
-        item['isValid'] !== 'FALSE'
-      );
-
-      // フィルタリング適用
       if (filters.contest_name) {
-        allItems = allItems.filter(item =>
-          item['contest_name'] && item['contest_name'].toLowerCase().includes(filters.contest_name.toLowerCase())
-        );
+        conditions.push(ilike(guests.contestName, `%${filters.contest_name}%`));
       }
       if (filters.organization_type) {
-        allItems = allItems.filter(item =>
-          item['group_type'] && item['group_type'].toLowerCase().includes(filters.organization_type.toLowerCase())
-        );
+        conditions.push(ilike(guests.groupType, `%${filters.organization_type}%`));
       }
       if (filters.pass_type) {
-        allItems = allItems.filter(item =>
-          item['pass_type'] && item['pass_type'].toLowerCase().includes(filters.pass_type.toLowerCase())
-        );
+        conditions.push(ilike(guests.passType, `%${filters.pass_type}%`));
       }
       if (filters.representative_name) {
-        allItems = allItems.filter(item =>
-          item['name_ja'] && item['name_ja'].toLowerCase().includes(filters.representative_name.toLowerCase())
-        );
+        conditions.push(ilike(guests.nameJa, `%${filters.representative_name}%`));
       }
       if (filters.organization_name) {
-        allItems = allItems.filter(item =>
-          item['company_ja'] && item['company_ja'].toLowerCase().includes(filters.organization_name.toLowerCase())
-        );
+        conditions.push(ilike(guests.companyJa, `%${filters.organization_name}%`));
       }
       if (filters.search) {
-        const searchTerm = filters.search.toLowerCase();
-        allItems = allItems.filter(item => {
-          const searchFields = [
-            item['name_ja'],
-            item['company_ja'],
-            item['contact_person'],
-            item['email']
-          ];
-
-          return searchFields.some(field =>
-            field && field.toString().toLowerCase().includes(searchTerm)
-          );
-        });
+        const searchTerm = `%${filters.search}%`;
+        conditions.push(
+          sql`(
+            ${guests.nameJa} ILIKE ${searchTerm} OR
+            ${guests.companyJa} ILIKE ${searchTerm} OR
+            ${guests.contactPerson} ILIKE ${searchTerm} OR
+            ${guests.email} ILIKE ${searchTerm}
+          )`
+        );
       }
 
-      // ソート処理
-      if (sortBy && allItems.length > 0) {
-        allItems.sort((a, b) => {
-          let aVal = a[sortBy] || '';
-          let bVal = b[sortBy] || '';
+      const whereClause = and(...conditions);
 
-          // 数値型フィールドの定義
-          const numericFields = ['ticket_count'];
+      // ソートカラムをマップ
+      const sortColumnMap = {
+        contest_name: guests.contestName,
+        contest_date: guests.contestDate,
+        name_ja: guests.nameJa,
+        company_ja: guests.companyJa,
+        ticket_count: guests.ticketCount,
+        pass_type: guests.passType,
+        group_type: guests.groupType,
+      };
+      const sortColumn = sortColumnMap[sortBy] || guests.contestName;
+      const orderFn = sortOrder === 'asc' ? asc : desc;
 
-          // 数値型フィールドの場合は数値に変換
-          if (numericFields.includes(sortBy)) {
-            aVal = aVal === '' || aVal == null ? Number.MAX_SAFE_INTEGER : (parseFloat(aVal) || Number.MAX_SAFE_INTEGER);
-            bVal = bVal === '' || bVal == null ? Number.MAX_SAFE_INTEGER : (parseFloat(bVal) || Number.MAX_SAFE_INTEGER);
-          }
-          // 文字列の場合は小文字で比較
-          else {
-            aVal = String(aVal).toLowerCase();
-            bVal = String(bVal).toLowerCase();
-          }
+      // 総件数を取得
+      const countResult = await db
+        .select({ count: sql`count(*)` })
+        .from(guests)
+        .where(whereClause);
+      const total = parseInt(countResult[0].count, 10);
 
-          if (aVal < bVal) {
-            return sortOrder === 'asc' ? -1 : 1;
-          }
-          if (aVal > bVal) {
-            return sortOrder === 'asc' ? 1 : -1;
-          }
-          return 0;
-        });
-      }
+      // データ取得
+      const offset = (page - 1) * limit;
+      const rows = await db
+        .select()
+        .from(guests)
+        .where(whereClause)
+        .orderBy(orderFn(sortColumn))
+        .limit(limit)
+        .offset(offset);
 
-      const total = allItems.length;
+      const data = rows.map(row => this._toSnakeCase(row));
       const totalPages = Math.ceil(total / limit);
-      const startIndex = (page - 1) * limit;
-      const endIndex = startIndex + limit;
-      const pagedData = allItems.slice(startIndex, endIndex);
 
-      return { data: pagedData, total, page, limit, totalPages };
+      return { data, total, page, limit, totalPages };
     } catch (error) {
       console.error('Error in Guest.findWithPaging:', error);
       return { data: [], total: 0, page, limit, totalPages: 0 };
     }
   }
 
-  // フィルターオプションの取得
+  /**
+   * フィルターオプションの取得
+   */
   async getFilterOptions() {
     try {
-      const allGuests = await this.findAll();
+      const db = getDb();
 
       // Contestsテーブルから大会名を取得（開催日の降順）
-      const contestModel = this.getContestModel();
-      const allContests = await contestModel.findAll();
-      
-      const contestNamesWithDates = allContests
-        .filter(contest => contest.contest_name && contest.contest_name.trim() !== '' && contest.contest_date)
-        .map(contest => ({
-          name: contest.contest_name,
-          date: contest.contest_date
-        }));
-      
+      const contestRows = await db
+        .select({
+          contestName: contests.contestName,
+          contestDate: contests.contestDate,
+        })
+        .from(contests)
+        .where(sql`${contests.contestName} IS NOT NULL AND ${contests.contestName} != ''`)
+        .orderBy(desc(contests.contestDate));
+
       // 大会名でグループ化し、各大会の最新の開催日を取得
       const contestMap = new Map();
-      contestNamesWithDates.forEach(item => {
-        if (!contestMap.has(item.name) || new Date(item.date) > new Date(contestMap.get(item.name))) {
-          contestMap.set(item.name, item.date);
+      contestRows.forEach(item => {
+        if (!contestMap.has(item.contestName) || 
+            new Date(item.contestDate) > new Date(contestMap.get(item.contestName))) {
+          contestMap.set(item.contestName, item.contestDate);
         }
       });
-      
+
       // 開催日の降順で並び替え
       const contestNames = Array.from(contestMap.entries())
         .sort((a, b) => new Date(b[1]) - new Date(a[1]))
         .map(entry => entry[0]);
 
-      const organizationTypes = [...new Set(allGuests.map(g => g['group_type']).filter(Boolean))];
-      const passTypes = [...new Set(allGuests.map(g => g['pass_type']).filter(Boolean))];
+      // 組織タイプを取得
+      const orgTypeRows = await db
+        .selectDistinct({ groupType: guests.groupType })
+        .from(guests)
+        .where(
+          and(
+            eq(guests.isValid, true),
+            sql`${guests.groupType} IS NOT NULL AND ${guests.groupType} != ''`
+          )
+        );
+
+      // パスタイプを取得
+      const passTypeRows = await db
+        .selectDistinct({ passType: guests.passType })
+        .from(guests)
+        .where(
+          and(
+            eq(guests.isValid, true),
+            sql`${guests.passType} IS NOT NULL AND ${guests.passType} != ''`
+          )
+        );
 
       return {
         contestNames,
-        organizationTypes,
-        passTypes
+        organizationTypes: orgTypeRows.map(r => r.groupType),
+        passTypes: passTypeRows.map(r => r.passType),
       };
     } catch (error) {
       console.error('Error in getFilterOptions:', error);
       return {
         contestNames: [],
         organizationTypes: [],
-        passTypes: []
+        passTypes: [],
       };
     }
   }
 
-  // 新規作成
-  async create(guestData) {
+  /**
+   * IDでゲストを取得
+   */
+  async findById(id) {
     try {
-      await this.ensureInitialized();
-      const values = await this.getSheetsService().getValues(`${this.sheetName}!A:Z`);
-      if (values.length === 0) {
-        throw new Error('ヘッダー行が見つかりません');
+      const db = getDb();
+      const rows = await db
+        .select()
+        .from(guests)
+        .where(eq(guests.id, parseInt(id, 10)));
+
+      if (rows.length === 0) {
+        return null;
       }
 
-      const headers = values[0];
+      return this._toSnakeCase(rows[0]);
+    } catch (error) {
+      console.error('Error in Guest.findById:', error);
+      return null;
+    }
+  }
 
-      // Boolean型フィールドのリスト
-      const booleanFields = ['is_pre_notified', 'is_checked_in', 'is_post_mailed'];
+  /**
+   * 新規作成
+   */
+  async create(guestData) {
+    try {
+      const db = getDb();
 
-      // 有効なフィールドのみを含む行データを作成
-      const newRow = headers.map(header => {
-        const value = guestData[header] || '';
+      const insertResult = await db
+        .insert(guests)
+        .values({
+          contestDate: guestData.contest_date || null,
+          contestName: guestData.contest_name || null,
+          ticketType: guestData.ticket_type || null,
+          groupType: guestData.group_type || null,
+          nameJa: guestData.name_ja,
+          passType: guestData.pass_type || null,
+          companyJa: guestData.company_ja || null,
+          requestType: guestData.request_type || null,
+          ticketCount: parseInt(guestData.ticket_count, 10) || 0,
+          isCheckedIn: guestData.is_checked_in === true || guestData.is_checked_in === 'TRUE',
+          note: guestData.note || null,
+          email: guestData.email || null,
+          phone: guestData.phone || null,
+          contactPerson: guestData.contact_person || null,
+          isPreNotified: guestData.is_pre_notified === true || guestData.is_pre_notified === 'TRUE',
+          isPostMailed: guestData.is_post_mailed === true || guestData.is_post_mailed === 'TRUE',
+          isValid: true,
+        })
+        .returning({ id: guests.id });
 
-        // Boolean型フィールドの場合、文字列をブール値に変換
-        if (booleanFields.includes(header)) {
-          if (value === 'TRUE' || value === true || value === '○') {
-            return true;
-          } else if (value === 'FALSE' || value === false || value === '') {
-            return false;
-          }
-        }
-
-        return value;
-      });
-
-      // 新しい行を追加
-      await this.getSheetsService().appendValues(`${this.sheetName}!A:Z`, [newRow]);
-
-      return { success: true, message: 'ゲストレコードを追加しました' };
+      return { 
+        success: true, 
+        message: 'ゲストレコードを追加しました',
+        id: insertResult[0]?.id 
+      };
     } catch (error) {
       console.error('Error in Guest.create:', error);
       throw error;
     }
   }
 
-  // 更新
-  async update(rowIndex, guestData) {
+  /**
+   * IDで更新
+   */
+  async update(id, guestData) {
     try {
-      await this.ensureInitialized();
-      const values = await this.getSheetsService().getValues(`${this.sheetName}!A:Z`);
-      if (values.length === 0) {
-        throw new Error('ヘッダー行が見つかりません');
+      const db = getDb();
+
+      const updateData = { updatedAt: new Date() };
+
+      // フィールドマッピング
+      const fieldMap = {
+        contest_date: 'contestDate',
+        contest_name: 'contestName',
+        ticket_type: 'ticketType',
+        group_type: 'groupType',
+        name_ja: 'nameJa',
+        pass_type: 'passType',
+        company_ja: 'companyJa',
+        request_type: 'requestType',
+        ticket_count: 'ticketCount',
+        is_checked_in: 'isCheckedIn',
+        note: 'note',
+        email: 'email',
+        phone: 'phone',
+        contact_person: 'contactPerson',
+        is_pre_notified: 'isPreNotified',
+        is_post_mailed: 'isPostMailed',
+      };
+
+      // Boolean型フィールド
+      const booleanFields = ['is_checked_in', 'is_pre_notified', 'is_post_mailed'];
+
+      for (const [snakeKey, value] of Object.entries(guestData)) {
+        const camelKey = fieldMap[snakeKey];
+        if (camelKey) {
+          if (booleanFields.includes(snakeKey)) {
+            updateData[camelKey] = value === true || value === 'TRUE' || value === '○';
+          } else if (snakeKey === 'ticket_count') {
+            updateData[camelKey] = parseInt(value, 10) || 0;
+          } else {
+            updateData[camelKey] = value;
+          }
+        }
       }
 
-      const headers = values[0];
-
-      // Boolean型フィールドのリスト
-      const booleanFields = ['is_pre_notified', 'is_checked_in', 'is_post_mailed'];
-
-      // 更新する行データを作成
-      const updatedRow = headers.map(header => {
-        if (guestData[header] !== undefined) {
-          // Boolean型フィールドの場合、文字列をブール値に変換
-          if (booleanFields.includes(header)) {
-            const value = guestData[header];
-            if (value === 'TRUE' || value === true || value === '○') {
-              return true;
-            } else if (value === 'FALSE' || value === false || value === '') {
-              return false;
-            }
-            return value;
-          }
-          return guestData[header];
-        }
-        return '';
-      });
-
-      // 行を更新
-      await this.getSheetsService().updateValues(
-        `${this.sheetName}!A${rowIndex}:Z${rowIndex}`,
-        [updatedRow]
-      );
+      await db
+        .update(guests)
+        .set(updateData)
+        .where(eq(guests.id, parseInt(id, 10)));
 
       return { success: true, message: 'ゲストレコードを更新しました' };
     } catch (error) {
@@ -347,14 +331,46 @@ class Guest extends BaseModel {
     }
   }
 
-  // 行インデックスで単一レコード取得
-  async findByRowIndex(rowIndex) {
+  /**
+   * IDで削除（論理削除）
+   */
+  async deleteById(id) {
     try {
-      const allGuests = await this.findAll();
-      return allGuests.find(guest => guest._rowIndex === rowIndex) || null;
+      const db = getDb();
+      await db
+        .update(guests)
+        .set({ 
+          isValid: false, 
+          deletedAt: new Date(),
+          updatedAt: new Date() 
+        })
+        .where(eq(guests.id, parseInt(id, 10)));
+
+      return { success: true };
     } catch (error) {
-      console.error('Error in Guest.findByRowIndex:', error);
-      return null;
+      console.error('Error in deleteById:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * チェックイン状態を更新
+   */
+  async updateCheckinStatus(id, isCheckedIn) {
+    try {
+      const db = getDb();
+      await db
+        .update(guests)
+        .set({ 
+          isCheckedIn, 
+          updatedAt: new Date() 
+        })
+        .where(eq(guests.id, parseInt(id, 10)));
+
+      return { success: true };
+    } catch (error) {
+      console.error('Error in updateCheckinStatus:', error);
+      return { success: false, error: error.message };
     }
   }
 }

@@ -604,7 +604,13 @@ class ScoresManager {
         `;
 
         container.innerHTML = tableHtml;
-        
+
+        // 列幅リサイズ機能を初期化
+        const table = container.querySelector('table');
+        if (window.ColumnResize && table) {
+            ColumnResize.init(table, 'scores-column-widths');
+        }
+
         // ソートイベントリスナーを追加
         this.addSortEventListeners();
     }

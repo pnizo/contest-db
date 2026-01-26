@@ -105,8 +105,8 @@ router.post('/', async (req, res) => {
       });
     }
 
-    // チェックイン実行（is_usableをFALSEに更新）
-    await ticketModel.checkin(ticket._rowIndex);
+    // チェックイン実行（is_usableをfalseに更新）
+    await ticketModel.checkin(ticket.id);
 
     res.json({
       success: true,
