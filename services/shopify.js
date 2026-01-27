@@ -1,5 +1,10 @@
 require('dotenv').config();
 
+// バリアントメタフィールドのキャッシュ（モジュールレベルで共有）
+// Map<variantId, { color: string, expiresAt: number }>
+const variantMetafieldCache = new Map();
+const CACHE_TTL_MS = 60 * 60 * 1000; // 1時間
+
 class ShopifyService {
   constructor() {
     this.shopName = process.env.SHOPIFY_SHOP_NAME;
@@ -1237,40 +1242,82 @@ class ShopifyService {
   async getVariantMetafields(variantIds) {
     if (!variantIds || variantIds.length === 0) return new Map();
 
-    const query = `
-      query getVariantMetafields($ids: [ID!]!) {
-        nodes(ids: $ids) {
-          ... on ProductVariant {
-            id
-            metafields(first: 10) {
-              edges {
-                node {
-                  namespace
-                  key
-                  value
+    const now = Date.now();
+    const colorMap = new Map();
+
+    // 1. 重複を除去してユニークなvariantIdを取得
+    const uniqueVariantIds = [...new Set(variantIds.map(id => String(id)))];
+
+    // 2. キャッシュをチェックし、キャッシュミスしたIDのみ収集
+    const uncachedIds = [];
+    for (const variantId of uniqueVariantIds) {
+      const cached = variantMetafieldCache.get(variantId);
+      if (cached && cached.expiresAt > now) {
+        // キャッシュヒット
+        colorMap.set(variantId, cached.color);
+      } else {
+        // キャッシュミスまたは期限切れ
+        if (cached) {
+          variantMetafieldCache.delete(variantId); // 期限切れを削除
+        }
+        uncachedIds.push(variantId);
+      }
+    }
+
+    // 3. キャッシュミスしたIDがあればAPIを呼び出す
+    if (uncachedIds.length > 0) {
+      console.log(`[Cache] Fetching ${uncachedIds.length} variant metafields (${uniqueVariantIds.length - uncachedIds.length} cached)`);
+      
+      const query = `
+        query getVariantMetafields($ids: [ID!]!) {
+          nodes(ids: $ids) {
+            ... on ProductVariant {
+              id
+              metafields(first: 10) {
+                edges {
+                  node {
+                    namespace
+                    key
+                    value
+                  }
                 }
               }
             }
           }
         }
+      `;
+
+      const gids = uncachedIds.map(id => `gid://shopify/ProductVariant/${id}`);
+      const response = await this.makeRequest('/graphql.json', {
+        method: 'POST',
+        body: JSON.stringify({ query, variables: { ids: gids } })
+      });
+
+      // 4. 結果を処理してキャッシュに保存
+      const expiresAt = now + CACHE_TTL_MS;
+      (response.data?.nodes || []).forEach(node => {
+        if (!node) return;
+        const variantId = node.id.replace('gid://shopify/ProductVariant/', '');
+        const colorMf = (node.metafields?.edges || []).find(
+          e => e.node.namespace === 'custom' && e.node.key === 'color'
+        );
+        const color = colorMf?.node?.value || '';
+        
+        // キャッシュに保存
+        variantMetafieldCache.set(variantId, { color, expiresAt });
+        colorMap.set(variantId, color);
+      });
+
+      // APIから返されなかったIDも空でキャッシュ（存在しないvariantの場合）
+      for (const variantId of uncachedIds) {
+        if (!colorMap.has(variantId)) {
+          variantMetafieldCache.set(variantId, { color: '', expiresAt });
+          colorMap.set(variantId, '');
+        }
       }
-    `;
-
-    const gids = variantIds.map(id => `gid://shopify/ProductVariant/${id}`);
-    const response = await this.makeRequest('/graphql.json', {
-      method: 'POST',
-      body: JSON.stringify({ query, variables: { ids: gids } })
-    });
-
-    const colorMap = new Map();
-    (response.data?.nodes || []).forEach(node => {
-      if (!node) return;
-      const variantId = node.id.replace('gid://shopify/ProductVariant/', '');
-      const colorMf = (node.metafields?.edges || []).find(
-        e => e.node.namespace === 'custom' && e.node.key === 'color'
-      );
-      colorMap.set(variantId, colorMf?.node?.value || '');
-    });
+    } else {
+      console.log(`[Cache] All ${uniqueVariantIds.length} variant metafields served from cache`);
+    }
 
     return colorMap;
   }
