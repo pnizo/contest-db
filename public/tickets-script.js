@@ -272,6 +272,7 @@ class TicketsManager {
             { key: 'email', label: 'メール', sortable: true },
             { key: 'product_name', label: '商品名', sortable: true },
             { key: 'variant', label: 'バリエーション', sortable: false },
+            { key: 'color', label: 'カラー', sortable: false },
             { key: 'item_sub_no', label: '枝番', sortable: true },
             { key: 'price', label: '単価', sortable: true },
             { key: 'financial_status', label: '支払い', sortable: true },

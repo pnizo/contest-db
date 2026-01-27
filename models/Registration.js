@@ -47,7 +47,7 @@ class Registration {
       .select()
       .from(registrations)
       .where(eq(registrations.isValid, true))
-      .orderBy(desc(registrations.contestDate));
+      .orderBy(desc(registrations.id));
 
     return rows.map(row => this._toResponse(row));
   }
@@ -57,7 +57,7 @@ class Registration {
     const rows = await db
       .select()
       .from(registrations)
-      .orderBy(desc(registrations.contestDate));
+      .orderBy(desc(registrations.id));
 
     return rows.map(row => this._toResponse(row));
   }
@@ -130,7 +130,7 @@ class Registration {
     return rows.map(row => this._toResponse(row));
   }
 
-  async findWithPaging(page = 1, limit = 50, filters = {}, sortBy = 'contest_date', sortOrder = 'desc') {
+  async findWithPaging(page = 1, limit = 50, filters = {}, sortBy = 'id', sortOrder = 'desc') {
     const db = getDb();
 
     let conditions = [eq(registrations.isValid, true)];
@@ -171,6 +171,7 @@ class Registration {
 
     // ソートカラムのマッピング
     const sortColumnMap = {
+      'id': registrations.id,
       'contest_date': registrations.contestDate,
       'contest_name': registrations.contestName,
       'player_no': registrations.playerNo,
@@ -180,7 +181,7 @@ class Registration {
       'country': registrations.country,
     };
 
-    const sortColumn = sortColumnMap[sortBy] || registrations.contestDate;
+    const sortColumn = sortColumnMap[sortBy] || registrations.id;
     const orderFn = sortOrder === 'asc' ? asc : desc;
 
     // 総数を取得

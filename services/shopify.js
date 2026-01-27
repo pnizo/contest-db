@@ -1037,6 +1037,17 @@ class ShopifyService {
                         product {
                           tags
                         }
+                        variant {
+                          metafields(first: 10) {
+                            edges {
+                              node {
+                                namespace
+                                key
+                                value
+                              }
+                            }
+                          }
+                        }
                       }
                     }
                   }
@@ -1126,6 +1137,16 @@ class ShopifyService {
       const quantity = item.quantity || 0;
       const currentQuantity = item.currentQuantity || 0;
 
+      // variantメタフィールドからcolorを取得
+      let color = '';
+      const variantMetafields = item.variant?.metafields?.edges || [];
+      const colorMetafield = variantMetafields.find(
+        mf => mf.node.namespace === 'custom' && mf.node.key === 'color'
+      );
+      if (colorMetafield) {
+        color = colorMetafield.node.value || '';
+      }
+
       // quantity分だけ行を生成
       // currentQuantity分はis_usable=TRUE、残りはis_usable=FALSE
       for (let i = 0; i < quantity; i++) {
@@ -1147,6 +1168,7 @@ class ShopifyService {
             item_sub_no: i + 1,           // 枝番（1から開始）
             owner_shopify_id: customerId, // 初期値は購入者のshopify_id
             reserved_seat: '',            // 初期値は空欄
+            color: color,                 // variantメタフィールドから取得
             is_usable: isValid
           },
           tags: orderTags
@@ -1173,6 +1195,7 @@ class ShopifyService {
           item_sub_no: 1,
           owner_shopify_id: customerId,
           reserved_seat: '',
+          color: '',
           is_usable: 'TRUE'
         },
         tags: orderTags
@@ -1207,13 +1230,65 @@ class ShopifyService {
   }
 
   /**
+   * variant IDからメタフィールドを一括取得
+   * @param {Array<string|number>} variantIds - variant IDの配列
+   * @returns {Promise<Map<string, string>>} variant_id → colorのマップ
+   */
+  async getVariantMetafields(variantIds) {
+    if (!variantIds || variantIds.length === 0) return new Map();
+
+    const query = `
+      query getVariantMetafields($ids: [ID!]!) {
+        nodes(ids: $ids) {
+          ... on ProductVariant {
+            id
+            metafields(first: 10) {
+              edges {
+                node {
+                  namespace
+                  key
+                  value
+                }
+              }
+            }
+          }
+        }
+      }
+    `;
+
+    const gids = variantIds.map(id => `gid://shopify/ProductVariant/${id}`);
+    const response = await this.makeRequest('/graphql.json', {
+      method: 'POST',
+      body: JSON.stringify({ query, variables: { ids: gids } })
+    });
+
+    const colorMap = new Map();
+    (response.data?.nodes || []).forEach(node => {
+      if (!node) return;
+      const variantId = node.id.replace('gid://shopify/ProductVariant/', '');
+      const colorMf = (node.metafields?.edges || []).find(
+        e => e.node.namespace === 'custom' && e.node.key === 'color'
+      );
+      colorMap.set(variantId, colorMf?.node?.value || '');
+    });
+
+    return colorMap;
+  }
+
+  /**
    * Webhook形式の注文データをTicket形式に変換
    * REST API形式（Webhook）からGraphQL形式に近い構造に変換し、
    * 既存のformatOrderForTicketSheet()を再利用
    * @param {Object} order - Webhook経由で受信した注文データ（REST API形式）
-   * @returns {Array} Ticket形式のデータ配列
+   * @returns {Promise<Array>} Ticket形式のデータ配列
    */
-  formatWebhookOrderForTicket(order) {
+  async formatWebhookOrderForTicket(order) {
+    // variant_idを収集してメタフィールドを一括取得
+    const variantIds = (order.line_items || [])
+      .map(item => item.variant_id)
+      .filter(id => id);
+    const colorMap = await this.getVariantMetafields(variantIds);
+
     // REST API形式のデータをGraphQL形式に変換
     const graphqlLikeOrder = {
       id: `gid://shopify/Order/${order.id}`,
@@ -1245,6 +1320,13 @@ class ShopifyService {
             originalUnitPriceSet: {
               shopMoney: {
                 amount: item.price
+              }
+            },
+            variant: {
+              metafields: {
+                edges: item.variant_id && colorMap.has(String(item.variant_id))
+                  ? [{ node: { namespace: 'custom', key: 'color', value: colorMap.get(String(item.variant_id)) } }]
+                  : []
               }
             }
           }

@@ -47,7 +47,7 @@ router.get('/', async (req, res) => {
       search,
       startDate,
       endDate,
-      sortBy = 'order_date',
+      sortBy = 'id',
       sortOrder = 'desc'
     } = req.query;
 

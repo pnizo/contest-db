@@ -30,6 +30,7 @@ class Ticket {
       is_usable: row.isUsable ? 'TRUE' : 'FALSE',
       owner_shopify_id: row.ownerShopifyId,
       reserved_seat: row.reservedSeat,
+      color: row.color,
       used_at: row.usedAt,
       created_at: row.createdAt,
       updated_at: row.updatedAt,
@@ -80,7 +81,7 @@ class Ticket {
   /**
    * ページング・フィルタリング・ソート付きでチケットを取得
    */
-  async findWithPaging(page = 1, limit = 50, filters = {}, sortBy = 'order_date', sortOrder = 'desc') {
+  async findWithPaging(page = 1, limit = 50, filters = {}, sortBy = 'id', sortOrder = 'desc') {
     try {
       const db = getDb();
 
@@ -128,6 +129,7 @@ class Ticket {
       // ソートカラムをマップ
       // order_dateは文字列型なので、日時型にキャストしてソート
       const sortColumnMap = {
+        id: tickets.id,
         order_date: sql`${tickets.orderDate}::timestamp`,
         order_no: tickets.orderNo,
         product_name: tickets.productName,
@@ -135,7 +137,7 @@ class Ticket {
         total_price: tickets.totalPrice,
         price: tickets.price,
       };
-      const sortColumn = sortColumnMap[sortBy] || sql`${tickets.orderDate}::timestamp`;
+      const sortColumn = sortColumnMap[sortBy] || tickets.id;
       const orderFn = sortOrder === 'asc' ? asc : desc;
 
       // 総件数を取得
@@ -332,6 +334,7 @@ class Ticket {
               financialStatus: baseData.financial_status,
               fulfillmentStatus: baseData.fulfillment_status,
               isUsable,
+              color: baseData.color || null,
               updatedAt: new Date(),
             })
             .where(eq(tickets.id, existing.id));
@@ -359,6 +362,7 @@ class Ticket {
               isUsable: true,
               ownerShopifyId: baseData.owner_shopify_id,
               reservedSeat: baseData.reserved_seat || '',
+              color: baseData.color || '',
             })
             .returning({ id: tickets.id });
 
@@ -472,6 +476,7 @@ class Ticket {
               isUsable: baseData.is_usable !== 'FALSE',
               ownerShopifyId: baseData.owner_shopify_id,
               reservedSeat: baseData.reserved_seat || '',
+              color: baseData.color || '',
             })
             .returning({ id: tickets.id });
 

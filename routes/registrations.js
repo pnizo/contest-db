@@ -206,7 +206,7 @@ router.get('/', requireAuth, async (req, res) => {
       search,
       startDate,
       endDate,
-      sortBy = 'contest_date',
+      sortBy = 'id',
       sortOrder = 'desc'
     } = req.query;
 
