@@ -54,13 +54,12 @@ router.post('/shopify/:topic', async (req, res) => {
     switch (topic) {
       case 'orders-create':
       case 'orders-updated':
-        const ticketData = await shopifyService.formatWebhookOrderForTicket(order);
-        result = await ticket.upsertFromWebhook(ticketData);
+        result = await ticket.upsertByOrder(order);
         console.log(`[Webhook] Upsert result:`, result);
         break;
 
       case 'orders-cancelled':
-        result = await ticket.cancelByOrderNo(order.name);
+        result = await ticket.cancelByOrder(order);
         console.log(`[Webhook] Cancel result:`, result);
         break;
 

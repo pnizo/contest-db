@@ -1,6 +1,7 @@
 const { getDb } = require('../lib/db');
 const { tickets, ticketTags } = require('../lib/db/schema');
 const { eq, ilike, and, desc, asc, sql, inArray } = require('drizzle-orm');
+const ShopifyService = require('../services/shopify');
 
 /**
  * チケットモデル - Neon Postgres / Drizzle ORM版
@@ -408,16 +409,33 @@ class Ticket {
   }
 
   /**
-   * Webhookからのアップサート処理
-   * @param {Array} ticketDataArray - formatWebhookOrderForTicketから返されたデータ配列
+   * 注文でアップサート処理
+   * @param {object} order - Shopify Webhook の order オブジェクト
    * @returns {Promise<Object>} 処理結果
    */
-  async upsertFromWebhook(ticketDataArray) {
+  async upsertByOrder(order) {
     try {
       const db = getDb();
+      const orderNo = order.name;
 
-      // 1. 既存データを取得
-      const existingRows = await db.select().from(tickets);
+      if (!orderNo) {
+        return { success: false, error: 'order.name is required' };
+      }
+
+      // 1. order を ticketData 形式に変換
+      const shopifyService = new ShopifyService();
+      const ticketDataArray = await shopifyService.formatWebhookOrderForTicket(order);
+
+      if (!ticketDataArray || ticketDataArray.length === 0) {
+        return { success: true, added: 0, updated: 0, skipped: 0, message: 'No ticket items in order' };
+      }
+
+      // 2. 対象注文の既存データのみ取得
+      const existingRows = await db
+        .select()
+        .from(tickets)
+        .where(eq(tickets.orderNo, orderNo));
+
       const existingMap = new Map();
       existingRows.forEach(ticket => {
         const key = `${ticket.orderNo}|${ticket.shopifyId}|${ticket.lineItemId}|${ticket.itemSubNo}`;
@@ -498,45 +516,33 @@ class Ticket {
 
       return { success: true, ...results };
     } catch (error) {
-      console.error('Error in upsertFromWebhook:', error);
+      console.error('Error in upsertByOrder:', error);
       return { success: false, error: error.message };
     }
   }
 
   /**
-   * 注文番号でキャンセル（is_usable=false）
-   * @param {string} orderNo - 注文番号（例: #1001）
+   * 注文でキャンセル（物理削除）
+   * @param {object} order - Shopify Webhook の order オブジェクト
    * @returns {Promise<Object>} 処理結果
    */
-  async cancelByOrderNo(orderNo) {
+  async cancelByOrder(order) {
     try {
       const db = getDb();
+      const orderNo = order.name;
 
-      // 該当するレコードを取得
-      const targetTickets = await db
-        .select()
-        .from(tickets)
-        .where(eq(tickets.orderNo, orderNo));
+      // 該当するレコードを削除（ticket_tagsはCASCADEで自動削除）
+      const result = await db
+        .delete(tickets)
+        .where(eq(tickets.orderNo, orderNo))
+        .returning({ id: tickets.id });
 
-      if (targetTickets.length === 0) {
-        return { success: true, cancelled: 0, message: 'No tickets found for this order' };
-      }
+      const deleted = result.length;
+      console.log(`[Ticket] Deleted ${deleted} tickets for order ${orderNo}`);
 
-      // is_usable=true のレコードのみ更新
-      let cancelled = 0;
-      for (const ticket of targetTickets) {
-        if (ticket.isUsable === true) {
-          await db
-            .update(tickets)
-            .set({ isUsable: false, updatedAt: new Date() })
-            .where(eq(tickets.id, ticket.id));
-          cancelled++;
-        }
-      }
-
-      return { success: true, cancelled, total: targetTickets.length };
+      return { success: true, deleted };
     } catch (error) {
-      console.error('Error in cancelByOrderNo:', error);
+      console.error('Error in cancelByOrder:', error);
       return { success: false, error: error.message };
     }
   }
