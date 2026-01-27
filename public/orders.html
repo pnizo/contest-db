@@ -60,6 +60,9 @@
                     <div class="controls">
                         <div class="search-container">
                             <div class="search-input-wrapper">
+                                <input type="text" id="productTypeInput" placeholder="商品タイプ（任意）例：コンテストエントリー" class="search-input">
+                            </div>
+                            <div class="search-input-wrapper">
                                 <input type="text" id="tagInput" placeholder="注文タグ（任意）例：タグ1,タグ2 または &quot;スペース含むタグ&quot;" class="search-input">
                             </div>
                             <button type="button" id="searchBtn" class="search-btn">検索</button>
@@ -81,6 +84,10 @@
                         <div class="info-item">
                             <span class="label">最終検索：</span>
                             <span id="dbExportDate" class="value">-</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="label">検索商品タイプ：</span>
+                            <span id="dbExportProductType" class="value">-</span>
                         </div>
                         <div class="info-item">
                             <span class="label">検索タグ：</span>

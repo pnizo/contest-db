@@ -807,7 +807,7 @@ button:active {
 .search-container {
     flex: 1;
     min-width: 300px;
-    max-width: 600px;
+    max-width: 1200px;
     display: flex;
     align-items: center;
     gap: 8px;

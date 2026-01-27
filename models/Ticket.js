@@ -456,7 +456,7 @@ class Ticket {
 
           results.updated++;
         } else {
-          // 新規追加
+          // 新規追加（競合時は無視 - 同時Webhook対策）
           const insertResult = await db
             .insert(tickets)
             .values({
@@ -478,10 +478,17 @@ class Ticket {
               reservedSeat: baseData.reserved_seat || '',
               color: baseData.color || '',
             })
+            .onConflictDoNothing({ target: [tickets.lineItemId, tickets.itemSubNo] })
             .returning({ id: tickets.id });
 
+          // 競合で挿入されなかった場合はスキップ
+          if (!insertResult[0]) {
+            results.skipped++;
+            continue;
+          }
+
           // タグを挿入
-          if (insertResult[0] && ticketData.tags && ticketData.tags.length > 0) {
+          if (ticketData.tags && ticketData.tags.length > 0) {
             await this._updateTags(insertResult[0].id, ticketData.tags);
           }
 

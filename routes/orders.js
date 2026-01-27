@@ -53,13 +53,13 @@ router.get('/current', async (req, res) => {
 // タグで注文を検索（プレビュー用）
 router.get('/search', async (req, res) => {
   try {
-    const { tag = '', limit = 0, paidOnly = 'true' } = req.query;  // limit=0 は無制限、tag は任意
+    const { tag = '', productType = '', limit = 0, paidOnly = 'true' } = req.query;  // limit=0 は無制限、tag は任意
     const paidOnlyBool = paidOnly === 'true';
 
-    console.log(`Searching orders with tag: ${tag || '(指定なし)'}, paidOnly: ${paidOnlyBool}`);
+    console.log(`Searching orders with tag: ${tag || '(指定なし)'}, productType: ${productType || '(指定なし)'}, paidOnly: ${paidOnlyBool}`);
 
     const shopify = getShopifyService();
-    const orders = await shopify.getOrdersByTag(tag, parseInt(limit), paidOnlyBool);
+    const orders = await shopify.getOrdersByTag(tag, parseInt(limit), paidOnlyBool, productType);
     console.log(`Found ${orders.length} orders`);
 
     // フォーマット（baseData + tags の形式）
@@ -95,8 +95,8 @@ router.get('/search', async (req, res) => {
       return [...row.baseData, ...paddedTags];
     });
 
-    // 検索タグを配列として解析
-    const searchTags = tag ? tag.split(/[,\s]+/).filter(t => t.trim()) : [];
+    // 検索タグを配列として解析（引用符で囲まれたスペース含むタグに対応）
+    const searchTags = tag ? shopify.parseTags(tag) : [];
 
     // DBに保存（orders, order_tags をクリアして新規保存）
     const order = getOrderModel();
@@ -109,6 +109,7 @@ router.get('/search', async (req, res) => {
     // 検索メタデータを保存（order_export_meta）
     await order.saveExportMeta({
       searchTags,
+      searchProductType: productType || null,
       paidOnly: paidOnlyBool,
       orderCount: orders.length,
       rowCount: formattedRows.length,
@@ -133,13 +134,13 @@ router.get('/search', async (req, res) => {
 // 検索結果をDBに保存（旧シート出力機能を置き換え）
 router.post('/export', requireAdmin, async (req, res) => {
   try {
-    const { tag = '', limit = 0, paidOnly = true } = req.body;  // limit=0 は無制限、tag は任意
+    const { tag = '', productType = '', limit = 0, paidOnly = true } = req.body;  // limit=0 は無制限、tag は任意
 
-    console.log(`Exporting orders with tag: ${tag || '(指定なし)'}, paidOnly: ${paidOnly} to database`);
+    console.log(`Exporting orders with tag: ${tag || '(指定なし)'}, productType: ${productType || '(指定なし)'}, paidOnly: ${paidOnly} to database`);
 
     // 注文を取得
     const shopify = getShopifyService();
-    const ordersData = await shopify.getOrdersByTag(tag, parseInt(limit), paidOnly);
+    const ordersData = await shopify.getOrdersByTag(tag, parseInt(limit), paidOnly, productType);
 
     if (ordersData.length === 0) {
       return res.json({
@@ -167,12 +168,13 @@ router.post('/export', requireAdmin, async (req, res) => {
       throw new Error(result.error || 'DB保存に失敗しました');
     }
 
-    // 検索タグを配列として解析
-    const searchTags = tag ? tag.split(/[,\s]+/).filter(t => t.trim()) : [];
+    // 検索タグを配列として解析（引用符で囲まれたスペース含むタグに対応）
+    const searchTags = tag ? shopify.parseTags(tag) : [];
 
     // エクスポートメタデータを保存
     await order.saveExportMeta({
       searchTags,
+      searchProductType: productType || null,
       paidOnly,
       orderCount: ordersData.length,
       rowCount: formattedRows.length,

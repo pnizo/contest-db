@@ -237,7 +237,7 @@ class ShopifyService {
     return tags;
   }
 
-  async getOrdersByTag(tagInput, limit = 0, paidOnly = true) {
+  async getOrdersByTag(tagInput, limit = 0, paidOnly = true, productType = '') {
     try {
       const allOrders = [];
       let pageInfo = null;
@@ -268,7 +268,7 @@ class ShopifyService {
       // limit=0 は無制限を意味する
       const isUnlimited = limit === 0;
       
-      console.log(`Shopify order search query: ${searchQuery}, limit: ${isUnlimited ? 'unlimited' : limit}`);
+      console.log(`Shopify order search query: ${searchQuery}, limit: ${isUnlimited ? 'unlimited' : limit}, productType: ${productType || '(指定なし)'}`);
 
       while (hasNextPage) {
         pageCount++;
@@ -311,6 +311,7 @@ class ShopifyService {
                         }
                         product {
                           tags
+                          productType
                         }
                       }
                     }
@@ -369,6 +370,24 @@ class ShopifyService {
       }
 
       console.log(`Shopify order fetch completed: ${allOrders.length} orders in ${pageCount} API calls`);
+
+      // productType フィルタリング（アプリケーションレベル）
+      if (productType) {
+        const filteredOrders = allOrders.map(order => {
+          const filteredLineItems = order.lineItems.edges.filter(edge =>
+            edge.node.product?.productType === productType
+          );
+          if (filteredLineItems.length === 0) return null;
+          return {
+            ...order,
+            lineItems: { edges: filteredLineItems }
+          };
+        }).filter(order => order !== null);
+
+        console.log(`Filtered by productType "${productType}": ${filteredOrders.length} orders (from ${allOrders.length})`);
+        return filteredOrders;
+      }
+
       return allOrders;
     } catch (error) {
       console.error('Error fetching orders by tag:', error);
@@ -975,23 +994,22 @@ class ShopifyService {
   }
 
   /**
-   * 観戦チケットタグを持つ注文を取得
-   * @param {string} tag - 検索するタグ（デフォルト: "観戦チケット"）
+   * 商品タイプでチケット注文を取得
+   * @param {string} productType - 検索する商品タイプ（デフォルト: "観戦チケット"）
    * @param {number} monthsAgo - 何ヶ月前からの注文を取得するか（デフォルト: 6）
    * @returns {Promise<Array>} 注文リスト
    */
-  async getTicketOrders(tag = '観戦チケット', monthsAgo = 6) {
+  async getTicketOrders(productType = '観戦チケット', monthsAgo = 3) {
     try {
       // 指定月数前の日付を計算
       const sinceDate = new Date();
       sinceDate.setMonth(sinceDate.getMonth() - monthsAgo);
       const dateStr = sinceDate.toISOString().split('T')[0];
 
-      console.log(`Fetching ticket orders with tag: "${tag}", since: ${dateStr}`);
+      console.log(`Fetching ticket orders with productType: "${productType}", since: ${dateStr}`);
 
-      // タグと日付でクエリを構築
-      const tagQuery = tag.includes(' ') || tag.includes(':') ? `"${tag}"` : tag;
-      const searchQuery = `tag:${tagQuery} created_at:>${dateStr}`;
+      // 日付でクエリを構築（productTypeはアプリケーションレベルでフィルタ）
+      const searchQuery = `created_at:>${dateStr}`;
 
       console.log(`Ticket order search query: ${searchQuery}`);
 
@@ -1041,6 +1059,7 @@ class ShopifyService {
                         }
                         product {
                           tags
+                          productType
                         }
                         variant {
                           metafields(first: 10) {
@@ -1104,10 +1123,90 @@ class ShopifyService {
       }
 
       console.log(`Ticket order fetch completed: ${allOrders.length} orders in ${pageCount} API calls`);
+
+      // productType フィルタリング（アプリケーションレベル）
+      if (productType) {
+        const filteredOrders = allOrders.map(order => {
+          const filteredLineItems = order.lineItems.edges.filter(edge =>
+            edge.node.product?.productType === productType
+          );
+          if (filteredLineItems.length === 0) return null;
+          return {
+            ...order,
+            lineItems: { edges: filteredLineItems }
+          };
+        }).filter(order => order !== null);
+
+        console.log(`Filtered by productType "${productType}": ${filteredOrders.length} orders (from ${allOrders.length})`);
+        return filteredOrders;
+      }
+
       return allOrders;
     } catch (error) {
       console.error('Error fetching ticket orders:', error);
       throw error;
+    }
+  }
+
+  /**
+   * 注文が指定したproductTypeの商品を含むかチェック
+   * @param {string} orderId - 注文ID（数値またはGID形式）
+   * @param {string} productType - チェックする商品タイプ（デフォルト: "観戦チケット"）
+   * @returns {Promise<boolean>} 指定したproductTypeを含む場合true
+   */
+  async orderHasProductType(orderId, productType = '観戦チケット') {
+    try {
+      const orderGid = orderId.toString().startsWith('gid://')
+        ? orderId
+        : `gid://shopify/Order/${orderId}`;
+
+      console.log(`Checking if order ${orderGid} has productType: "${productType}"`);
+
+      const query = `
+        query getOrder($id: ID!) {
+          order(id: $id) {
+            id
+            lineItems(first: 100) {
+              edges {
+                node {
+                  product {
+                    productType
+                  }
+                }
+              }
+            }
+          }
+        }
+      `;
+
+      const response = await this.makeRequest('/graphql.json', {
+        method: 'POST',
+        body: JSON.stringify({
+          query: query,
+          variables: { id: orderGid }
+        })
+      });
+
+      if (response.errors) {
+        console.error('GraphQL errors:', response.errors);
+        return false;
+      }
+
+      const order = response.data?.order;
+      if (!order) {
+        console.log(`Order not found: ${orderGid}`);
+        return false;
+      }
+
+      const hasProductType = order.lineItems.edges.some(edge =>
+        edge.node.product?.productType === productType
+      );
+
+      console.log(`Order ${orderGid} has productType "${productType}": ${hasProductType}`);
+      return hasProductType;
+    } catch (error) {
+      console.error('Error checking order productType:', error);
+      return false;
     }
   }
 

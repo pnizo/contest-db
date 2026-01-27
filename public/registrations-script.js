@@ -544,12 +544,12 @@ class RegistrationsManager {
             statusElement.style.display = 'block';
             statusElement.textContent = 'エントリーを取得中...';
 
-            // "コンテストエントリー" と contest_name の2つのタグで検索してOrdersシートに出力
-            const tag = `"コンテストエントリー", "${contestName}"`;
+            // productType: "コンテストエントリー" と tag: contest_name で検索してOrdersシートに出力
             const response = await authFetch('/api/orders/export', {
                 method: 'POST',
                 body: JSON.stringify({
-                    tag: tag,
+                    tag: `"${contestName}"`,
+                    productType: 'コンテストエントリー',
                     paidOnly: true
                 })
             });

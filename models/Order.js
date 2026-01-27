@@ -468,6 +468,7 @@ class Order {
 
       await db.insert(orderExportMeta).values({
         searchTags: JSON.stringify(meta.searchTags || []),
+        searchProductType: meta.searchProductType || null,
         paidOnly: meta.paidOnly !== false,
         exportedAt: new Date(),
         orderCount: meta.orderCount || 0,
@@ -503,6 +504,7 @@ class Order {
       return {
         id: row.id,
         searchTags: row.searchTags ? JSON.parse(row.searchTags) : [],
+        searchProductType: row.searchProductType || null,
         paidOnly: row.paidOnly,
         exportedAt: row.exportedAt,
         orderCount: row.orderCount,

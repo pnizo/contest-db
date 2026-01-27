@@ -90,15 +90,26 @@ class OrdersManager {
         // 検索機能
         document.getElementById('searchBtn').addEventListener('click', () => {
             const tag = document.getElementById('tagInput').value.trim();
+            const productType = document.getElementById('productTypeInput').value.trim();
             const paidOnly = document.getElementById('paidOnlyCheckbox').checked;
-            this.searchOrders(tag, paidOnly);
+            this.searchOrders(tag, productType, paidOnly);
         });
 
         document.getElementById('tagInput').addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
-                const tag = e.target.value.trim();
+                const tag = document.getElementById('tagInput').value.trim();
+                const productType = document.getElementById('productTypeInput').value.trim();
                 const paidOnly = document.getElementById('paidOnlyCheckbox').checked;
-                this.searchOrders(tag, paidOnly);
+                this.searchOrders(tag, productType, paidOnly);
+            }
+        });
+
+        document.getElementById('productTypeInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                const tag = document.getElementById('tagInput').value.trim();
+                const productType = document.getElementById('productTypeInput').value.trim();
+                const paidOnly = document.getElementById('paidOnlyCheckbox').checked;
+                this.searchOrders(tag, productType, paidOnly);
             }
         });
 
@@ -108,7 +119,7 @@ class OrdersManager {
         });
     }
 
-    async searchOrders(tag, paidOnly = true) {
+    async searchOrders(tag, productType = '', paidOnly = true) {
         const searchBtn = document.getElementById('searchBtn');
         const originalText = searchBtn.textContent;
         const container = document.getElementById('ordersTableContainer');
@@ -118,7 +129,12 @@ class OrdersManager {
             searchBtn.textContent = '検索中...';
             container.innerHTML = '<div class="loading">検索中...</div>';
 
-            const response = await authFetch(`${this.apiUrl}/search?tag=${encodeURIComponent(tag)}&paidOnly=${paidOnly}`);
+            const params = new URLSearchParams({
+                tag: tag || '',
+                productType: productType || '',
+                paidOnly: paidOnly.toString()
+            });
+            const response = await authFetch(`${this.apiUrl}/search?${params}`);
             const result = await response.json();
 
             if (result.success) {
@@ -264,6 +280,7 @@ class OrdersManager {
         const orderCountEl = document.getElementById('dbOrderCount');
         const exportDateEl = document.getElementById('dbExportDate');
         const exportTagsEl = document.getElementById('dbExportTags');
+        const exportProductTypeEl = document.getElementById('dbExportProductType');
 
         orderCountEl.textContent = `${totalOrders}件`;
 
@@ -285,9 +302,17 @@ class OrdersManager {
             } else {
                 exportTagsEl.textContent = '（タグ指定なし）';
             }
+
+            // 検索商品タイプの表示
+            if (latestExport.searchProductType) {
+                exportProductTypeEl.innerHTML = `<span class="tag-badge">${this.escapeHtml(latestExport.searchProductType)}</span>`;
+            } else {
+                exportProductTypeEl.textContent = '（指定なし）';
+            }
         } else {
             exportDateEl.textContent = '-';
             exportTagsEl.textContent = '-';
+            exportProductTypeEl.textContent = '-';
         }
 
         dbInfoSection.classList.remove('hidden');

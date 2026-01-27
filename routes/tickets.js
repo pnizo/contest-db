@@ -170,18 +170,18 @@ router.delete('/:id', requireAdmin, async (req, res) => {
 // POST /import - Shopifyからインポート（管理者のみ）
 router.post('/import', requireAdmin, async (req, res) => {
   try {
-    const { tag = '観戦チケット', monthsAgo = 6 } = req.body;
+    const { productType = '観戦チケット', monthsAgo = 3 } = req.body;
 
-    console.log(`Starting ticket import with tag: "${tag}", monthsAgo: ${monthsAgo}`);
+    console.log(`Starting ticket import with productType: "${productType}", monthsAgo: ${monthsAgo}`);
 
     // Shopifyから注文を取得
     const shopify = getShopifyService();
-    const orders = await shopify.getTicketOrders(tag, parseInt(monthsAgo));
+    const orders = await shopify.getTicketOrders(productType, parseInt(monthsAgo));
 
     if (orders.length === 0) {
       return res.json({
         success: true,
-        message: `タグ「${tag}」を持つ注文が見つかりませんでした`,
+        message: `商品タイプ「${productType}」を持つ注文が見つかりませんでした`,
         imported: 0
       });
     }

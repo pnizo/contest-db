@@ -166,15 +166,15 @@
                 <button class="modal-close" onclick="ticketsManager.closeImportModal()">&times;</button>
             </div>
             <div class="modal-form">
-                <p class="modal-description">Shopifyから「観戦チケット」タグを持つ注文をインポートします。</p>
+                <p class="modal-description">Shopifyから商品タイプが「チケット」の注文をインポートします。</p>
                 <div class="form-group">
-                    <label for="importTag">検索タグ:</label>
-                    <input type="text" id="importTag" value="観戦チケット" class="form-input">
-                    <small>※Shopifyの注文タグで検索します</small>
+                    <label for="importProductType">商品タイプ:</label>
+                    <input type="text" id="importProductType" value="観戦チケット" class="form-input">
+                    <small>※Shopifyの商品タイプで検索します</small>
                 </div>
                 <div class="form-group">
                     <label for="importMonthsAgo">取得期間（月数）:</label>
-                    <input type="number" id="importMonthsAgo" value="6" min="1" max="24" class="form-input">
+                    <input type="number" id="importMonthsAgo" value="3" min="1" max="24" class="form-input">
                     <small>※何ヶ月前からの注文を取得するか指定します</small>
                 </div>
                 <div class="form-warning">
