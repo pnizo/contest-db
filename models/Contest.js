@@ -239,7 +239,7 @@ class Contest {
           contestName: contestData.contest_name,
           contestDate: contestData.contest_date,
           contestPlace: contestData.contest_place || '',
-          isReady: contestData.is_ready === true || contestData.is_ready === 'true',
+          isReady: contestData.is_ready === true || contestData.is_ready === 'true' || contestData.is_ready === 'TRUE',
         })
         .returning({ id: contests.id });
 
@@ -273,7 +273,7 @@ class Contest {
         updateData.contestPlace = contestData.contest_place;
       }
       if (contestData.is_ready !== undefined) {
-        updateData.isReady = contestData.is_ready === true || contestData.is_ready === 'true';
+        updateData.isReady = contestData.is_ready === true || contestData.is_ready === 'true' || contestData.is_ready === 'TRUE';
       }
 
       await db
