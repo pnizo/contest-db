@@ -360,7 +360,7 @@ class Ticket {
               price: baseData.price,
               lineItemId: baseData.line_item_id,
               itemSubNo: parseInt(baseData.item_sub_no, 10) || 0,
-              isUsable: true,
+              isUsable: baseData.is_usable !== 'FALSE',
               ownerShopifyId: baseData.owner_shopify_id,
               reservedSeat: baseData.reserved_seat || '',
               color: baseData.color || '',
@@ -437,9 +437,15 @@ class Ticket {
         .where(eq(tickets.orderNo, orderNo));
 
       const existingMap = new Map();
+      // lineItemIdごとのisUsable=TRUEのカウント
+      const usableCountByLineItem = new Map();
       existingRows.forEach(ticket => {
         const key = `${ticket.orderNo}|${ticket.shopifyId}|${ticket.lineItemId}|${ticket.itemSubNo}`;
         existingMap.set(key, ticket);
+        // isUsable=TRUEのカウント
+        if (ticket.isUsable === true) {
+          usableCountByLineItem.set(ticket.lineItemId, (usableCountByLineItem.get(ticket.lineItemId) || 0) + 1);
+        }
       });
 
       const results = {
@@ -454,6 +460,8 @@ class Ticket {
         const key = `${baseData.order_no}|${baseData.shopify_id}|${baseData.line_item_id}|${baseData.item_sub_no}`;
         const existing = existingMap.get(key);
 
+        console.log(`[upsertByOrder] Processing ticket: key=${key}, is_usable=${baseData.is_usable}, existing=${existing ? `id=${existing.id}, isUsable=${existing.isUsable}` : 'null'}`);
+
         if (existing) {
           // is_usable=false のレコードは変更しない
           if (existing.isUsable === false) {
@@ -462,12 +470,14 @@ class Ticket {
           }
 
           // 更新
+          const newIsUsable = baseData.is_usable !== 'FALSE';
+          console.log(`[upsertByOrder] Updating ticket id=${existing.id}: isUsable ${existing.isUsable} -> ${newIsUsable} (baseData.is_usable="${baseData.is_usable}")`);
           await db
             .update(tickets)
             .set({
               financialStatus: baseData.financial_status,
               fulfillmentStatus: baseData.fulfillment_status,
-              isUsable: baseData.is_usable !== 'FALSE',
+              isUsable: newIsUsable,
               updatedAt: new Date(),
             })
             .where(eq(tickets.id, existing.id));
@@ -475,6 +485,15 @@ class Ticket {
           results.updated++;
         } else {
           // 新規追加（競合時は無視 - 同時Webhook対策）
+          // lineItemIdの現在のisUsable=TRUEカウントを取得
+          const lineItemId = baseData.line_item_id;
+          const currentUsableCount = usableCountByLineItem.get(lineItemId) || 0;
+          const currentQuantity = baseData.current_quantity || 0;
+
+          // currentQuantityに達するまでTRUEで追加
+          const isUsable = currentUsableCount < currentQuantity;
+          console.log(`[upsertByOrder] Inserting ticket: lineItemId=${lineItemId}, currentUsableCount=${currentUsableCount}, currentQuantity=${currentQuantity}, isUsable=${isUsable}`);
+
           const insertResult = await db
             .insert(tickets)
             .values({
@@ -489,9 +508,9 @@ class Ticket {
               productName: baseData.product_name,
               variant: baseData.variant,
               price: baseData.price,
-              lineItemId: baseData.line_item_id,
+              lineItemId: lineItemId,
               itemSubNo: parseInt(baseData.item_sub_no, 10) || 0,
-              isUsable: baseData.is_usable !== 'FALSE',
+              isUsable: isUsable,
               ownerShopifyId: baseData.owner_shopify_id,
               reservedSeat: baseData.reserved_seat || '',
               color: baseData.color || '',
@@ -503,6 +522,11 @@ class Ticket {
           if (!insertResult[0]) {
             results.skipped++;
             continue;
+          }
+
+          // 追加成功したらisUsable=TRUEのカウントをインクリメント
+          if (isUsable) {
+            usableCountByLineItem.set(lineItemId, currentUsableCount + 1);
           }
 
           // タグを挿入
@@ -521,31 +545,6 @@ class Ticket {
     }
   }
 
-  /**
-   * 注文でキャンセル（物理削除）
-   * @param {object} order - Shopify Webhook の order オブジェクト
-   * @returns {Promise<Object>} 処理結果
-   */
-  async cancelByOrder(order) {
-    try {
-      const db = getDb();
-      const orderNo = order.name;
-
-      // 該当するレコードを削除（ticket_tagsはCASCADEで自動削除）
-      const result = await db
-        .delete(tickets)
-        .where(eq(tickets.orderNo, orderNo))
-        .returning({ id: tickets.id });
-
-      const deleted = result.length;
-      console.log(`[Ticket] Deleted ${deleted} tickets for order ${orderNo}`);
-
-      return { success: true, deleted };
-    } catch (error) {
-      console.error('Error in cancelByOrder:', error);
-      return { success: false, error: error.message };
-    }
-  }
 }
 
 module.exports = Ticket;

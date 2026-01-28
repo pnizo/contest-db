@@ -1273,7 +1273,8 @@ class ShopifyService {
             owner_shopify_id: customerId, // 初期値は購入者のshopify_id
             reserved_seat: '',            // 初期値は空欄
             color: color,                 // variantメタフィールドから取得
-            is_usable: isValid
+            is_usable: isValid,
+            current_quantity: currentQuantity  // fulfillable_quantityに基づく有効数
           },
           tags: orderTags
         });
@@ -1455,28 +1456,32 @@ class ShopifyService {
       displayFulfillmentStatus: this._mapFulfillmentStatus(order.fulfillment_status),
       tags: order.tags ? order.tags.split(', ') : [],
       lineItems: {
-        edges: (order.line_items || []).map(item => ({
-          node: {
-            id: `gid://shopify/LineItem/${item.id}`,
-            title: item.title,
-            variantTitle: item.variant_title,
-            quantity: item.quantity,
-            currentQuantity: item.quantity - (item.fulfillable_quantity !== undefined ? 
-              (item.quantity - item.fulfillable_quantity) : 0),
-            originalUnitPriceSet: {
-              shopMoney: {
-                amount: item.price
-              }
-            },
-            variant: {
-              metafields: {
-                edges: item.variant_id && colorMap.has(String(item.variant_id))
-                  ? [{ node: { namespace: 'custom', key: 'color', value: colorMap.get(String(item.variant_id)) } }]
-                  : []
+        edges: (order.line_items || []).map(item => {
+          const currentQuantity = item.quantity - (item.fulfillable_quantity !== undefined ?
+            (item.quantity - item.fulfillable_quantity) : 0);
+          console.log(`[formatWebhookOrderForTicket] LineItem ${item.id}: quantity=${item.quantity}, fulfillable_quantity=${item.fulfillable_quantity}, currentQuantity=${currentQuantity}`);
+          return {
+            node: {
+              id: `gid://shopify/LineItem/${item.id}`,
+              title: item.title,
+              variantTitle: item.variant_title,
+              quantity: item.quantity,
+              currentQuantity: currentQuantity,
+              originalUnitPriceSet: {
+                shopMoney: {
+                  amount: item.price
+                }
+              },
+              variant: {
+                metafields: {
+                  edges: item.variant_id && colorMap.has(String(item.variant_id))
+                    ? [{ node: { namespace: 'custom', key: 'color', value: colorMap.get(String(item.variant_id)) } }]
+                    : []
+                }
               }
             }
-          }
-        }))
+          };
+        })
       }
     };
 
