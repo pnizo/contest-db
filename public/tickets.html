@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>チケット管理 - FWJコンテストDB</title>
+    <title>チケット管理 - スプレッドシートDB</title>
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -17,38 +17,7 @@
                 </div>
             </div>
             <div class="auth-actions">
-                <nav class="page-nav">
-                    <a href="/users" class="nav-link">ユーザー</a>
-
-                    <div class="nav-dropdown">
-                        <button class="nav-link dropdown-toggle">大会運営 <span class="dropdown-arrow">▼</span></button>
-                        <div class="dropdown-menu">
-                            <a href="/contests" class="dropdown-item">コンテスト情報</a>
-                            <a href="/registrations" class="dropdown-item">出場登録</a>
-                            <a href="/scores" class="dropdown-item">大会成績</a>
-                            <a href="/notes" class="dropdown-item">特記事項</a>
-                            <a href="/subjects" class="dropdown-item admin-only">違反認定者</a>
-                        </div>
-                    </div>
-
-                    <div class="nav-dropdown">
-                        <button class="nav-link dropdown-toggle active">入場管理 <span class="dropdown-arrow">▼</span></button>
-                        <div class="dropdown-menu">
-                            <a href="/guests" class="dropdown-item">関係者チケット</a>
-                            <a href="/tickets" class="dropdown-item active">チケット管理</a>
-                        </div>
-                    </div>
-
-                    <div class="nav-dropdown">
-                        <button class="nav-link dropdown-toggle">Shopify検索 <span class="dropdown-arrow">▼</span></button>
-                        <div class="dropdown-menu">
-                            <a href="/members" class="dropdown-item">FWJ会員検索</a>
-                            <a href="/orders" class="dropdown-item">注文検索</a>
-                        </div>
-                    </div>
-                </nav>
-                <a href="/manual.html" target="_blank" class="manual-link">マニュアル</a>
-                <button id="logoutBtn" class="logout-btn">ログアウト</button>
+                <!-- ナビゲーションはnavigation.jsで動的生成 -->
             </div>
         </div>
 
@@ -166,15 +135,15 @@
                 <button class="modal-close" onclick="ticketsManager.closeImportModal()">&times;</button>
             </div>
             <div class="modal-form">
-                <p class="modal-description">Shopifyから商品タイプが「チケット」の注文をインポートします。</p>
+                <p class="modal-description">Shopifyから「観戦チケット」タグを持つ注文をインポートします。</p>
                 <div class="form-group">
-                    <label for="importProductType">商品タイプ:</label>
-                    <input type="text" id="importProductType" value="観戦チケット" class="form-input">
-                    <small>※Shopifyの商品タイプで検索します</small>
+                    <label for="importTag">検索タグ:</label>
+                    <input type="text" id="importTag" value="観戦チケット" class="form-input">
+                    <small>※Shopifyの注文タグで検索します</small>
                 </div>
                 <div class="form-group">
                     <label for="importMonthsAgo">取得期間（月数）:</label>
-                    <input type="number" id="importMonthsAgo" value="3" min="1" max="24" class="form-input">
+                    <input type="number" id="importMonthsAgo" value="6" min="1" max="24" class="form-input">
                     <small>※何ヶ月前からの注文を取得するか指定します</small>
                 </div>
                 <div class="form-warning">
@@ -211,8 +180,7 @@
         </div>
     </div>
 
-    <script src="column-resize.js"></script>
-    <script src="table-sort.js"></script>
+    <script src="navigation.js"></script>
     <script src="tickets-script.js"></script>
 </body>
 </html>

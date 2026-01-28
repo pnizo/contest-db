@@ -17,38 +17,7 @@
                 </div>
             </div>
             <div class="auth-actions">
-                <nav class="page-nav">
-                    <a href="/users" class="nav-link">ユーザー</a>
-
-                    <div class="nav-dropdown">
-                        <button class="nav-link dropdown-toggle active">大会運営 <span class="dropdown-arrow">▼</span></button>
-                        <div class="dropdown-menu">
-                            <a href="/contests" class="dropdown-item">コンテスト情報</a>
-                            <a href="/registrations" class="dropdown-item">出場登録</a>
-                            <a href="/scores" class="dropdown-item active">大会成績</a>
-                            <a href="/notes" class="dropdown-item">特記事項</a>
-                            <a href="/subjects" class="dropdown-item admin-only">違反認定者</a>
-                        </div>
-                    </div>
-
-                    <div class="nav-dropdown">
-                        <button class="nav-link dropdown-toggle">入場管理 <span class="dropdown-arrow">▼</span></button>
-                        <div class="dropdown-menu">
-                            <a href="/guests" class="dropdown-item">関係者チケット</a>
-                            <a href="/tickets" class="dropdown-item">チケット管理</a>
-                        </div>
-                    </div>
-
-                    <div class="nav-dropdown">
-                        <button class="nav-link dropdown-toggle">Shopify検索 <span class="dropdown-arrow">▼</span></button>
-                        <div class="dropdown-menu">
-                            <a href="/members" class="dropdown-item">FWJ会員検索</a>
-                            <a href="/orders" class="dropdown-item">注文検索</a>
-                        </div>
-                    </div>
-                </nav>
-                <a href="/manual.html" target="_blank" class="manual-link">マニュアル</a>
-                <button id="logoutBtn" class="logout-btn">ログアウト</button>
+                <!-- ナビゲーションはnavigation.jsで動的生成 -->
             </div>
         </div>
 
@@ -137,6 +106,7 @@
         </div>
     </div>
 
+    <script src="navigation.js"></script>
     <script src="column-resize.js"></script>
     <script src="table-sort.js"></script>
     <script src="scores-script.js"></script>

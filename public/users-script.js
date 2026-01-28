@@ -106,11 +106,9 @@ class UserManager {
             document.getElementById('userName').textContent = userName;
             document.getElementById('userRole').innerHTML = `<span class="role-badge ${this.currentUser.role}">${this.currentUser.role}</span>`;
 
-            // 管理者の場合、admin-onlyリンクを表示
-            if (this.isAdmin) {
-                document.querySelectorAll('.admin-only').forEach(el => {
-                    el.style.display = 'inline-block';
-                });
+            // 管理者の場合、admin-only要素を表示
+            if (this.isAdmin && typeof showAdminOnlyElements === 'function') {
+                showAdminOnlyElements();
             }
 
             // 管理者でない場合、新規追加ボタンと削除済み表示ボタンを非表示にする

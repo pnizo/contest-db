@@ -106,11 +106,9 @@ class NotesManager {
             document.getElementById('userAvatar').textContent = displayName.charAt(0).toUpperCase();
             document.getElementById('authHeader').style.display = 'flex';
 
-            // 管理者の場合、admin-onlyリンクを表示
-            if (this.isAdmin) {
-                document.querySelectorAll('.admin-only').forEach(el => {
-                    el.style.display = 'inline-block';
-                });
+            // 管理者の場合、admin-only要素を表示
+            if (this.isAdmin && typeof showAdminOnlyElements === 'function') {
+                showAdminOnlyElements();
             }
 
             console.log('NOTES: Auth header displayed');
