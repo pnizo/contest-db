@@ -33,6 +33,7 @@ class Registration {
       occupation: row.occupation || '',
       instagram: row.instagram || '',
       biography: row.biography || '',
+      back_stage_pass: row.backStagePass ?? 0,
       isValid: row.isValid ? 'TRUE' : 'FALSE',
       createdAt: row.createdAt ? row.createdAt.toISOString() : '',
       updatedAt: row.updatedAt ? row.updatedAt.toISOString() : '',
@@ -274,6 +275,7 @@ class Registration {
         occupation: data.occupation || null,
         instagram: data.instagram || null,
         biography: data.biography || null,
+        backStagePass: parseInt(data.back_stage_pass, 10) || 0,
         isValid: true,
         createdAt: now,
         updatedAt: now,
@@ -321,6 +323,7 @@ class Registration {
       if (data.occupation !== undefined) updateData.occupation = data.occupation || null;
       if (data.instagram !== undefined) updateData.instagram = data.instagram || null;
       if (data.biography !== undefined) updateData.biography = data.biography || null;
+      if (data.back_stage_pass !== undefined) updateData.backStagePass = parseInt(data.back_stage_pass, 10) || 0;
 
       if (data.isValid !== undefined) {
         updateData.isValid = data.isValid === 'TRUE' || data.isValid === true;
@@ -434,6 +437,7 @@ class Registration {
           occupation: normalizedRow['occupation'] || null,
           instagram: normalizedRow['instagram'] || null,
           biography: normalizedRow['biography'] || null,
+          backStagePass: parseInt(normalizedRow['back_stage_pass'], 10) || 0,
           isValid: true,
           createdAt: now,
           updatedAt: now,

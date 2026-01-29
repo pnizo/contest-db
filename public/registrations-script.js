@@ -884,7 +884,8 @@ class RegistrationsManager {
             { key: 'weight', label: '体重' },
             { key: 'occupation', label: '職業' },
             { key: 'instagram', label: 'Instagram' },
-            { key: 'biography', label: '自己紹介' }
+            { key: 'biography', label: '自己紹介' },
+            { key: 'back_stage_pass', label: 'BSP' }
         ];
 
         headers.forEach(header => {

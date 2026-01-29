@@ -523,6 +523,7 @@ router.get('/export/all_fields/:contestName', requireAuth, async (req, res) => {
       'occupation': reg.occupation || '',
       'instagram': reg.instagram || '',
       'biography': reg.biography || '',
+      'back_stage_pass': reg.back_stage_pass ?? 0,
       'createdAt': reg.createdAt || '',
       'isValid': reg.isValid || '',
       'deletedAt': reg.deletedAt || '',
@@ -727,6 +728,7 @@ router.post('/import-shopify', requireAdmin, async (req, res) => {
         fwj_card_no: shopifyId,
         email: order.email || '',
         class_name: className,
+        back_stage_pass: order.back_stage_pass ?? 0,
 
         // player_no: 決定済みの値を設定
         player_no: playerNo,

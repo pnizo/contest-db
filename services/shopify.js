@@ -289,6 +289,9 @@ class ShopifyService {
                   displayFinancialStatus
                   displayFulfillmentStatus
                   tags
+                  metafield(namespace: "custom", key: "back_stage_pass") {
+                    value
+                  }
                   customer {
                     id
                     email
@@ -409,6 +412,7 @@ class ShopifyService {
     const financialStatus = this.translateFinancialStatus(order.displayFinancialStatus);
     const fulfillmentStatus = this.translateFulfillmentStatus(order.displayFulfillmentStatus);
 
+    const backStagePass = order.metafield?.value || '';
     const lineItems = order.lineItems?.edges || [];
 
     if (lineItems.length === 0) {
@@ -428,7 +432,8 @@ class ShopifyService {
           '', // 数量
           '', // 現在数量
           '', // 単価
-          ''  // line_item_id
+          '', // line_item_id
+          ''  // back_stage_pass
         ],
         tags: []
       }];
@@ -456,7 +461,8 @@ class ShopifyService {
             item.quantity ?? '',           // 元の数量
             item.currentQuantity ?? '',    // 現在の数量
             item.originalUnitPriceSet?.shopMoney?.amount || '',
-            lineItemId                     // line_item_id
+            lineItemId,                    // line_item_id
+            backStagePass                  // back_stage_pass
           ],
           tags: productTags
         };

@@ -19,6 +19,66 @@ function getShopifyService() {
 // すべて認証が必要
 router.use(requireAuth);
 
+// GET /export/:productName - 指定商品名を持つチケットの全項目取得
+router.get('/export/:productName', async (req, res) => {
+  try {
+    const productName = decodeURIComponent(req.params.productName);
+    const tickets = await ticketModel.findByProductName(productName);
+
+    // ファイル名を生成（日付付き）
+    const date = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    const safeName = productName.replace(/[^\w\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]/g, '_');
+    const filename = `tickets_${safeName}_${date}.csv`;
+
+    res.json({
+      success: true,
+      data: tickets,
+      filename
+    });
+  } catch (error) {
+    console.error('Export tickets error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// POST /import-reserved-seats - 指定席CSVインポート（管理者のみ）
+router.post('/import-reserved-seats', requireAdmin, async (req, res) => {
+  try {
+    const { csvData } = req.body;
+
+    if (!csvData || !Array.isArray(csvData)) {
+      return res.status(400).json({
+        success: false,
+        error: 'CSVデータが不正です'
+      });
+    }
+
+    // 必須フィールドのチェック
+    const validData = csvData.filter(row => row.id && row.hasOwnProperty('reserved_seat'));
+
+    if (validData.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'id と reserved_seat 列が必要です'
+      });
+    }
+
+    const result = await ticketModel.bulkUpdateReservedSeats(validData);
+
+    res.json({
+      success: true,
+      data: {
+        total: result.total,
+        updated: result.updated,
+        message: `${result.updated}件の指定席を更新しました`
+      }
+    });
+  } catch (error) {
+    console.error('Import reserved seats error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // GET /filter-options - フィルターオプション取得
 router.get('/filter-options', async (req, res) => {
   try {

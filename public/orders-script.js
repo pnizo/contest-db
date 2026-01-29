@@ -303,7 +303,11 @@ class OrdersManager {
 
             // 検索商品タイプの表示
             if (latestExport.searchProductType) {
-                exportProductTypeEl.innerHTML = `<span class="tag-badge">${this.escapeHtml(latestExport.searchProductType)}</span>`;
+                exportProductTypeEl.innerHTML = `<span class="tag-badge clickable" data-product-type="${this.escapeHtml(latestExport.searchProductType)}">${this.escapeHtml(latestExport.searchProductType)}</span>`;
+
+                exportProductTypeEl.querySelector('.tag-badge.clickable').addEventListener('click', () => {
+                    this.setProductTypeSearch(latestExport.searchProductType);
+                });
             } else {
                 exportProductTypeEl.textContent = '（指定なし）';
             }
@@ -345,6 +349,13 @@ class OrdersManager {
         this.showNotification(`タグ「${tag}」を追加しました`, 'success');
     }
 
+    setProductTypeSearch(productType) {
+        const productTypeInput = document.getElementById('productTypeInput');
+        productTypeInput.value = productType;
+        productTypeInput.focus();
+        this.showNotification(`商品タイプ「${productType}」をセットしました`, 'success');
+    }
+
     displayCurrentOrders(orders) {
         const container = document.getElementById('ordersTableContainer');
 
@@ -360,7 +371,7 @@ class OrdersManager {
         const headers = [
             '注文番号', '注文日時', '顧客ID', '顧客名', 'メールアドレス',
             '合計金額', '支払いステータス', '発送ステータス',
-            '商品名', 'バリエーション', '数量', '現在数量', '単価', 'タグ'
+            '商品名', 'バリエーション', '数量', '現在数量', '単価', 'BSP', 'タグ'
         ];
         const headerRow = document.createElement('tr');
         headers.forEach(header => {
@@ -388,6 +399,7 @@ class OrdersManager {
                 order.quantity,
                 order.current_quantity,
                 order.price ? `¥${Number(order.price).toLocaleString()}` : '',
+                order.back_stage_pass ?? 0,
                 order.tags ? order.tags.join(', ') : ''
             ];
 

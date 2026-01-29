@@ -33,8 +33,11 @@
                             </div>
                             <button type="button" id="searchBtn" class="search-btn" title="検索">検索</button>
                         </div>
-                        <div class="control-buttons admin-only">
-                            <button id="importBtn">Shopifyインポート</button>
+                            <button id="importBtn" class="admin-only">Shopifyインポート</button>
+                        <div class="control-buttons">
+                            <button id="csvExportBtn">CSVエクスポート</button>
+                            <button id="csvImportBtn">指定席インポート</button>
+
                         </div>
                     </div>
                 </div>
@@ -135,11 +138,11 @@
                 <button class="modal-close" onclick="ticketsManager.closeImportModal()">&times;</button>
             </div>
             <div class="modal-form">
-                <p class="modal-description">Shopifyから「観戦チケット」タグを持つ注文をインポートします。</p>
+                <p class="modal-description">Shopifyから商品タイプ「観戦チケット」の注文をインポートします。</p>
                 <div class="form-group">
-                    <label for="importTag">検索タグ:</label>
-                    <input type="text" id="importTag" value="観戦チケット" class="form-input">
-                    <small>※Shopifyの注文タグで検索します</small>
+                    <label for="importProductType">商品タイプ:</label>
+                    <input type="text" id="importProductType" value="観戦チケット" class="form-input">
+                    <small>※Shopifyの商品タイプで検索します</small>
                 </div>
                 <div class="form-group">
                     <label for="importMonthsAgo">取得期間（月数）:</label>
@@ -176,6 +179,56 @@
                     <button type="button" onclick="ticketsManager.closeDeleteModal()" class="btn btn-secondary">キャンセル</button>
                     <button type="button" id="confirmDeleteBtn" class="btn btn-danger">削除</button>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- CSV Export Modal -->
+    <div id="csvExportModal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>CSVエクスポート</h2>
+                <button class="modal-close" onclick="ticketsManager.closeCsvExportModal()">&times;</button>
+            </div>
+            <div class="modal-form">
+                <p class="modal-description">商品名を選択して、該当するチケットをCSV形式でダウンロードします。</p>
+                <div class="form-group">
+                    <label for="exportProductNameSelect">商品名を選択:</label>
+                    <select id="exportProductNameSelect" class="form-input">
+                        <option value="">読み込み中...</option>
+                    </select>
+                </div>
+                <div class="form-actions">
+                    <button type="button" onclick="ticketsManager.closeCsvExportModal()" class="btn btn-secondary">キャンセル</button>
+                    <button type="button" id="executeCsvExportBtn" class="btn btn-primary">エクスポート実行</button>
+                </div>
+                <div id="csvExportStatus" class="import-status hidden"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- CSV Import Modal -->
+    <div id="csvImportModal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>指定席CSVインポート</h2>
+                <button class="modal-close" onclick="ticketsManager.closeCsvImportModal()">&times;</button>
+            </div>
+            <div class="modal-form">
+                <p class="modal-description">CSVファイルから指定席（reserved_seat）を一括更新します。</p>
+                <div class="form-group">
+                    <label for="csvImportFile">CSVファイルを選択:</label>
+                    <input type="file" id="csvImportFile" accept=".csv" class="form-input">
+                    <small>※CSVには「id」列と「reserved_seat」列が必要です</small>
+                </div>
+                <div class="form-warning">
+                    <strong>注意:</strong> CSVに含まれるidに対応するチケットのreserved_seatが上書きされます。
+                </div>
+                <div class="form-actions">
+                    <button type="button" onclick="ticketsManager.closeCsvImportModal()" class="btn btn-secondary">キャンセル</button>
+                    <button type="button" id="executeCsvImportBtn" class="btn btn-primary">インポート実行</button>
+                </div>
+                <div id="csvImportStatus" class="import-status hidden"></div>
             </div>
         </div>
     </div>

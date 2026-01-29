@@ -96,7 +96,12 @@ function renderNavigation() {
  */
 function showAdminOnlyElements() {
     document.querySelectorAll('.admin-only').forEach(el => {
-        el.style.display = '';
+        // ドロップダウンアイテムはblock、それ以外はinline-block
+        if (el.classList.contains('dropdown-item')) {
+            el.style.display = 'block';
+        } else {
+            el.style.display = 'inline-block';
+        }
     });
 }
 

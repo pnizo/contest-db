@@ -165,6 +165,32 @@ class TicketsManager {
             this.executeImport();
         });
 
+        // CSVエクスポートボタン
+        const csvExportBtn = document.getElementById('csvExportBtn');
+        if (csvExportBtn) {
+            csvExportBtn.addEventListener('click', () => {
+                this.openCsvExportModal();
+            });
+        }
+
+        // CSVエクスポート実行ボタン
+        document.getElementById('executeCsvExportBtn').addEventListener('click', () => {
+            this.executeCsvExport();
+        });
+
+        // CSVインポートボタン
+        const csvImportBtn = document.getElementById('csvImportBtn');
+        if (csvImportBtn) {
+            csvImportBtn.addEventListener('click', () => {
+                this.openCsvImportModal();
+            });
+        }
+
+        // CSVインポート実行ボタン
+        document.getElementById('executeCsvImportBtn').addEventListener('click', () => {
+            this.executeReservedSeatImport();
+        });
+
         // 編集保存ボタン
         document.getElementById('saveEditBtn').addEventListener('click', () => {
             this.saveEdit();
@@ -604,6 +630,292 @@ class TicketsManager {
             AuthToken.remove();
             window.location.href = '/';
         }
+    }
+
+    // ====== CSVエクスポート ======
+
+    async openCsvExportModal() {
+        document.getElementById('csvExportStatus').classList.add('hidden');
+        document.getElementById('csvExportModal').classList.remove('hidden');
+        await this.loadExportProductNames();
+    }
+
+    closeCsvExportModal() {
+        document.getElementById('csvExportModal').classList.add('hidden');
+    }
+
+    async loadExportProductNames() {
+        const select = document.getElementById('exportProductNameSelect');
+        select.innerHTML = '<option value="">読み込み中...</option>';
+
+        try {
+            const response = await authFetch(`${this.apiUrl}/filter-options`);
+            const result = await response.json();
+
+            if (result.success && result.data && result.data.productNames) {
+                select.innerHTML = '<option value="">商品名を選択してください</option>';
+                result.data.productNames.forEach(name => {
+                    const option = document.createElement('option');
+                    option.value = name;
+                    option.textContent = name;
+                    select.appendChild(option);
+                });
+            } else {
+                select.innerHTML = '<option value="">商品名がありません</option>';
+            }
+        } catch (error) {
+            console.error('Load export product names error:', error);
+            select.innerHTML = '<option value="">読み込みエラー</option>';
+        }
+    }
+
+    async executeCsvExport() {
+        const productName = document.getElementById('exportProductNameSelect').value;
+        if (!productName) {
+            this.showNotification('商品名を選択してください', 'error');
+            return;
+        }
+
+        const executeBtn = document.getElementById('executeCsvExportBtn');
+        const statusDiv = document.getElementById('csvExportStatus');
+        const originalText = executeBtn.textContent;
+
+        try {
+            executeBtn.disabled = true;
+            executeBtn.textContent = 'エクスポート中...';
+            statusDiv.classList.remove('hidden');
+            statusDiv.className = 'import-status';
+            statusDiv.textContent = 'データを取得しています...';
+
+            const response = await authFetch(`${this.apiUrl}/export/${encodeURIComponent(productName)}`);
+            const result = await response.json();
+
+            if (result.success) {
+                if (result.data.length === 0) {
+                    statusDiv.className = 'import-status error';
+                    statusDiv.textContent = '該当するチケットがありません';
+                    return;
+                }
+
+                statusDiv.textContent = 'CSVを生成しています...';
+                this.downloadCSV(result.data, result.filename);
+
+                statusDiv.className = 'import-status success';
+                statusDiv.textContent = `${result.data.length}件のデータをエクスポートしました`;
+                this.showNotification(`${result.data.length}件のデータをエクスポートしました`, 'success');
+            } else {
+                statusDiv.className = 'import-status error';
+                statusDiv.textContent = `エラー: ${result.error}`;
+            }
+        } catch (error) {
+            console.error('CSV export error:', error);
+            statusDiv.className = 'import-status error';
+            statusDiv.textContent = `エラー: ${error.message}`;
+        } finally {
+            executeBtn.disabled = false;
+            executeBtn.textContent = originalText;
+        }
+    }
+
+    downloadCSV(data, filename) {
+        if (!data || data.length === 0) return;
+
+        // ヘッダー行（全項目）
+        const headers = Object.keys(data[0]);
+
+        // CSV生成（BOM付きUTF-8）
+        const csvContent = [
+            headers.join(','),
+            ...data.map(row => {
+                return headers.map(header => {
+                    let value = row[header];
+                    // 配列（tags）の場合はセミコロン区切りに
+                    if (Array.isArray(value)) {
+                        value = value.join(';');
+                    }
+                    // null/undefinedは空文字に
+                    if (value === null || value === undefined) {
+                        value = '';
+                    }
+                    // 文字列に変換
+                    value = String(value);
+                    // カンマ、改行、ダブルクォートを含む場合はエスケープ
+                    if (value.includes(',') || value.includes('\n') || value.includes('"')) {
+                        value = '"' + value.replace(/"/g, '""') + '"';
+                    }
+                    return value;
+                }).join(',');
+            })
+        ].join('\n');
+
+        // BOM付きでBlobを作成
+        const bom = new Uint8Array([0xEF, 0xBB, 0xBF]);
+        const blob = new Blob([bom, csvContent], { type: 'text/csv;charset=utf-8;' });
+
+        // ダウンロード
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(link.href);
+    }
+
+    // ====== 指定席CSVインポート ======
+
+    openCsvImportModal() {
+        document.getElementById('csvImportFile').value = '';
+        document.getElementById('csvImportStatus').classList.add('hidden');
+        document.getElementById('csvImportModal').classList.remove('hidden');
+    }
+
+    closeCsvImportModal() {
+        document.getElementById('csvImportModal').classList.add('hidden');
+    }
+
+    async executeReservedSeatImport() {
+        const fileInput = document.getElementById('csvImportFile');
+        const file = fileInput.files[0];
+
+        if (!file) {
+            this.showNotification('ファイルを選択してください', 'error');
+            return;
+        }
+
+        const executeBtn = document.getElementById('executeCsvImportBtn');
+        const statusDiv = document.getElementById('csvImportStatus');
+        const originalText = executeBtn.textContent;
+
+        try {
+            executeBtn.disabled = true;
+            executeBtn.textContent = 'インポート中...';
+            statusDiv.classList.remove('hidden');
+            statusDiv.className = 'import-status';
+            statusDiv.textContent = 'CSVを読み込んでいます...';
+
+            // ファイルを読み込み
+            const csvText = await this.readFileAsText(file);
+            const csvData = this.parseCSV(csvText);
+
+            if (csvData.length === 0) {
+                statusDiv.className = 'import-status error';
+                statusDiv.textContent = 'CSVにデータがありません';
+                return;
+            }
+
+            // id と reserved_seat 列の存在確認
+            const firstRow = csvData[0];
+            if (!firstRow.hasOwnProperty('id') || !firstRow.hasOwnProperty('reserved_seat')) {
+                statusDiv.className = 'import-status error';
+                statusDiv.textContent = 'CSVに「id」列と「reserved_seat」列が必要です';
+                return;
+            }
+
+            statusDiv.textContent = 'データを送信しています...';
+
+            const response = await authFetch(`${this.apiUrl}/import-reserved-seats`, {
+                method: 'POST',
+                body: JSON.stringify({ csvData })
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                statusDiv.className = 'import-status success';
+                statusDiv.textContent = result.data.message;
+                this.showNotification(result.data.message, 'success');
+
+                // 少し待ってからモーダルを閉じてデータをリロード
+                setTimeout(() => {
+                    this.closeCsvImportModal();
+                    this.loadTickets();
+                }, 2000);
+            } else {
+                statusDiv.className = 'import-status error';
+                statusDiv.textContent = `エラー: ${result.error}`;
+            }
+        } catch (error) {
+            console.error('CSV import error:', error);
+            statusDiv.className = 'import-status error';
+            statusDiv.textContent = `エラー: ${error.message}`;
+        } finally {
+            executeBtn.disabled = false;
+            executeBtn.textContent = originalText;
+        }
+    }
+
+    readFileAsText(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = (e) => resolve(e.target.result);
+            reader.onerror = (e) => reject(new Error('ファイルの読み込みに失敗しました'));
+            reader.readAsText(file, 'UTF-8');
+        });
+    }
+
+    parseCSV(csvText) {
+        const lines = csvText.trim().split('\n');
+        if (lines.length < 2) return [];
+
+        // BOMを除去
+        let headerLine = lines[0];
+        if (headerLine.charCodeAt(0) === 0xFEFF) {
+            headerLine = headerLine.slice(1);
+        }
+
+        const headers = this.parseCSVLine(headerLine);
+        const data = [];
+
+        for (let i = 1; i < lines.length; i++) {
+            const line = lines[i].trim();
+            if (!line) continue;
+
+            const values = this.parseCSVLine(line);
+            const row = {};
+            headers.forEach((header, index) => {
+                row[header] = values[index] || '';
+            });
+            data.push(row);
+        }
+
+        return data;
+    }
+
+    parseCSVLine(line) {
+        const result = [];
+        let current = '';
+        let inQuotes = false;
+
+        for (let i = 0; i < line.length; i++) {
+            const char = line[i];
+            const nextChar = line[i + 1];
+
+            if (inQuotes) {
+                if (char === '"') {
+                    if (nextChar === '"') {
+                        current += '"';
+                        i++;
+                    } else {
+                        inQuotes = false;
+                    }
+                } else {
+                    current += char;
+                }
+            } else {
+                if (char === '"') {
+                    inQuotes = true;
+                } else if (char === ',') {
+                    result.push(current);
+                    current = '';
+                } else {
+                    current += char;
+                }
+            }
+        }
+
+        result.push(current);
+        return result;
     }
 }
 

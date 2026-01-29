@@ -28,6 +28,7 @@ class Order {
       current_quantity: row.currentQuantity,
       price: row.price,
       line_item_id: row.lineItemId,
+      back_stage_pass: row.backStagePass ?? 0,
       created_at: row.createdAt,
       updated_at: row.updatedAt,
       tags: row.tags || [],
@@ -377,6 +378,7 @@ class Order {
             currentQuantity: parseInt(baseData[11], 10) || 0, // current_quantity
             price: baseData[12],          // price
             lineItemId: baseData[13],     // line_item_id
+            backStagePass: parseInt(baseData[14], 10) || 0, // back_stage_pass
           })
           .returning({ id: orders.id });
 

@@ -545,6 +545,91 @@ class Ticket {
     }
   }
 
+  /**
+   * 商品名でチケットを検索（全項目取得）
+   * @param {string} productName - 商品名
+   * @returns {Promise<Array>} チケット一覧
+   */
+  async findByProductName(productName) {
+    try {
+      const db = getDb();
+
+      // 商品名でチケットを取得
+      let rows = await db
+        .select()
+        .from(tickets)
+        .where(eq(tickets.productName, productName))
+        .orderBy(desc(tickets.id));
+
+      if (rows.length === 0) {
+        return [];
+      }
+
+      // タグを取得
+      const ticketIds = rows.map(r => r.id);
+      const tagRows = await db
+        .select()
+        .from(ticketTags)
+        .where(inArray(ticketTags.ticketId, ticketIds))
+        .orderBy(ticketTags.sortOrder);
+
+      // タグをチケットにマップ
+      const tagMap = new Map();
+      tagRows.forEach(t => {
+        if (!tagMap.has(t.ticketId)) {
+          tagMap.set(t.ticketId, []);
+        }
+        tagMap.get(t.ticketId).push(t.tag);
+      });
+
+      rows = rows.map(row => ({
+        ...row,
+        tags: tagMap.get(row.id) || [],
+      }));
+
+      return rows.map(row => this._toSnakeCase(row));
+    } catch (error) {
+      console.error('Error in findByProductName:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * reserved_seat一括更新
+   * @param {Array<{id: number, reserved_seat: string}>} csvData - 更新データ
+   * @returns {Promise<{total: number, updated: number}>} 更新結果
+   */
+  async bulkUpdateReservedSeats(csvData) {
+    try {
+      const db = getDb();
+      let updated = 0;
+
+      for (const row of csvData) {
+        const id = parseInt(row.id, 10);
+        if (isNaN(id) || id < 1) {
+          continue;
+        }
+
+        const reservedSeat = row.reserved_seat || '';
+
+        await db
+          .update(tickets)
+          .set({
+            reservedSeat,
+            updatedAt: new Date(),
+          })
+          .where(eq(tickets.id, id));
+
+        updated++;
+      }
+
+      return { total: csvData.length, updated };
+    } catch (error) {
+      console.error('Error in bulkUpdateReservedSeats:', error);
+      throw error;
+    }
+  }
+
 }
 
 module.exports = Ticket;
