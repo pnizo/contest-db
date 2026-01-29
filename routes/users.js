@@ -96,11 +96,19 @@ router.post('/', requireAdmin, async (req, res) => {
 
 router.put('/:id', requireAuth, async (req, res) => {
   try {
+    // ゲストユーザーは自分のプロフィールを編集できない
+    if (req.user.role === 'guest' && String(req.params.id) === String(req.user.id)) {
+      return res.status(403).json({
+        success: false,
+        error: 'ゲストユーザーはプロフィールを編集できません'
+      });
+    }
+
     // 一般ユーザーは自分のIDのみ更新可能、管理者はすべて更新可能
     if (req.user.role !== 'admin' && req.params.id !== req.user.id) {
-      return res.status(403).json({ 
-        success: false, 
-        error: '自分のプロフィールのみ更新できます' 
+      return res.status(403).json({
+        success: false,
+        error: '自分のプロフィールのみ更新できます'
       });
     }
 
@@ -112,6 +120,11 @@ router.put('/:id', requireAuth, async (req, res) => {
     // 一般ユーザーはroleを変更できない
     if (req.user.role !== 'admin' && updateData.role) {
       delete updateData.role;
+    }
+
+    // ゲストユーザーが自分自身のパスワードを変更することを禁止
+    if (req.user.role === 'guest' && String(req.params.id) === String(req.user.id) && updateData.password) {
+      delete updateData.password;
     }
 
     const result = await userModel.update(req.params.id, updateData);

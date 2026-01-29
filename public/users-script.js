@@ -173,6 +173,14 @@ class UserManager {
                 roleField.style.cursor = '';
             }
             
+            // ゲストユーザーは自分のパスワードを変更できない
+            const passwordGroup = document.getElementById('modalPassword').closest('.form-group');
+            if (!this.isAdmin && this.currentUser.role === 'guest' && String(user.id) === String(this.currentUser.id)) {
+                passwordGroup.style.display = 'none';
+            } else {
+                passwordGroup.style.display = '';
+            }
+
             this.editingUserId = user.id;
         } else {
             // 新規作成モード
@@ -350,7 +358,7 @@ class UserManager {
                             deleteBtn.addEventListener('click', () => this.deleteUser(user.id));
                             actionsDiv.appendChild(deleteBtn);
                         }
-                    } else if (!isDeleted) {
+                    } else if (!isDeleted && this.currentUser.role !== 'guest') {
                         const editBtn = document.createElement('button');
                         editBtn.className = 'btn-small btn-edit';
                         editBtn.textContent = '編集';
@@ -371,7 +379,7 @@ class UserManager {
                 } else if (header.key === 'role') {
                     const roleBadge = document.createElement('span');
                     roleBadge.className = `role-badge ${user.role || 'user'}`;
-                    roleBadge.textContent = user.role === 'admin' ? '管理者' : 'ユーザー';
+                    roleBadge.textContent = user.role === 'admin' ? '管理者' : user.role === 'guest' ? 'ゲスト' : 'ユーザー';
                     td.appendChild(roleBadge);
                 } else if (header.key === 'createdAt') {
                     td.textContent = user.createdAt ? new Date(user.createdAt).toLocaleDateString('ja-JP') : '';

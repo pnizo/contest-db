@@ -98,8 +98,16 @@ router.get('/status', (req, res) => {
 
 router.post('/change-password', requireAuth, async (req, res) => {
   try {
+    // ゲストユーザーはパスワード変更不可
+    if (req.session.user.role === 'guest') {
+      return res.status(403).json({
+        success: false,
+        error: 'ゲストユーザーはパスワードを変更できません'
+      });
+    }
+
     const { currentPassword, newPassword } = req.body;
-    
+
     if (!currentPassword || !newPassword) {
       return res.status(400).json({
         success: false,
