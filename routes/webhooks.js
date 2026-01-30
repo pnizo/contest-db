@@ -29,9 +29,9 @@ router.post('/shopify/:topic', async (req, res) => {
     }
 
     // 4. チケット対象の注文かチェック
-    const hasTicketProduct = await shopifyService.orderHasProductType(order.id, '観戦チケット');
+    const hasTicketProduct = await shopifyService.orderHasTag(order.id, '観戦チケット');
     if (!hasTicketProduct) {
-      console.log('[Webhook] Not a ticket order (no ticket productType), skipped');
+      console.log('[Webhook] Not a ticket order (no ticket tag), skipped');
       return res.status(200).json({ message: 'Not a ticket order, skipped' });
     }
 

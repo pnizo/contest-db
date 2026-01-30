@@ -982,21 +982,21 @@ class ShopifyService {
 
   /**
    * 商品タイプでチケット注文を取得
-   * @param {string} productType - 検索する商品タイプ（デフォルト: "観戦チケット"）
+   * @param {string} tag - 検索するタグ（デフォルト: "観戦チケット"）
    * @param {number} monthsAgo - 何ヶ月前からの注文を取得するか（デフォルト: 6）
    * @returns {Promise<Array>} 注文リスト
    */
-  async getTicketOrders(productType = '観戦チケット', monthsAgo = 3) {
+  async getTicketOrders(tag = '観戦チケット', monthsAgo = 3) {
     try {
       // 指定月数前の日付を計算
       const sinceDate = new Date();
       sinceDate.setMonth(sinceDate.getMonth() - monthsAgo);
       const dateStr = sinceDate.toISOString().split('T')[0];
 
-      console.log(`Fetching ticket orders with productType: "${productType}", since: ${dateStr}`);
+      console.log(`Fetching ticket orders with tag: "${tag}", since: ${dateStr}`);
 
-      // 日付でクエリを構築（productTypeはアプリケーションレベルでフィルタ）
-      const searchQuery = `created_at:>${dateStr}`;
+      // タグと日付でクエリを構築
+      const searchQuery = `tag:"${tag}" created_at:>${dateStr}`;
 
       console.log(`Ticket order search query: ${searchQuery}`);
 
@@ -1046,7 +1046,6 @@ class ShopifyService {
                         }
                         product {
                           tags
-                          productType
                         }
                         variant {
                           metafields(first: 10) {
@@ -1111,24 +1110,20 @@ class ShopifyService {
 
       console.log(`Ticket order fetch completed: ${allOrders.length} orders in ${pageCount} API calls`);
 
-      // productType フィルタリング（アプリケーションレベル）
-      if (productType) {
-        const filteredOrders = allOrders.map(order => {
-          const filteredLineItems = order.lineItems.edges.filter(edge =>
-            edge.node.product?.productType === productType
-          );
-          if (filteredLineItems.length === 0) return null;
-          return {
-            ...order,
-            lineItems: { edges: filteredLineItems }
-          };
-        }).filter(order => order !== null);
+      // lineItemごとにタグでフィルタリング（対象タグを持つlineItemのみ残す）
+      const filteredOrders = allOrders.map(order => {
+        const filteredLineItems = order.lineItems.edges.filter(edge =>
+          edge.node.product?.tags?.includes(tag)
+        );
+        if (filteredLineItems.length === 0) return null;
+        return {
+          ...order,
+          lineItems: { edges: filteredLineItems }
+        };
+      }).filter(order => order !== null);
 
-        console.log(`Filtered by productType "${productType}": ${filteredOrders.length} orders (from ${allOrders.length})`);
-        return filteredOrders;
-      }
-
-      return allOrders;
+      console.log(`Filtered by tag "${tag}": ${filteredOrders.length} orders with matching lineItems (from ${allOrders.length})`);
+      return filteredOrders;
     } catch (error) {
       console.error('Error fetching ticket orders:', error);
       throw error;
@@ -1136,18 +1131,18 @@ class ShopifyService {
   }
 
   /**
-   * 注文が指定したproductTypeの商品を含むかチェック
+   * 注文が指定したタグを含むかチェック
    * @param {string} orderId - 注文ID（数値またはGID形式）
-   * @param {string} productType - チェックする商品タイプ（デフォルト: "観戦チケット"）
-   * @returns {Promise<boolean>} 指定したproductTypeを含む場合true
+   * @param {string} tag - チェックするタグ（デフォルト: "観戦チケット"）
+   * @returns {Promise<boolean>} 指定したタグを含む場合true
    */
-  async orderHasProductType(orderId, productType = '観戦チケット') {
+  async orderHasTag(orderId, tag = '観戦チケット') {
     try {
       const orderGid = orderId.toString().startsWith('gid://')
         ? orderId
         : `gid://shopify/Order/${orderId}`;
 
-      console.log(`Checking if order ${orderGid} has productType: "${productType}"`);
+      console.log(`Checking if order ${orderGid} has tag: "${tag}"`);
 
       const query = `
         query getOrder($id: ID!) {
@@ -1157,7 +1152,7 @@ class ShopifyService {
               edges {
                 node {
                   product {
-                    productType
+                    tags
                   }
                 }
               }
@@ -1185,14 +1180,14 @@ class ShopifyService {
         return false;
       }
 
-      const hasProductType = order.lineItems.edges.some(edge =>
-        edge.node.product?.productType === productType
+      const hasTag = order.lineItems.edges.some(edge =>
+        edge.node.product?.tags?.includes(tag)
       );
 
-      console.log(`Order ${orderGid} has productType "${productType}": ${hasProductType}`);
-      return hasProductType;
+      console.log(`Order ${orderGid} has tag "${tag}": ${hasTag}`);
+      return hasTag;
     } catch (error) {
-      console.error('Error checking order productType:', error);
+      console.error('Error checking order tag:', error);
       return false;
     }
   }
