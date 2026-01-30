@@ -230,18 +230,18 @@ router.delete('/:id', requireAdmin, async (req, res) => {
 // POST /import - Shopifyからインポート（管理者のみ）
 router.post('/import', requireAdmin, async (req, res) => {
   try {
-    const { productType = '観戦チケット', monthsAgo = 3 } = req.body;
+    const { tag = '観戦チケット', monthsAgo = 3 } = req.body;
 
-    console.log(`Starting ticket import with productType: "${productType}", monthsAgo: ${monthsAgo}`);
+    console.log(`Starting ticket import with tag: "${tag}", monthsAgo: ${monthsAgo}`);
 
     // Shopifyから注文を取得
     const shopify = getShopifyService();
-    const orders = await shopify.getTicketOrders(productType, parseInt(monthsAgo));
+    const orders = await shopify.getTicketOrders(tag, parseInt(monthsAgo));
 
     if (orders.length === 0) {
       return res.json({
         success: true,
-        message: `商品タイプ「${productType}」を持つ注文が見つかりませんでした`,
+        message: `タグ「${tag}」を持つ注文が見つかりませんでした`,
         imported: 0
       });
     }
@@ -257,24 +257,20 @@ router.post('/import', requireAdmin, async (req, res) => {
 
     console.log(`Converted to ${allTickets.length} ticket rows`);
 
-    // 最大タグ数を計算
-    const maxTags = allTickets.reduce((max, ticket) => Math.max(max, ticket.tags.length), 0);
-
     // シートにインポート
-    const result = await ticketModel.importTickets(allTickets, maxTags);
+    const result = await ticketModel.importTickets(allTickets);
 
     if (!result.success) {
       return res.status(400).json(result);
     }
 
-    console.log(`Imported ${result.imported} tickets with ${maxTags} tag columns`);
+    console.log(`Imported ${result.imported} tickets`);
 
     res.json({
       success: true,
       message: `${orders.length}件の注文から${result.imported}件のチケットをインポートしました`,
       orderCount: orders.length,
       ticketCount: result.imported,
-      maxTags: maxTags
     });
   } catch (error) {
     console.error('Ticket import error:', error);

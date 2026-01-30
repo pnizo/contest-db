@@ -237,7 +237,7 @@ class ShopifyService {
     return tags;
   }
 
-  async getOrdersByTag(tagInput, limit = 0, paidOnly = true, productType = '') {
+  async getOrdersByTag(tagInput, limit = 0, paidOnly = true) {
     try {
       const allOrders = [];
       let pageInfo = null;
@@ -268,7 +268,7 @@ class ShopifyService {
       // limit=0 は無制限を意味する
       const isUnlimited = limit === 0;
       
-      console.log(`Shopify order search query: ${searchQuery}, limit: ${isUnlimited ? 'unlimited' : limit}, productType: ${productType || '(指定なし)'}`);
+      console.log(`Shopify order search query: ${searchQuery}, limit: ${isUnlimited ? 'unlimited' : limit}`);
 
       while (hasNextPage) {
         pageCount++;
@@ -314,7 +314,6 @@ class ShopifyService {
                         }
                         product {
                           tags
-                          productType
                         }
                       }
                     }
@@ -373,24 +372,6 @@ class ShopifyService {
       }
 
       console.log(`Shopify order fetch completed: ${allOrders.length} orders in ${pageCount} API calls`);
-
-      // productType フィルタリング（アプリケーションレベル）
-      if (productType) {
-        const filteredOrders = allOrders.map(order => {
-          const filteredLineItems = order.lineItems.edges.filter(edge =>
-            edge.node.product?.productType === productType
-          );
-          if (filteredLineItems.length === 0) return null;
-          return {
-            ...order,
-            lineItems: { edges: filteredLineItems }
-          };
-        }).filter(order => order !== null);
-
-        console.log(`Filtered by productType "${productType}": ${filteredOrders.length} orders (from ${allOrders.length})`);
-        return filteredOrders;
-      }
-
       return allOrders;
     } catch (error) {
       console.error('Error fetching orders by tag:', error);

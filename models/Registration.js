@@ -293,47 +293,53 @@ class Registration {
     }
   }
 
+  _buildUpdateData(data) {
+    const updateData = {
+      updatedAt: new Date(),
+    };
+
+    // 更新可能なフィールド
+    if (data.contest_date !== undefined) updateData.contestDate = data.contest_date;
+    if (data.contest_name !== undefined) updateData.contestName = data.contest_name;
+    if (data.player_no !== undefined) updateData.playerNo = data.player_no || null;
+    if (data.name_ja !== undefined) updateData.nameJa = data.name_ja || null;
+    if (data.name_ja_kana !== undefined) updateData.nameJaKana = data.name_ja_kana || null;
+    if (data.fwj_card_no !== undefined) updateData.fwjCardNo = data.fwj_card_no || null;
+    if (data.first_name !== undefined) updateData.firstName = data.first_name || null;
+    if (data.last_name !== undefined) updateData.lastName = data.last_name || null;
+    if (data.email !== undefined) updateData.email = data.email || null;
+    if (data.phone !== undefined) updateData.phone = data.phone || null;
+    if (data.country !== undefined) updateData.country = data.country || null;
+    if (data.age !== undefined) updateData.age = data.age || null;
+    if (data.class_name !== undefined) updateData.className = data.class_name || null;
+    if (data.sort_index !== undefined) updateData.sortIndex = data.sort_index || null;
+    if (data.score_card !== undefined) updateData.scoreCard = data.score_card || null;
+    if (data.contest_order !== undefined) updateData.contestOrder = data.contest_order || null;
+    if (data.height !== undefined) updateData.height = data.height || null;
+    if (data.weight !== undefined) updateData.weight = data.weight || null;
+    if (data.occupation !== undefined) updateData.occupation = data.occupation || null;
+    if (data.instagram !== undefined) updateData.instagram = data.instagram || null;
+    if (data.biography !== undefined) updateData.biography = data.biography || null;
+    if (data.back_stage_pass !== undefined) updateData.backStagePass = parseInt(data.back_stage_pass, 10) || 0;
+
+    if (data.isValid !== undefined) {
+      updateData.isValid = data.isValid === 'TRUE' || data.isValid === true;
+    }
+    if (data.deletedAt !== undefined) {
+      updateData.deletedAt = data.deletedAt ? new Date(data.deletedAt) : null;
+    }
+    if (data.restoredAt !== undefined) {
+      updateData.restoredAt = data.restoredAt ? new Date(data.restoredAt) : null;
+    }
+
+    return updateData;
+  }
+
   async update(id, data) {
     const db = getDb();
 
     try {
-      const updateData = {
-        updatedAt: new Date(),
-      };
-
-      // 更新可能なフィールド
-      if (data.contest_date !== undefined) updateData.contestDate = data.contest_date;
-      if (data.contest_name !== undefined) updateData.contestName = data.contest_name;
-      if (data.player_no !== undefined) updateData.playerNo = data.player_no || null;
-      if (data.name_ja !== undefined) updateData.nameJa = data.name_ja || null;
-      if (data.name_ja_kana !== undefined) updateData.nameJaKana = data.name_ja_kana || null;
-      if (data.fwj_card_no !== undefined) updateData.fwjCardNo = data.fwj_card_no || null;
-      if (data.first_name !== undefined) updateData.firstName = data.first_name || null;
-      if (data.last_name !== undefined) updateData.lastName = data.last_name || null;
-      if (data.email !== undefined) updateData.email = data.email || null;
-      if (data.phone !== undefined) updateData.phone = data.phone || null;
-      if (data.country !== undefined) updateData.country = data.country || null;
-      if (data.age !== undefined) updateData.age = data.age || null;
-      if (data.class_name !== undefined) updateData.className = data.class_name || null;
-      if (data.sort_index !== undefined) updateData.sortIndex = data.sort_index || null;
-      if (data.score_card !== undefined) updateData.scoreCard = data.score_card || null;
-      if (data.contest_order !== undefined) updateData.contestOrder = data.contest_order || null;
-      if (data.height !== undefined) updateData.height = data.height || null;
-      if (data.weight !== undefined) updateData.weight = data.weight || null;
-      if (data.occupation !== undefined) updateData.occupation = data.occupation || null;
-      if (data.instagram !== undefined) updateData.instagram = data.instagram || null;
-      if (data.biography !== undefined) updateData.biography = data.biography || null;
-      if (data.back_stage_pass !== undefined) updateData.backStagePass = parseInt(data.back_stage_pass, 10) || 0;
-
-      if (data.isValid !== undefined) {
-        updateData.isValid = data.isValid === 'TRUE' || data.isValid === true;
-      }
-      if (data.deletedAt !== undefined) {
-        updateData.deletedAt = data.deletedAt ? new Date(data.deletedAt) : null;
-      }
-      if (data.restoredAt !== undefined) {
-        updateData.restoredAt = data.restoredAt ? new Date(data.restoredAt) : null;
-      }
+      const updateData = this._buildUpdateData(data);
 
       const result = await db
         .update(registrations)
@@ -348,6 +354,31 @@ class Registration {
       return { success: true, data: this._toResponse(result[0]) };
     } catch (error) {
       console.error('Registration update error:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  async batchUpdate(updates) {
+    const db = getDb();
+    const CHUNK_SIZE = 500;
+
+    try {
+      const updateQueries = updates.map(({ id, data }) => {
+        const updateData = this._buildUpdateData(data);
+        return db
+          .update(registrations)
+          .set(updateData)
+          .where(eq(registrations.id, parseInt(id)));
+      });
+
+      for (let i = 0; i < updateQueries.length; i += CHUNK_SIZE) {
+        const chunk = updateQueries.slice(i, i + CHUNK_SIZE);
+        await db.batch(chunk);
+      }
+
+      return { success: true, updated: updateQueries.length };
+    } catch (error) {
+      console.error('Registration batchUpdate error:', error);
       return { success: false, error: error.message };
     }
   }

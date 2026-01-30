@@ -890,6 +890,106 @@ router.post('/import-shopify', requireAdmin, async (req, res) => {
   }
 });
 
+// POST /import-csv - CSVインポート（選択した項目のみ更新）
+router.post('/import-csv', requireAdmin, async (req, res) => {
+  try {
+    const { csvData, fields } = req.body;
+
+    // バリデーション
+    if (!csvData || !Array.isArray(csvData) || csvData.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'CSVデータが必要です'
+      });
+    }
+
+    if (!fields || !Array.isArray(fields) || fields.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'インポートする項目を1つ以上選択してください'
+      });
+    }
+
+    // 許可フィールドのホワイトリストチェック
+    const ALLOWED_IMPORT_FIELDS = [
+      'name_ja', 'name_ja_kana', 'first_name', 'last_name',
+      'country', 'age', 'class_name', 'height', 'weight',
+      'occupation', 'biography', 'back_stage_pass'
+    ];
+
+    const invalidFields = fields.filter(f => !ALLOWED_IMPORT_FIELDS.includes(f));
+    if (invalidFields.length > 0) {
+      return res.status(400).json({
+        success: false,
+        error: `許可されていないフィールドが含まれています: ${invalidFields.join(', ')}`
+      });
+    }
+
+    // id列の存在チェック
+    if (!('id' in csvData[0])) {
+      return res.status(400).json({
+        success: false,
+        error: 'CSVにid列が必要です'
+      });
+    }
+
+    console.log(`Starting CSV import: ${csvData.length} rows, fields: ${fields.join(', ')}`);
+
+    // バッチ更新用の配列を構築
+    const updates = [];
+    let skipped = 0;
+
+    for (const row of csvData) {
+      const id = row.id;
+      if (!id) {
+        skipped++;
+        continue;
+      }
+
+      // 選択されたフィールドのみ更新データとして抽出
+      const updateData = {};
+      fields.forEach(field => {
+        if (field in row) {
+          updateData[field] = row[field];
+        }
+      });
+
+      if (Object.keys(updateData).length === 0) {
+        skipped++;
+        continue;
+      }
+
+      updates.push({ id, data: updateData });
+    }
+
+    // バッチUPDATE実行
+    let updated = 0;
+    if (updates.length > 0) {
+      const result = await registrationModel.batchUpdate(updates);
+      if (result.success) {
+        updated = result.updated;
+      } else {
+        return res.status(500).json({ success: false, error: result.error });
+      }
+    }
+
+    res.json({
+      success: true,
+      data: {
+        totalRows: csvData.length,
+        updated,
+        skipped,
+        fields: fields,
+        message: `${updated}件を更新しました（${skipped}件スキップ）`
+      }
+    });
+
+  } catch (error) {
+    console.error('CSV import error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // POST /import-contest-order - 開催順CSVインポート
 router.post('/import-contest-order', requireAdmin, async (req, res) => {
   try {
@@ -960,10 +1060,10 @@ router.post('/import-contest-order', requireAdmin, async (req, res) => {
       }
     });
 
-    // 更新処理
+    // バッチ更新用の配列を構築
+    const updates = [];
     let updated = 0;
     let cleared = 0;
-    const errors = [];
 
     for (const reg of targetRegistrations) {
       const className = reg.class_name?.trim() || '';
@@ -988,10 +1088,14 @@ router.post('/import-contest-order', requireAdmin, async (req, res) => {
         cleared++;
       }
 
-      try {
-        await registrationModel.update(reg.id, updateData);
-      } catch (updateError) {
-        errors.push(`ID ${reg.id}: ${updateError.message}`);
+      updates.push({ id: reg.id, data: updateData });
+    }
+
+    // バッチUPDATE実行
+    if (updates.length > 0) {
+      const result = await registrationModel.batchUpdate(updates);
+      if (!result.success) {
+        return res.status(500).json({ success: false, error: result.error });
       }
     }
 
@@ -1003,7 +1107,6 @@ router.post('/import-contest-order', requireAdmin, async (req, res) => {
         updated,
         cleared,
         csvRows: csvData.length,
-        errors: errors.length > 0 ? errors : undefined,
         message: `${updated}件を更新、${cleared}件をクリアしました`
       }
     });

@@ -215,12 +215,13 @@ class Member {
    * @param {object} memberData - メンバーデータ（snake_case）
    * @returns {Promise<Object>} 処理結果
    */
-  async upsertFromShopify(memberData) {
+  async upsertFromShopify(membersDataArray) {
     try {
       const db = getDb();
+      const CHUNK_SIZE = 500;
 
-      // snake_case → camelCase 変換
-      const insertData = {
+      // Phase 1: 全入力データを insertData 形式に変換
+      const allData = membersDataArray.map(memberData => ({
         shopifyId: memberData.shopify_id,
         email: memberData.email,
         firstName: memberData.first_name || null,
@@ -244,27 +245,59 @@ class Member {
         fwjKanaLastName: memberData.fwj_kanalastname || null,
         fwjHeight: memberData.fwj_height || null,
         fwjWeight: memberData.fwj_weight || null,
-      };
+      }));
 
-      // 既存チェック
-      const existing = await this.findByShopifyId(memberData.shopify_id);
+      // Phase 2: 既存データをMapに（shopifyId → row）
+      const existingRows = await db.select().from(members);
+      const existingMap = new Map();
+      existingRows.forEach(row => {
+        if (row.shopifyId) {
+          existingMap.set(row.shopifyId, row);
+        }
+      });
 
-      if (existing) {
-        // 更新
-        await db
-          .update(members)
-          .set({
-            ...insertData,
-            updatedAt: new Date(),
-          })
-          .where(eq(members.shopifyId, memberData.shopify_id));
+      // Phase 3: INSERT/UPDATE を分類
+      const updateList = [];
+      const insertList = [];
 
-        return { success: true, action: 'updated', message: 'FWJ会員情報を更新しました' };
-      } else {
-        // 新規作成
-        await db.insert(members).values(insertData);
-        return { success: true, action: 'created', message: 'FWJ会員情報を追加しました' };
+      for (const data of allData) {
+        const existing = existingMap.get(data.shopifyId);
+        if (existing) {
+          updateList.push({ data, existing });
+        } else {
+          insertList.push(data);
+        }
       }
+
+      // Phase 4: バッチ UPDATE（db.batch()）
+      if (updateList.length > 0) {
+        const updateQueries = updateList.map(({ data, existing }) =>
+          db.update(members).set({
+            ...data,
+            updatedAt: new Date(),
+          }).where(eq(members.id, existing.id))
+        );
+
+        for (let i = 0; i < updateQueries.length; i += CHUNK_SIZE) {
+          const chunk = updateQueries.slice(i, i + CHUNK_SIZE);
+          await db.batch(chunk);
+        }
+      }
+
+      // Phase 5: バッチ INSERT（.values([...])）
+      if (insertList.length > 0) {
+        for (let i = 0; i < insertList.length; i += CHUNK_SIZE) {
+          const chunk = insertList.slice(i, i + CHUNK_SIZE);
+          await db.insert(members).values(chunk);
+        }
+      }
+
+      return {
+        success: true,
+        created: insertList.length,
+        updated: updateList.length,
+        message: `FWJ会員情報を同期しました（新規: ${insertList.length}件、更新: ${updateList.length}件）`,
+      };
     } catch (error) {
       console.error('Error in upsertFromShopify:', error);
       throw error;

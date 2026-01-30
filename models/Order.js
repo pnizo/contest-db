@@ -1,11 +1,37 @@
 const { getDb } = require('../lib/db');
-const { orders, orderTags, orderExportMeta } = require('../lib/db/schema');
-const { eq, ilike, and, desc, asc, sql, inArray, max } = require('drizzle-orm');
+const { orders, orderExportMeta } = require('../lib/db/schema');
+const { eq, ilike, and, desc, asc, sql } = require('drizzle-orm');
 
 /**
  * Orderモデル - Neon Postgres / Drizzle ORM版
  */
 class Order {
+  /**
+   * 行データからタグ配列を抽出
+   * @private
+   */
+  _tagsFromRow(row) {
+    const tags = [];
+    for (let i = 1; i <= 10; i++) {
+      const v = row[`tag${i}`];
+      if (v != null && v !== '') tags.push(v);
+    }
+    return tags;
+  }
+
+  /**
+   * タグ配列を tag1-tag10 カラムオブジェクトに変換
+   * @private
+   */
+  _tagsToColumns(tags) {
+    const cols = {};
+    const src = (tags || []).filter(t => t && t.trim() !== '');
+    for (let i = 1; i <= 10; i++) {
+      cols[`tag${i}`] = src[i - 1] || null;
+    }
+    return cols;
+  }
+
   /**
    * DBのcamelCaseをAPI用のsnake_caseに変換
    * @private
@@ -31,7 +57,7 @@ class Order {
       back_stage_pass: row.backStagePass ?? 0,
       created_at: row.createdAt,
       updated_at: row.updatedAt,
-      tags: row.tags || [],
+      tags: this._tagsFromRow(row),
     };
   }
 
@@ -42,34 +68,10 @@ class Order {
   async findAll() {
     try {
       const db = getDb();
-      let rows = await db
+      const rows = await db
         .select()
         .from(orders)
         .orderBy(desc(orders.createdAt));
-
-      // タグを取得
-      if (rows.length > 0) {
-        const orderIds = rows.map(r => r.id);
-        const tagRows = await db
-          .select()
-          .from(orderTags)
-          .where(inArray(orderTags.orderId, orderIds))
-          .orderBy(orderTags.sortOrder);
-
-        // タグをオーダーにマップ
-        const tagMap = new Map();
-        tagRows.forEach(t => {
-          if (!tagMap.has(t.orderId)) {
-            tagMap.set(t.orderId, []);
-          }
-          tagMap.get(t.orderId).push(t.tag);
-        });
-
-        rows = rows.map(row => ({
-          ...row,
-          tags: tagMap.get(row.id) || [],
-        }));
-      }
 
       return rows.map(row => this._toSnakeCase(row));
     } catch (error) {
@@ -137,37 +139,13 @@ class Order {
 
       // データ取得
       const offset = (page - 1) * limit;
-      let rows = await db
+      const rows = await db
         .select()
         .from(orders)
         .where(whereClause)
         .orderBy(orderFn(sortColumn))
         .limit(limit)
         .offset(offset);
-
-      // タグを取得
-      if (rows.length > 0) {
-        const orderIds = rows.map(r => r.id);
-        const tagRows = await db
-          .select()
-          .from(orderTags)
-          .where(inArray(orderTags.orderId, orderIds))
-          .orderBy(orderTags.sortOrder);
-
-        // タグをオーダーにマップ
-        const tagMap = new Map();
-        tagRows.forEach(t => {
-          if (!tagMap.has(t.orderId)) {
-            tagMap.set(t.orderId, []);
-          }
-          tagMap.get(t.orderId).push(t.tag);
-        });
-
-        rows = rows.map(row => ({
-          ...row,
-          tags: tagMap.get(row.id) || [],
-        }));
-      }
 
       const data = rows.map(row => this._toSnakeCase(row));
       const totalPages = Math.ceil(total / limit);
@@ -187,35 +165,10 @@ class Order {
   async findByOrderNo(orderNo) {
     try {
       const db = getDb();
-      let rows = await db
+      const rows = await db
         .select()
         .from(orders)
         .where(eq(orders.orderNo, orderNo));
-
-      if (rows.length === 0) {
-        return [];
-      }
-
-      // タグを取得
-      const orderIds = rows.map(r => r.id);
-      const tagRows = await db
-        .select()
-        .from(orderTags)
-        .where(inArray(orderTags.orderId, orderIds))
-        .orderBy(orderTags.sortOrder);
-
-      const tagMap = new Map();
-      tagRows.forEach(t => {
-        if (!tagMap.has(t.orderId)) {
-          tagMap.set(t.orderId, []);
-        }
-        tagMap.get(t.orderId).push(t.tag);
-      });
-
-      rows = rows.map(row => ({
-        ...row,
-        tags: tagMap.get(row.id) || [],
-      }));
 
       return rows.map(row => this._toSnakeCase(row));
     } catch (error) {
@@ -241,19 +194,7 @@ class Order {
         return null;
       }
 
-      // タグを取得
-      const tagRows = await db
-        .select()
-        .from(orderTags)
-        .where(eq(orderTags.orderId, rows[0].id))
-        .orderBy(orderTags.sortOrder);
-
-      const row = {
-        ...rows[0],
-        tags: tagRows.map(t => t.tag),
-      };
-
-      return this._toSnakeCase(row);
+      return this._toSnakeCase(rows[0]);
     } catch (error) {
       console.error('Error in findByLineItemId:', error);
       return null;
@@ -277,48 +218,10 @@ class Order {
         return null;
       }
 
-      // タグを取得
-      const tagRows = await db
-        .select()
-        .from(orderTags)
-        .where(eq(orderTags.orderId, rows[0].id))
-        .orderBy(orderTags.sortOrder);
-
-      const row = {
-        ...rows[0],
-        tags: tagRows.map(t => t.tag),
-      };
-
-      return this._toSnakeCase(row);
+      return this._toSnakeCase(rows[0]);
     } catch (error) {
       console.error('Error in findById:', error);
       return null;
-    }
-  }
-
-  /**
-   * タグを更新
-   * @private
-   */
-  async _updateTags(orderId, tags) {
-    const db = getDb();
-
-    // 既存タグを削除
-    await db.delete(orderTags).where(eq(orderTags.orderId, orderId));
-
-    // 新しいタグを挿入
-    if (tags && tags.length > 0) {
-      const tagValues = tags
-        .filter(tag => tag && tag.trim() !== '')
-        .map((tag, index) => ({
-          orderId,
-          tag,
-          sortOrder: index,
-        }));
-
-      if (tagValues.length > 0) {
-        await db.insert(orderTags).values(tagValues);
-      }
     }
   }
 
@@ -355,42 +258,38 @@ class Order {
   async exportFromShopify(orderRows) {
     try {
       const db = getDb();
-      let imported = 0;
 
-      for (const orderData of orderRows) {
+      // 全レコードの values を配列に変換
+      const allValues = orderRows.map(orderData => {
         const baseData = orderData.baseData;
+        return {
+          orderNo: baseData[0],        // order_no
+          orderDate: baseData[1],       // order_date
+          shopifyId: baseData[2],       // shopify_id
+          fullName: baseData[3],        // full_name
+          email: baseData[4],           // email
+          totalPrice: baseData[5],      // total_price
+          financialStatus: baseData[6], // financial_status
+          fulfillmentStatus: baseData[7], // fulfillment_status
+          productName: baseData[8],     // product_name
+          variant: baseData[9],         // variant
+          quantity: parseInt(baseData[10], 10) || 0, // quantity
+          currentQuantity: parseInt(baseData[11], 10) || 0, // current_quantity
+          price: baseData[12],          // price
+          lineItemId: baseData[13],     // line_item_id
+          backStagePass: parseInt(baseData[14], 10) || 0, // back_stage_pass
+          ...this._tagsToColumns(orderData.tags),
+        };
+      });
 
-        // 新規挿入
-        const insertResult = await db
-          .insert(orders)
-          .values({
-            orderNo: baseData[0],        // order_no
-            orderDate: baseData[1],       // order_date
-            shopifyId: baseData[2],       // shopify_id
-            fullName: baseData[3],        // full_name
-            email: baseData[4],           // email
-            totalPrice: baseData[5],      // total_price
-            financialStatus: baseData[6], // financial_status
-            fulfillmentStatus: baseData[7], // fulfillment_status
-            productName: baseData[8],     // product_name
-            variant: baseData[9],         // variant
-            quantity: parseInt(baseData[10], 10) || 0, // quantity
-            currentQuantity: parseInt(baseData[11], 10) || 0, // current_quantity
-            price: baseData[12],          // price
-            lineItemId: baseData[13],     // line_item_id
-            backStagePass: parseInt(baseData[14], 10) || 0, // back_stage_pass
-          })
-          .returning({ id: orders.id });
-
-        // タグを挿入
-        if (insertResult[0] && orderData.tags && orderData.tags.length > 0) {
-          await this._updateTags(insertResult[0].id, orderData.tags);
-        }
-
-        imported++;
+      // チャンク分割してバッチINSERT（PostgreSQLパラメータ上限対策）
+      const CHUNK_SIZE = 500;
+      for (let i = 0; i < allValues.length; i += CHUNK_SIZE) {
+        const chunk = allValues.slice(i, i + CHUNK_SIZE);
+        await db.insert(orders).values(chunk);
       }
 
-      return { success: true, imported };
+      return { success: true, imported: allValues.length };
     } catch (error) {
       console.error('Error in exportFromShopify:', error);
       return { success: false, error: error.message };
@@ -406,7 +305,7 @@ class Order {
     try {
       const db = getDb();
 
-      // 全削除（order_tagsはCASCADEで自動削除）
+      // 全削除
       await db.delete(orders);
 
       // 一括追加
@@ -470,7 +369,6 @@ class Order {
 
       await db.insert(orderExportMeta).values({
         searchTags: JSON.stringify(meta.searchTags || []),
-        searchProductType: meta.searchProductType || null,
         paidOnly: meta.paidOnly !== false,
         exportedAt: new Date(),
         orderCount: meta.orderCount || 0,
@@ -506,7 +404,6 @@ class Order {
       return {
         id: row.id,
         searchTags: row.searchTags ? JSON.parse(row.searchTags) : [],
-        searchProductType: row.searchProductType || null,
         paidOnly: row.paidOnly,
         exportedAt: row.exportedAt,
         orderCount: row.orderCount,
@@ -544,15 +441,25 @@ class Order {
           .orderBy(desc(orders.createdAt))
           .limit(1);
 
-        // ユニークなタグを取得
-        const uniqueTagsResult = await db
-          .selectDistinct({ tag: orderTags.tag })
-          .from(orderTags)
-          .orderBy(orderTags.tag);
+        // ユニークなタグを取得（tag1-tag10 の UNION）
+        const uniqueTagsResult = await db.execute(sql`
+          SELECT DISTINCT tag FROM (
+            SELECT tag1 AS tag FROM orders WHERE tag1 IS NOT NULL AND tag1 != ''
+            UNION SELECT tag2 FROM orders WHERE tag2 IS NOT NULL AND tag2 != ''
+            UNION SELECT tag3 FROM orders WHERE tag3 IS NOT NULL AND tag3 != ''
+            UNION SELECT tag4 FROM orders WHERE tag4 IS NOT NULL AND tag4 != ''
+            UNION SELECT tag5 FROM orders WHERE tag5 IS NOT NULL AND tag5 != ''
+            UNION SELECT tag6 FROM orders WHERE tag6 IS NOT NULL AND tag6 != ''
+            UNION SELECT tag7 FROM orders WHERE tag7 IS NOT NULL AND tag7 != ''
+            UNION SELECT tag8 FROM orders WHERE tag8 IS NOT NULL AND tag8 != ''
+            UNION SELECT tag9 FROM orders WHERE tag9 IS NOT NULL AND tag9 != ''
+            UNION SELECT tag10 FROM orders WHERE tag10 IS NOT NULL AND tag10 != ''
+          ) t ORDER BY tag
+        `);
 
         latestMeta = {
           id: null,
-          searchTags: uniqueTagsResult.map(r => r.tag),
+          searchTags: uniqueTagsResult.rows.map(r => r.tag),
           paidOnly: true,
           exportedAt: latestOrderResult[0]?.createdAt || null,
           orderCount: totalOrders,

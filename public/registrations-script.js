@@ -34,6 +34,21 @@ async function authFetch(url, options = {}) {
 }
 
 class RegistrationsManager {
+    static CSV_IMPORT_FIELDS = [
+        { key: 'name_ja', label: '氏名' },
+        { key: 'name_ja_kana', label: 'フリガナ' },
+        { key: 'first_name', label: 'First Name' },
+        { key: 'last_name', label: 'Last Name' },
+        { key: 'country', label: '国' },
+        { key: 'age', label: '年齢' },
+        { key: 'class_name', label: 'クラス名' },
+        { key: 'height', label: '身長' },
+        { key: 'weight', label: '体重' },
+        { key: 'occupation', label: '職業' },
+        { key: 'biography', label: '自己紹介' },
+        { key: 'back_stage_pass', label: 'BSP' },
+    ];
+
     constructor() {
         console.log('REGISTRATIONS: RegistrationsManager constructor called');
         this.apiUrl = '/api/registrations';
@@ -176,6 +191,14 @@ class RegistrationsManager {
 
         document.getElementById('shopifyImportBtn').addEventListener('click', () => {
             this.openShopifyImportModal();
+        });
+
+        document.getElementById('csvImportBtn').addEventListener('click', () => {
+            this.openCsvImportModal();
+        });
+
+        document.getElementById('csvImportExecuteBtn').addEventListener('click', () => {
+            this.executeCsvImport();
         });
 
         document.getElementById('contestOrderImportBtn').addEventListener('click', () => {
@@ -395,6 +418,134 @@ class RegistrationsManager {
         document.getElementById('contestOrderImportModal').classList.add('hidden');
     }
 
+    // CSVインポートモーダル
+    openCsvImportModal() {
+        const modal = document.getElementById('csvImportModal');
+        modal.classList.remove('hidden');
+
+        // フォームをリセット
+        document.getElementById('csvImportFile').value = '';
+        document.getElementById('csvImportExecuteBtn').disabled = true;
+        document.getElementById('csvImportStatus').className = 'import-status hidden';
+        document.getElementById('csvImportStatus').textContent = '';
+
+        // チェックボックスを動的生成（全OFF）
+        const container = document.getElementById('csvImportFields');
+        container.innerHTML = '';
+        RegistrationsManager.CSV_IMPORT_FIELDS.forEach(field => {
+            const label = document.createElement('label');
+            label.className = 'checkbox-label';
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.name = 'csvImportField';
+            checkbox.value = field.key;
+            checkbox.addEventListener('change', () => this.validateCsvImportForm());
+            label.appendChild(checkbox);
+            label.appendChild(document.createTextNode(' ' + field.label));
+            container.appendChild(label);
+        });
+
+        // ファイル選択時のバリデーション
+        const fileInput = document.getElementById('csvImportFile');
+        fileInput.removeEventListener('change', this.csvImportFileChangeBound);
+        this.csvImportFileChangeBound = () => this.validateCsvImportForm();
+        fileInput.addEventListener('change', this.csvImportFileChangeBound);
+    }
+
+    closeCsvImportModal() {
+        document.getElementById('csvImportModal').classList.add('hidden');
+    }
+
+    validateCsvImportForm() {
+        const csvFile = document.getElementById('csvImportFile').files[0];
+        const checkedFields = document.querySelectorAll('input[name="csvImportField"]:checked');
+        const importBtn = document.getElementById('csvImportExecuteBtn');
+        importBtn.disabled = !(csvFile && checkedFields.length > 0);
+    }
+
+    async executeCsvImport() {
+        const csvFile = document.getElementById('csvImportFile').files[0];
+        const statusEl = document.getElementById('csvImportStatus');
+        const importBtn = document.getElementById('csvImportExecuteBtn');
+
+        if (!csvFile) {
+            statusEl.textContent = 'CSVファイルを選択してください';
+            statusEl.className = 'import-status error';
+            return;
+        }
+
+        // チェック済みフィールドを取得
+        const checkedFields = Array.from(
+            document.querySelectorAll('input[name="csvImportField"]:checked')
+        ).map(cb => cb.value);
+
+        if (checkedFields.length === 0) {
+            statusEl.textContent = 'インポートする項目を1つ以上選択してください';
+            statusEl.className = 'import-status error';
+            return;
+        }
+
+        try {
+            importBtn.disabled = true;
+            statusEl.textContent = 'CSVファイルを読み込み中...';
+            statusEl.className = 'import-status';
+
+            // CSVファイルを読み込み
+            const csvText = await this.readFileAsText(csvFile);
+            const csvData = this.parseCSV(csvText);
+
+            if (csvData.length === 0) {
+                statusEl.textContent = 'CSVファイルにデータがありません';
+                statusEl.className = 'import-status error';
+                importBtn.disabled = false;
+                return;
+            }
+
+            // id列の存在チェック
+            if (!('id' in csvData[0])) {
+                statusEl.textContent = 'CSVにid列が必要です。全項目エクスポートしたCSVを使用してください。';
+                statusEl.className = 'import-status error';
+                importBtn.disabled = false;
+                return;
+            }
+
+            statusEl.textContent = `${csvData.length}件のデータをインポート中...`;
+
+            // APIを呼び出し
+            const response = await authFetch('/api/registrations/import-csv', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...AuthToken.getHeaders()
+                },
+                body: JSON.stringify({ csvData, fields: checkedFields })
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                statusEl.textContent = result.data.message;
+                statusEl.className = 'import-status success';
+                this.showNotification(result.data.message, 'success');
+
+                // データを再読み込み
+                setTimeout(() => {
+                    this.closeCsvImportModal();
+                    this.loadRegistrations();
+                }, 1500);
+            } else {
+                statusEl.textContent = `エラー: ${result.error}`;
+                statusEl.className = 'import-status error';
+                importBtn.disabled = false;
+            }
+        } catch (error) {
+            console.error('CSV import error:', error);
+            statusEl.textContent = `エラー: ${error.message}`;
+            statusEl.className = 'import-status error';
+            importBtn.disabled = false;
+        }
+    }
+
     validateContestOrderImportForm() {
         const contestName = document.getElementById('contestOrderContestName').value;
         const csvFile = document.getElementById('contestOrderCsvFile').files[0];
@@ -542,12 +693,11 @@ class RegistrationsManager {
             statusElement.style.display = 'block';
             statusElement.textContent = 'エントリーを取得中...';
 
-            // productType: "コンテストエントリー" と tag: contest_name で検索してOrdersシートに出力
+            // タグで検索してOrdersシートに出力
             const response = await authFetch('/api/orders/export', {
                 method: 'POST',
                 body: JSON.stringify({
-                    tag: `"${contestName}"`,
-                    productType: 'コンテストエントリー',
+                    tag: `"${contestName}" "コンテストエントリー"`,
                     paidOnly: true
                 })
             });

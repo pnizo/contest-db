@@ -542,7 +542,7 @@ class TicketsManager {
     }
 
     openImportModal() {
-        document.getElementById('importProductType').value = '観戦チケット';
+        document.getElementById('importTag').value = '観戦チケット';
         document.getElementById('importMonthsAgo').value = '3';
         document.getElementById('importStatus').classList.add('hidden');
         document.getElementById('importModal').classList.remove('hidden');
@@ -553,11 +553,11 @@ class TicketsManager {
     }
 
     async executeImport() {
-        const productType = document.getElementById('importProductType').value.trim();
+        const tag = document.getElementById('importTag').value.trim();
         const monthsAgo = parseInt(document.getElementById('importMonthsAgo').value) || 3;
 
-        if (!productType) {
-            this.showNotification('商品タイプを入力してください', 'error');
+        if (!tag) {
+            this.showNotification('タグを入力してください', 'error');
             return;
         }
 
@@ -574,7 +574,7 @@ class TicketsManager {
 
             const response = await authFetch(`${this.apiUrl}/import`, {
                 method: 'POST',
-                body: JSON.stringify({ productType, monthsAgo })
+                body: JSON.stringify({ tag, monthsAgo })
             });
 
             const result = await response.json();

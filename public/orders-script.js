@@ -88,26 +88,15 @@ class OrdersManager {
         // 検索機能
         document.getElementById('searchBtn').addEventListener('click', () => {
             const tag = document.getElementById('tagInput').value.trim();
-            const productType = document.getElementById('productTypeInput').value.trim();
             const paidOnly = document.getElementById('paidOnlyCheckbox').checked;
-            this.searchOrders(tag, productType, paidOnly);
+            this.searchOrders(tag, paidOnly);
         });
 
         document.getElementById('tagInput').addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
                 const tag = document.getElementById('tagInput').value.trim();
-                const productType = document.getElementById('productTypeInput').value.trim();
                 const paidOnly = document.getElementById('paidOnlyCheckbox').checked;
-                this.searchOrders(tag, productType, paidOnly);
-            }
-        });
-
-        document.getElementById('productTypeInput').addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                const tag = document.getElementById('tagInput').value.trim();
-                const productType = document.getElementById('productTypeInput').value.trim();
-                const paidOnly = document.getElementById('paidOnlyCheckbox').checked;
-                this.searchOrders(tag, productType, paidOnly);
+                this.searchOrders(tag, paidOnly);
             }
         });
 
@@ -117,7 +106,7 @@ class OrdersManager {
         });
     }
 
-    async searchOrders(tag, productType = '', paidOnly = true) {
+    async searchOrders(tag, paidOnly = true) {
         const searchBtn = document.getElementById('searchBtn');
         const originalText = searchBtn.textContent;
         const container = document.getElementById('ordersTableContainer');
@@ -129,7 +118,6 @@ class OrdersManager {
 
             const params = new URLSearchParams({
                 tag: tag || '',
-                productType: productType || '',
                 paidOnly: paidOnly.toString()
             });
             const response = await authFetch(`${this.apiUrl}/search?${params}`);
@@ -278,7 +266,6 @@ class OrdersManager {
         const orderCountEl = document.getElementById('dbOrderCount');
         const exportDateEl = document.getElementById('dbExportDate');
         const exportTagsEl = document.getElementById('dbExportTags');
-        const exportProductTypeEl = document.getElementById('dbExportProductType');
 
         orderCountEl.textContent = `${totalOrders}件`;
 
@@ -301,20 +288,9 @@ class OrdersManager {
                 exportTagsEl.textContent = '（タグ指定なし）';
             }
 
-            // 検索商品タイプの表示
-            if (latestExport.searchProductType) {
-                exportProductTypeEl.innerHTML = `<span class="tag-badge clickable" data-product-type="${this.escapeHtml(latestExport.searchProductType)}">${this.escapeHtml(latestExport.searchProductType)}</span>`;
-
-                exportProductTypeEl.querySelector('.tag-badge.clickable').addEventListener('click', () => {
-                    this.setProductTypeSearch(latestExport.searchProductType);
-                });
-            } else {
-                exportProductTypeEl.textContent = '（指定なし）';
-            }
         } else {
             exportDateEl.textContent = '-';
             exportTagsEl.textContent = '-';
-            exportProductTypeEl.textContent = '-';
         }
 
         dbInfoSection.classList.remove('hidden');
@@ -329,31 +305,25 @@ class OrdersManager {
     addTagToSearch(tag) {
         const tagInput = document.getElementById('tagInput');
         const currentValue = tagInput.value.trim();
+        const quotedTag = `"${tag}"`;
 
         // すでに同じタグが含まれているかチェック
         const existingTags = currentValue.split(/[,\s]+/).filter(t => t.trim());
-        if (existingTags.includes(tag)) {
+        if (existingTags.includes(tag) || existingTags.includes(quotedTag)) {
             this.showNotification(`タグ「${tag}」は既に追加されています`, 'info');
             return;
         }
 
-        // タグを追加
+        // タグを引用符で囲んで追加
         if (currentValue) {
-            tagInput.value = `${currentValue}, ${tag}`;
+            tagInput.value = `${currentValue}, ${quotedTag}`;
         } else {
-            tagInput.value = tag;
+            tagInput.value = quotedTag;
         }
 
         // 入力欄にフォーカス
         tagInput.focus();
         this.showNotification(`タグ「${tag}」を追加しました`, 'success');
-    }
-
-    setProductTypeSearch(productType) {
-        const productTypeInput = document.getElementById('productTypeInput');
-        productTypeInput.value = productType;
-        productTypeInput.focus();
-        this.showNotification(`商品タイプ「${productType}」をセットしました`, 'success');
     }
 
     displayCurrentOrders(orders) {

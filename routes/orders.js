@@ -53,13 +53,13 @@ router.get('/current', async (req, res) => {
 // タグで注文を検索（プレビュー用）
 router.get('/search', async (req, res) => {
   try {
-    const { tag = '', productType = '', limit = 0, paidOnly = 'true' } = req.query;  // limit=0 は無制限、tag は任意
+    const { tag = '', limit = 0, paidOnly = 'true' } = req.query;  // limit=0 は無制限、tag は任意
     const paidOnlyBool = paidOnly === 'true';
 
-    console.log(`Searching orders with tag: ${tag || '(指定なし)'}, productType: ${productType || '(指定なし)'}, paidOnly: ${paidOnlyBool}`);
+    console.log(`Searching orders with tag: ${tag || '(指定なし)'}, paidOnly: ${paidOnlyBool}`);
 
     const shopify = getShopifyService();
-    const orders = await shopify.getOrdersByTag(tag, parseInt(limit), paidOnlyBool, productType);
+    const orders = await shopify.getOrdersByTag(tag, parseInt(limit), paidOnlyBool);
     console.log(`Found ${orders.length} orders`);
 
     // フォーマット（baseData + tags の形式）
@@ -69,36 +69,10 @@ router.get('/search', async (req, res) => {
       formattedRows.push(...rows);
     });
 
-    // 最大タグ数を計算
-    const maxTags = formattedRows.reduce((max, row) => Math.max(max, row.tags.length), 0);
-
-    // タグヘッダーを生成
-    const tagHeaders = [];
-    for (let i = 1; i <= maxTags; i++) {
-      tagHeaders.push(`tag${i}`);
-    }
-
-    // 基本ヘッダー
-    const baseHeaders = [
-      '注文番号', '注文日時', '顧客ID', '顧客名', 'メールアドレス',
-      '合計金額', '支払いステータス', '発送ステータス',
-      '商品名', 'バリエーション', '数量', '現在数量', '単価', 'LineItemID'
-    ];
-    const headers = [...baseHeaders, ...tagHeaders];
-
-    // 行データをフラット配列に変換（タグをパディング）
-    const data = formattedRows.map(row => {
-      const paddedTags = [...row.tags];
-      while (paddedTags.length < maxTags) {
-        paddedTags.push('');
-      }
-      return [...row.baseData, ...paddedTags];
-    });
-
     // 検索タグを配列として解析（引用符で囲まれたスペース含むタグに対応）
     const searchTags = tag ? shopify.parseTags(tag) : [];
 
-    // DBに保存（orders, order_tags をクリアして新規保存）
+    // DBに保存
     const order = getOrderModel();
     const importResult = await order.clearAndImport(formattedRows);
 
@@ -109,7 +83,6 @@ router.get('/search', async (req, res) => {
     // 検索メタデータを保存（order_export_meta）
     await order.saveExportMeta({
       searchTags,
-      searchProductType: productType || null,
       paidOnly: paidOnlyBool,
       orderCount: orders.length,
       rowCount: formattedRows.length,
@@ -119,11 +92,8 @@ router.get('/search', async (req, res) => {
 
     res.json({
       success: true,
-      data: data,
-      headers: headers,
       count: orders.length,
-      rowCount: data.length,
-      maxTags: maxTags
+      rowCount: formattedRows.length,
     });
   } catch (error) {
     console.error('Order search error:', error);
@@ -134,13 +104,13 @@ router.get('/search', async (req, res) => {
 // 検索結果をDBに保存（旧シート出力機能を置き換え）
 router.post('/export', requireAdmin, async (req, res) => {
   try {
-    const { tag = '', productType = '', limit = 0, paidOnly = true } = req.body;  // limit=0 は無制限、tag は任意
+    const { tag = '', limit = 0, paidOnly = true } = req.body;  // limit=0 は無制限、tag は任意
 
-    console.log(`Exporting orders with tag: ${tag || '(指定なし)'}, productType: ${productType || '(指定なし)'}, paidOnly: ${paidOnly} to database`);
+    console.log(`Exporting orders with tag: ${tag || '(指定なし)'}, paidOnly: ${paidOnly} to database`);
 
     // 注文を取得
     const shopify = getShopifyService();
-    const ordersData = await shopify.getOrdersByTag(tag, parseInt(limit), paidOnly, productType);
+    const ordersData = await shopify.getOrdersByTag(tag, parseInt(limit), paidOnly);
 
     if (ordersData.length === 0) {
       return res.json({
@@ -157,9 +127,6 @@ router.post('/export', requireAdmin, async (req, res) => {
       formattedRows.push(...orderRows);
     });
 
-    // 最大タグ数を計算（DB保存用）
-    const maxTags = formattedRows.reduce((max, row) => Math.max(max, row.tags.length), 0);
-
     // DBに保存（全削除→一括追加）
     const order = getOrderModel();
     const result = await order.clearAndImport(formattedRows);
@@ -174,13 +141,12 @@ router.post('/export', requireAdmin, async (req, res) => {
     // エクスポートメタデータを保存
     await order.saveExportMeta({
       searchTags,
-      searchProductType: productType || null,
       paidOnly,
       orderCount: ordersData.length,
       rowCount: formattedRows.length,
     });
 
-    console.log(`Exported ${ordersData.length} orders (${formattedRows.length} rows, ${maxTags} tag columns) to database`);
+    console.log(`Exported ${ordersData.length} orders (${formattedRows.length} rows) to database`);
 
     res.json({
       success: true,

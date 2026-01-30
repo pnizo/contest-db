@@ -37,6 +37,7 @@
                             <button id="shopifyImportBtn" class="admin-only">Shopifyインポート</button>
                             <button id="contestOrderImportBtn" class="admin-only">開催順インポート</button>
                             <button id="exportModalBtn">CSVエクスポート</button>
+                            <button id="csvImportBtn" class="admin-only">CSVインポート</button>
                         </div>
                     </div>
                 </div>
@@ -173,6 +174,35 @@
                     <button type="button" id="contestOrderImportExecuteBtn" disabled class="btn btn-primary">インポート実行</button>
                 </div>
                 <div id="contestOrderImportStatus" class="import-status hidden"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- CSV Import Modal -->
+    <div id="csvImportModal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>CSVインポート</h2>
+                <button class="modal-close" onclick="registrationsManager.closeCsvImportModal()">&times;</button>
+            </div>
+            <div class="modal-form">
+                <p class="modal-description">全項目エクスポートしたCSVファイルから、選択した項目を一括更新します。</p>
+                <div class="form-group">
+                    <label for="csvImportFile">CSVファイル:</label>
+                    <input type="file" id="csvImportFile" accept=".csv" required>
+                    <small>※全項目エクスポートしたCSVファイルを選択してください（id列が必須）</small>
+                </div>
+                <div class="form-group">
+                    <label>インポートする項目:</label>
+                    <div id="csvImportFields" class="checkbox-group">
+                        <!-- チェックボックスはJSで動的生成 -->
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button type="button" onclick="registrationsManager.closeCsvImportModal()" class="btn btn-secondary">キャンセル</button>
+                    <button type="button" id="csvImportExecuteBtn" disabled class="btn btn-primary">インポート実行</button>
+                </div>
+                <div id="csvImportStatus" class="import-status hidden"></div>
             </div>
         </div>
     </div>

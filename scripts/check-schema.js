@@ -17,21 +17,21 @@ async function checkSchema() {
     console.log(`${col.column_name}: ${col.data_type} (nullable: ${col.is_nullable})`);
   });
   
-  // ticket_tagsテーブルの確認
+  // tickets テーブルの tag カラム確認
   const tagColumns = await sql`
     SELECT column_name, data_type, is_nullable
     FROM information_schema.columns
-    WHERE table_name = 'ticket_tags'
+    WHERE table_name = 'tickets' AND column_name LIKE 'tag%'
     ORDER BY ordinal_position
   `;
-  
+
   if (tagColumns.length > 0) {
-    console.log('\n=== ticket_tags table columns ===');
+    console.log('\n=== tickets tag columns ===');
     tagColumns.forEach(col => {
       console.log(`${col.column_name}: ${col.data_type} (nullable: ${col.is_nullable})`);
     });
   } else {
-    console.log('\n=== ticket_tags table does not exist ===');
+    console.log('\n=== No tag columns found in tickets table ===');
   }
   
   // contestsテーブルの確認

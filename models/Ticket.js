@@ -1,12 +1,38 @@
 const { getDb } = require('../lib/db');
-const { tickets, ticketTags } = require('../lib/db/schema');
-const { eq, ilike, and, desc, asc, sql, inArray } = require('drizzle-orm');
+const { tickets } = require('../lib/db/schema');
+const { eq, ilike, and, desc, asc, sql } = require('drizzle-orm');
 const ShopifyService = require('../services/shopify');
 
 /**
  * チケットモデル - Neon Postgres / Drizzle ORM版
  */
 class Ticket {
+  /**
+   * tag1-tag10カラムからタグ配列を構築（null/空文字は除外）
+   * @private
+   */
+  _tagsFromRow(row) {
+    const tags = [];
+    for (let i = 1; i <= 10; i++) {
+      const v = row[`tag${i}`];
+      if (v != null && v !== '') tags.push(v);
+    }
+    return tags;
+  }
+
+  /**
+   * タグ配列を { tag1, tag2, ..., tag10 } オブジェクトに変換（10個超は切り捨て）
+   * @private
+   */
+  _tagsToColumns(tags) {
+    const cols = {};
+    const src = (tags || []).filter(t => t && t.trim() !== '');
+    for (let i = 1; i <= 10; i++) {
+      cols[`tag${i}`] = src[i - 1] || null;
+    }
+    return cols;
+  }
+
   /**
    * DBのcamelCaseをAPI用のsnake_caseに変換
    * @private
@@ -35,7 +61,7 @@ class Ticket {
       used_at: row.usedAt,
       created_at: row.createdAt,
       updated_at: row.updatedAt,
-      tags: row.tags || [],
+      tags: this._tagsFromRow(row),
     };
   }
 
@@ -158,30 +184,6 @@ class Ticket {
         .limit(limit)
         .offset(offset);
 
-      // タグを取得
-      if (rows.length > 0) {
-        const ticketIds = rows.map(r => r.id);
-        const tagRows = await db
-          .select()
-          .from(ticketTags)
-          .where(inArray(ticketTags.ticketId, ticketIds))
-          .orderBy(ticketTags.sortOrder);
-
-        // タグをチケットにマップ
-        const tagMap = new Map();
-        tagRows.forEach(t => {
-          if (!tagMap.has(t.ticketId)) {
-            tagMap.set(t.ticketId, []);
-          }
-          tagMap.get(t.ticketId).push(t.tag);
-        });
-
-        rows = rows.map(row => ({
-          ...row,
-          tags: tagMap.get(row.id) || [],
-        }));
-      }
-
       const data = rows.map(row => this._toSnakeCase(row));
       const totalPages = Math.ceil(total / limit);
 
@@ -205,19 +207,7 @@ class Ticket {
         return null;
       }
 
-      // タグを取得
-      const tagRows = await db
-        .select()
-        .from(ticketTags)
-        .where(eq(ticketTags.ticketId, rows[0].id))
-        .orderBy(ticketTags.sortOrder);
-
-      const row = {
-        ...rows[0],
-        tags: tagRows.map(t => t.tag),
-      };
-
-      return this._toSnakeCase(row);
+      return this._toSnakeCase(rows[0]);
     } catch (error) {
       console.error('Error in findById:', error);
       return null;
@@ -302,13 +292,13 @@ class Ticket {
   /**
    * ShopifyからインポートしたデータをDBに書き込む
    * @param {Array<object>} ticketsData - チケットデータ配列
-   * @param {number} maxTags - 最大タグ数（未使用、互換性のため維持）
    */
-  async importTickets(ticketsData, maxTags = 0) {
+  async importTickets(ticketsData) {
     try {
       const db = getDb();
+      const CHUNK_SIZE = 500;
 
-      // 1. 既存データを取得（キー: order_no|shopify_id|line_item_id|item_sub_no）
+      // Phase 1: 既存データを取得（キー: order_no|shopify_id|line_item_id|item_sub_no）
       const existingRows = await db.select().from(tickets);
       const existingMap = new Map();
       existingRows.forEach(ticket => {
@@ -316,95 +306,80 @@ class Ticket {
         existingMap.set(key, ticket);
       });
 
-      let imported = 0;
+      // Phase 2: INSERT/UPDATE を分類（メモリ内）
+      const updateList = [];
+      const insertList = [];
 
-      // 2. 各チケットを処理
       for (const ticketData of ticketsData) {
         const baseData = ticketData.baseData;
         const key = `${baseData.order_no}|${baseData.shopify_id}|${baseData.line_item_id}|${baseData.item_sub_no}`;
         const existing = existingMap.get(key);
 
         if (existing) {
-          // 既存データの更新（is_usable=FALSE維持）
-          const isUsable = existing.isUsable === false ? false : (baseData.is_usable !== 'FALSE');
-
-          await db
-            .update(tickets)
-            .set({
-              totalPrice: baseData.total_price,
-              financialStatus: baseData.financial_status,
-              fulfillmentStatus: baseData.fulfillment_status,
-              isUsable,
-              color: baseData.color || null,
-              updatedAt: new Date(),
-            })
-            .where(eq(tickets.id, existing.id));
-
-          // タグを更新
-          await this._updateTags(existing.id, ticketData.tags || []);
+          updateList.push({ ticketData, existing });
         } else {
-          // 新規挿入
-          const insertResult = await db
-            .insert(tickets)
-            .values({
-              orderNo: baseData.order_no,
-              orderDate: baseData.order_date,
-              shopifyId: baseData.shopify_id,
-              fullName: baseData.full_name,
-              email: baseData.email,
-              totalPrice: baseData.total_price,
-              financialStatus: baseData.financial_status,
-              fulfillmentStatus: baseData.fulfillment_status,
-              productName: baseData.product_name,
-              variant: baseData.variant,
-              price: baseData.price,
-              lineItemId: baseData.line_item_id,
-              itemSubNo: parseInt(baseData.item_sub_no, 10) || 0,
-              isUsable: baseData.is_usable !== 'FALSE',
-              ownerShopifyId: baseData.owner_shopify_id,
-              reservedSeat: baseData.reserved_seat || '',
-              color: baseData.color || '',
-            })
-            .returning({ id: tickets.id });
-
-          // タグを挿入
-          if (insertResult[0] && ticketData.tags && ticketData.tags.length > 0) {
-            await this._updateTags(insertResult[0].id, ticketData.tags);
-          }
+          insertList.push(ticketData);
         }
-        imported++;
       }
 
-      return { success: true, imported };
+      // Phase 3: バッチ UPDATE（db.batch()）
+      if (updateList.length > 0) {
+        const updateQueries = updateList.map(({ ticketData, existing }) => {
+          const baseData = ticketData.baseData;
+          const isUsable = existing.isUsable === false ? false : (baseData.is_usable !== 'FALSE');
+          return db.update(tickets).set({
+            totalPrice: baseData.total_price,
+            financialStatus: baseData.financial_status,
+            fulfillmentStatus: baseData.fulfillment_status,
+            isUsable,
+            color: baseData.color || null,
+            ...this._tagsToColumns(ticketData.tags),
+            updatedAt: new Date(),
+          }).where(eq(tickets.id, existing.id));
+        });
+
+        for (let i = 0; i < updateQueries.length; i += CHUNK_SIZE) {
+          const chunk = updateQueries.slice(i, i + CHUNK_SIZE);
+          await db.batch(chunk);
+        }
+      }
+
+      // Phase 4: バッチ INSERT（.values([...])）
+      if (insertList.length > 0) {
+        const insertValues = insertList.map(ticketData => {
+          const baseData = ticketData.baseData;
+          return {
+            orderNo: baseData.order_no,
+            orderDate: baseData.order_date,
+            shopifyId: baseData.shopify_id,
+            fullName: baseData.full_name,
+            email: baseData.email,
+            totalPrice: baseData.total_price,
+            financialStatus: baseData.financial_status,
+            fulfillmentStatus: baseData.fulfillment_status,
+            productName: baseData.product_name,
+            variant: baseData.variant,
+            price: baseData.price,
+            lineItemId: baseData.line_item_id,
+            itemSubNo: parseInt(baseData.item_sub_no, 10) || 0,
+            isUsable: baseData.is_usable !== 'FALSE',
+            ownerShopifyId: baseData.owner_shopify_id,
+            reservedSeat: baseData.reserved_seat || '',
+            color: baseData.color || '',
+            ...this._tagsToColumns(ticketData.tags),
+          };
+        });
+
+        for (let i = 0; i < insertValues.length; i += CHUNK_SIZE) {
+          const chunk = insertValues.slice(i, i + CHUNK_SIZE);
+          await db.insert(tickets).values(chunk);
+        }
+      }
+
+      return { success: true, imported: ticketsData.length };
     } catch (error) {
       console.error('Error importing tickets:', error);
       return { success: false, error: error.message };
-    }
-  }
-
-  /**
-   * タグを更新
-   * @private
-   */
-  async _updateTags(ticketId, tags) {
-    const db = getDb();
-
-    // 既存タグを削除
-    await db.delete(ticketTags).where(eq(ticketTags.ticketId, ticketId));
-
-    // 新しいタグを挿入
-    if (tags && tags.length > 0) {
-      const tagValues = tags
-        .filter(tag => tag && tag.trim() !== '')
-        .map((tag, index) => ({
-          ticketId,
-          tag,
-          sortOrder: index,
-        }));
-
-      if (tagValues.length > 0) {
-        await db.insert(ticketTags).values(tagValues);
-      }
     }
   }
 
@@ -422,7 +397,7 @@ class Ticket {
         return { success: false, error: 'order.name is required' };
       }
 
-      // 1. order を ticketData 形式に変換
+      // Phase 1: order を ticketData 形式に変換
       const shopifyService = new ShopifyService();
       const ticketDataArray = await shopifyService.formatWebhookOrderForTicket(order);
 
@@ -430,19 +405,17 @@ class Ticket {
         return { success: true, added: 0, updated: 0, skipped: 0, message: 'No ticket items in order' };
       }
 
-      // 2. 対象注文の既存データのみ取得
+      // SELECT: 対象注文の既存データのみ取得
       const existingRows = await db
         .select()
         .from(tickets)
         .where(eq(tickets.orderNo, orderNo));
 
       const existingMap = new Map();
-      // lineItemIdごとのisUsable=TRUEのカウント
       const usableCountByLineItem = new Map();
       existingRows.forEach(ticket => {
         const key = `${ticket.orderNo}|${ticket.shopifyId}|${ticket.lineItemId}|${ticket.itemSubNo}`;
         existingMap.set(key, ticket);
-        // isUsable=TRUEのカウント
         if (ticket.isUsable === true) {
           usableCountByLineItem.set(ticket.lineItemId, (usableCountByLineItem.get(ticket.lineItemId) || 0) + 1);
         }
@@ -454,89 +427,103 @@ class Ticket {
         skipped: 0,
       };
 
-      // 2. 各チケットを処理
+      // Phase 2: 分類（メモリ内、DBアクセスなし）
+      const skipList = [];
+      const updateList = [];
+      const insertList = [];
+
       for (const ticketData of ticketDataArray) {
         const baseData = ticketData.baseData;
         const key = `${baseData.order_no}|${baseData.shopify_id}|${baseData.line_item_id}|${baseData.item_sub_no}`;
         const existing = existingMap.get(key);
 
-        console.log(`[upsertByOrder] Processing ticket: key=${key}, is_usable=${baseData.is_usable}, existing=${existing ? `id=${existing.id}, isUsable=${existing.isUsable}` : 'null'}`);
-
         if (existing) {
-          // is_usable=false のレコードは変更しない
           if (existing.isUsable === false) {
-            results.skipped++;
-            continue;
+            skipList.push({ ticketData, existing });
+          } else {
+            updateList.push({ ticketData, existing });
           }
-
-          // 更新
-          const newIsUsable = baseData.is_usable !== 'FALSE';
-          console.log(`[upsertByOrder] Updating ticket id=${existing.id}: isUsable ${existing.isUsable} -> ${newIsUsable} (baseData.is_usable="${baseData.is_usable}")`);
-          await db
-            .update(tickets)
-            .set({
-              financialStatus: baseData.financial_status,
-              fulfillmentStatus: baseData.fulfillment_status,
-              isUsable: newIsUsable,
-              updatedAt: new Date(),
-            })
-            .where(eq(tickets.id, existing.id));
-
-          results.updated++;
         } else {
-          // 新規追加（競合時は無視 - 同時Webhook対策）
-          // lineItemIdの現在のisUsable=TRUEカウントを取得
-          const lineItemId = baseData.line_item_id;
-          const currentUsableCount = usableCountByLineItem.get(lineItemId) || 0;
-          const currentQuantity = baseData.current_quantity || 0;
-
-          // currentQuantityに達するまでTRUEで追加
-          const isUsable = currentUsableCount < currentQuantity;
-          console.log(`[upsertByOrder] Inserting ticket: lineItemId=${lineItemId}, currentUsableCount=${currentUsableCount}, currentQuantity=${currentQuantity}, isUsable=${isUsable}`);
-
-          const insertResult = await db
-            .insert(tickets)
-            .values({
-              orderNo: baseData.order_no,
-              orderDate: baseData.order_date,
-              shopifyId: baseData.shopify_id,
-              fullName: baseData.full_name,
-              email: baseData.email,
-              totalPrice: baseData.total_price,
-              financialStatus: baseData.financial_status,
-              fulfillmentStatus: baseData.fulfillment_status,
-              productName: baseData.product_name,
-              variant: baseData.variant,
-              price: baseData.price,
-              lineItemId: lineItemId,
-              itemSubNo: parseInt(baseData.item_sub_no, 10) || 0,
-              isUsable: isUsable,
-              ownerShopifyId: baseData.owner_shopify_id,
-              reservedSeat: baseData.reserved_seat || '',
-              color: baseData.color || '',
-            })
-            .onConflictDoNothing({ target: [tickets.lineItemId, tickets.itemSubNo] })
-            .returning({ id: tickets.id });
-
-          // 競合で挿入されなかった場合はスキップ
-          if (!insertResult[0]) {
-            results.skipped++;
-            continue;
-          }
-
-          // 追加成功したらisUsable=TRUEのカウントをインクリメント
-          if (isUsable) {
-            usableCountByLineItem.set(lineItemId, currentUsableCount + 1);
-          }
-
-          // タグを挿入
-          if (ticketData.tags && ticketData.tags.length > 0) {
-            await this._updateTags(insertResult[0].id, ticketData.tags);
-          }
-
-          results.added++;
+          insertList.push(ticketData);
         }
       }
+
+      console.log(`[upsertByOrder] Order ${orderNo}: ${ticketDataArray.length} tickets - insert: ${insertList.length}, update: ${updateList.length}, skip: ${skipList.length}`);
+
+      results.skipped = skipList.length;
+
+      // Phase 3: isUsable 事前計算（insertList対象）
+      const runningUsableCount = new Map(usableCountByLineItem);
+
+      const insertEntries = insertList.map(ticketData => {
+        const baseData = ticketData.baseData;
+        const lineItemId = baseData.line_item_id;
+        const currentQuantity = baseData.current_quantity || 0;
+        const currentCount = runningUsableCount.get(lineItemId) || 0;
+        const isUsable = currentCount < currentQuantity;
+
+        if (isUsable) {
+          runningUsableCount.set(lineItemId, currentCount + 1);
+        }
+
+        return { ticketData, isUsable };
+      });
+
+      // Phase 4: バッチ UPDATE（db.batch() で 1 HTTP リクエスト）
+      if (updateList.length > 0) {
+        const updateQueries = updateList.map(({ ticketData, existing }) => {
+          const baseData = ticketData.baseData;
+          return db.update(tickets).set({
+            financialStatus: baseData.financial_status,
+            fulfillmentStatus: baseData.fulfillment_status,
+            isUsable: baseData.is_usable !== 'FALSE',
+            ...this._tagsToColumns(ticketData.tags),
+            updatedAt: new Date(),
+          }).where(eq(tickets.id, existing.id));
+        });
+
+        await db.batch(updateQueries);
+        results.updated = updateList.length;
+      }
+
+      // Phase 5: バッチ INSERT（.values([...]) で 1 HTTP リクエスト）
+      if (insertEntries.length > 0) {
+        const insertValues = insertEntries.map(({ ticketData, isUsable }) => {
+          const baseData = ticketData.baseData;
+          return {
+            orderNo: baseData.order_no,
+            orderDate: baseData.order_date,
+            shopifyId: baseData.shopify_id,
+            fullName: baseData.full_name,
+            email: baseData.email,
+            totalPrice: baseData.total_price,
+            financialStatus: baseData.financial_status,
+            fulfillmentStatus: baseData.fulfillment_status,
+            productName: baseData.product_name,
+            variant: baseData.variant,
+            price: baseData.price,
+            lineItemId: baseData.line_item_id,
+            itemSubNo: parseInt(baseData.item_sub_no, 10) || 0,
+            isUsable,
+            ownerShopifyId: baseData.owner_shopify_id,
+            reservedSeat: baseData.reserved_seat || '',
+            color: baseData.color || '',
+            ...this._tagsToColumns(ticketData.tags),
+          };
+        });
+
+        const insertResult = await db
+          .insert(tickets)
+          .values(insertValues)
+          .onConflictDoNothing({ target: [tickets.lineItemId, tickets.itemSubNo] })
+          .returning({ id: tickets.id });
+
+        results.added = insertResult.length;
+        results.skipped += (insertEntries.length - insertResult.length);
+      }
+
+      // Phase 6: 結果ログ
+      console.log(`[upsertByOrder] Order ${orderNo}: done - added=${results.added}, updated=${results.updated}, skipped=${results.skipped}`);
 
       return { success: true, ...results };
     } catch (error) {
@@ -565,28 +552,6 @@ class Ticket {
         return [];
       }
 
-      // タグを取得
-      const ticketIds = rows.map(r => r.id);
-      const tagRows = await db
-        .select()
-        .from(ticketTags)
-        .where(inArray(ticketTags.ticketId, ticketIds))
-        .orderBy(ticketTags.sortOrder);
-
-      // タグをチケットにマップ
-      const tagMap = new Map();
-      tagRows.forEach(t => {
-        if (!tagMap.has(t.ticketId)) {
-          tagMap.set(t.ticketId, []);
-        }
-        tagMap.get(t.ticketId).push(t.tag);
-      });
-
-      rows = rows.map(row => ({
-        ...row,
-        tags: tagMap.get(row.id) || [],
-      }));
-
       return rows.map(row => this._toSnakeCase(row));
     } catch (error) {
       console.error('Error in findByProductName:', error);
@@ -602,8 +567,10 @@ class Ticket {
   async bulkUpdateReservedSeats(csvData) {
     try {
       const db = getDb();
-      let updated = 0;
+      const CHUNK_SIZE = 500;
 
+      // 有効な行のみフィルタしてクエリを構築
+      const updateQueries = [];
       for (const row of csvData) {
         const id = parseInt(row.id, 10);
         if (isNaN(id) || id < 1) {
@@ -611,19 +578,21 @@ class Ticket {
         }
 
         const reservedSeat = row.reserved_seat || '';
-
-        await db
-          .update(tickets)
-          .set({
+        updateQueries.push(
+          db.update(tickets).set({
             reservedSeat,
             updatedAt: new Date(),
-          })
-          .where(eq(tickets.id, id));
-
-        updated++;
+          }).where(eq(tickets.id, id))
+        );
       }
 
-      return { total: csvData.length, updated };
+      // チャンク分割してバッチUPDATE
+      for (let i = 0; i < updateQueries.length; i += CHUNK_SIZE) {
+        const chunk = updateQueries.slice(i, i + CHUNK_SIZE);
+        await db.batch(chunk);
+      }
+
+      return { total: csvData.length, updated: updateQueries.length };
     } catch (error) {
       console.error('Error in bulkUpdateReservedSeats:', error);
       throw error;
