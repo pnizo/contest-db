@@ -333,6 +333,7 @@ class Ticket {
             financialStatus: baseData.financial_status,
             fulfillmentStatus: baseData.fulfillment_status,
             isUsable,
+            productId: baseData.product_id || '',
             color: baseData.color || null,
             ...this._tagsToColumns(ticketData.tags),
             updatedAt: new Date(),
@@ -479,6 +480,7 @@ class Ticket {
             financialStatus: baseData.financial_status,
             fulfillmentStatus: baseData.fulfillment_status,
             isUsable: baseData.is_usable !== 'FALSE',
+            productId: baseData.product_id || '',
             ...this._tagsToColumns(ticketData.tags),
             updatedAt: new Date(),
           }).where(eq(tickets.id, existing.id));
