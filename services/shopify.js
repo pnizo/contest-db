@@ -397,27 +397,8 @@ class ShopifyService {
     const lineItems = order.lineItems?.edges || [];
 
     if (lineItems.length === 0) {
-      // 商品がない場合は1行（タグは空配列）
-      return [{
-        baseData: [
-          orderName,
-          createdAt,
-          customerId,
-          customerName,
-          customerEmail,
-          totalPrice,
-          financialStatus,
-          fulfillmentStatus,
-          '', // 商品名
-          '', // バリエーション
-          '', // 数量
-          '', // 現在数量
-          '', // 単価
-          '', // line_item_id
-          ''  // back_stage_pass
-        ],
-        tags: []
-      }];
+      // 商品がない注文はINSERTしない
+      return [];
     }
 
     // 商品ごとに行を展開（削除済み商品も含む）
