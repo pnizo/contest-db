@@ -5,6 +5,11 @@ require('dotenv').config();
 const variantMetafieldCache = new Map();
 const CACHE_TTL_MS = 60 * 60 * 1000; // 1時間
 
+// 商品タグのキャッシュ（モジュールレベルで共有）
+// Map<productId, { tags: string[], expiresAt: number }>
+const productTagCache = new Map();
+const PRODUCT_TAG_CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24時間
+
 class ShopifyService {
   constructor() {
     this.shopName = process.env.SHOPIFY_SHOP_NAME;
@@ -313,6 +318,7 @@ class ShopifyService {
                           }
                         }
                         product {
+                          id
                           tags
                         }
                       }
@@ -424,7 +430,8 @@ class ShopifyService {
             item.currentQuantity ?? '',    // 現在の数量
             item.originalUnitPriceSet?.shopMoney?.amount || '',
             lineItemId,                    // line_item_id
-            backStagePass                  // back_stage_pass
+            backStagePass,                 // back_stage_pass
+            item.product?.id?.replace('gid://shopify/Product/', '') || ''  // product_id
           ],
           tags: productTags
         };
@@ -1026,6 +1033,7 @@ class ShopifyService {
                           }
                         }
                         product {
+                          id
                           tags
                         }
                         variant {
@@ -1133,6 +1141,7 @@ class ShopifyService {
               edges {
                 node {
                   product {
+                    id
                     tags
                   }
                 }
@@ -1191,14 +1200,13 @@ class ShopifyService {
     const totalPrice = order.totalPriceSet?.shopMoney?.amount || '';
     const financialStatus = this.translateFinancialStatus(order.displayFinancialStatus);
     const fulfillmentStatus = this.translateFulfillmentStatus(order.displayFulfillmentStatus);
-    const orderTags = order.tags || [];
-
     const lineItems = order.lineItems?.edges || [];
     const rows = [];
 
     // 各LineItemを処理
     lineItems.forEach(edge => {
       const item = edge.node;
+      const productTags = item.product?.tags || [];
       const lineItemId = item.id ? item.id.replace('gid://shopify/LineItem/', '') : '';
       const price = item.originalUnitPriceSet?.shopMoney?.amount || '';
       const quantity = item.quantity || 0;
@@ -1232,6 +1240,7 @@ class ShopifyService {
             variant: item.variantTitle || '',
             price: price,
             line_item_id: lineItemId,
+            product_id: item.product?.id?.replace('gid://shopify/Product/', '') || '',
             item_sub_no: i + 1,           // 枝番（1から開始）
             owner_shopify_id: customerId, // 初期値は購入者のshopify_id
             reserved_seat: '',            // 初期値は空欄
@@ -1239,36 +1248,10 @@ class ShopifyService {
             is_usable: isValid,
             current_quantity: currentQuantity  // fulfillable_quantityに基づく有効数
           },
-          tags: orderTags
+          tags: productTags
         });
       }
     });
-
-    // LineItemがない場合は1行（タグのみ）
-    if (rows.length === 0) {
-      rows.push({
-        baseData: {
-          order_no: orderName,
-          order_date: createdAt,
-          shopify_id: customerId,
-          full_name: customerName,
-          email: customerEmail,
-          total_price: totalPrice,
-          financial_status: financialStatus,
-          fulfillment_status: fulfillmentStatus,
-          product_name: '',
-          variant: '',
-          price: '',
-          line_item_id: '',
-          item_sub_no: 1,
-          owner_shopify_id: customerId,
-          reserved_seat: '',
-          color: '',
-          is_usable: 'TRUE'
-        },
-        tags: orderTags
-      });
-    }
 
     return rows;
   }
@@ -1295,6 +1278,78 @@ class ShopifyService {
       .digest('base64');
     
     return hash === hmac;
+  }
+
+  /**
+   * product IDから商品タグを一括取得
+   * @param {Array<string|number>} productIds - product IDの配列
+   * @returns {Promise<Map<string, Array<string>>>} product_id → tagsのマップ
+   */
+  async getProductTags(productIds) {
+    if (!productIds || productIds.length === 0) return new Map();
+
+    const now = Date.now();
+    const tagMap = new Map();
+
+    const uniqueIds = [...new Set(productIds.map(id => String(id)).filter(id => id))];
+    if (uniqueIds.length === 0) return tagMap;
+
+    // キャッシュをチェックし、キャッシュミスしたIDのみ収集
+    const uncachedIds = [];
+    for (const productId of uniqueIds) {
+      const cached = productTagCache.get(productId);
+      if (cached && cached.expiresAt > now) {
+        tagMap.set(productId, cached.tags);
+      } else {
+        if (cached) {
+          productTagCache.delete(productId);
+        }
+        uncachedIds.push(productId);
+      }
+    }
+
+    // キャッシュミスしたIDがあればAPIを呼び出す
+    if (uncachedIds.length > 0) {
+      console.log(`[Cache] Fetching ${uncachedIds.length} product tags (${uniqueIds.length - uncachedIds.length} cached)`);
+
+      const query = `
+        query getProductTags($ids: [ID!]!) {
+          nodes(ids: $ids) {
+            ... on Product {
+              id
+              tags
+            }
+          }
+        }
+      `;
+
+      const gids = uncachedIds.map(id => `gid://shopify/Product/${id}`);
+      const response = await this.makeRequest('/graphql.json', {
+        method: 'POST',
+        body: JSON.stringify({ query, variables: { ids: gids } })
+      });
+
+      const expiresAt = now + PRODUCT_TAG_CACHE_TTL_MS;
+      (response.data?.nodes || []).forEach(node => {
+        if (!node?.id) return;
+        const productId = node.id.replace('gid://shopify/Product/', '');
+        const tags = node.tags || [];
+        productTagCache.set(productId, { tags, expiresAt });
+        tagMap.set(productId, tags);
+      });
+
+      // APIから返されなかったIDも空でキャッシュ
+      for (const productId of uncachedIds) {
+        if (!tagMap.has(productId)) {
+          productTagCache.set(productId, { tags: [], expiresAt });
+          tagMap.set(productId, []);
+        }
+      }
+    } else {
+      console.log(`[Cache] All ${uniqueIds.length} product tags served from cache`);
+    }
+
+    return tagMap;
   }
 
   /**
@@ -1393,11 +1448,14 @@ class ShopifyService {
    * @returns {Promise<Array>} Ticket形式のデータ配列
    */
   async formatWebhookOrderForTicket(order) {
-    // variant_idを収集してメタフィールドを一括取得
-    const variantIds = (order.line_items || [])
-      .map(item => item.variant_id)
-      .filter(id => id);
-    const colorMap = await this.getVariantMetafields(variantIds);
+    // variant_idを収集してメタフィールドを一括取得、product_idから商品タグを一括取得
+    const lineItems = order.line_items || [];
+    const variantIds = lineItems.map(item => item.variant_id).filter(id => id);
+    const productIds = lineItems.map(item => item.product_id).filter(id => id);
+    const [colorMap, productTagMap] = await Promise.all([
+      this.getVariantMetafields(variantIds),
+      this.getProductTags(productIds)
+    ]);
 
     // REST API形式のデータをGraphQL形式に変換
     const graphqlLikeOrder = {
@@ -1419,7 +1477,7 @@ class ShopifyService {
       displayFulfillmentStatus: this._mapFulfillmentStatus(order.fulfillment_status),
       tags: order.tags ? order.tags.split(', ') : [],
       lineItems: {
-        edges: (order.line_items || []).map(item => {
+        edges: lineItems.map(item => {
           const currentQuantity = item.quantity - (item.fulfillable_quantity !== undefined ?
             (item.quantity - item.fulfillable_quantity) : 0);
           console.log(`[formatWebhookOrderForTicket] LineItem ${item.id}: quantity=${item.quantity}, fulfillable_quantity=${item.fulfillable_quantity}, currentQuantity=${currentQuantity}`);
@@ -1434,6 +1492,10 @@ class ShopifyService {
                 shopMoney: {
                   amount: item.price
                 }
+              },
+              product: {
+                id: `gid://shopify/Product/${item.product_id}`,
+                tags: productTagMap.get(String(item.product_id)) || []
               },
               variant: {
                 metafields: {

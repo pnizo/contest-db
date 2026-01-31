@@ -55,6 +55,7 @@ class Order {
       price: row.price,
       line_item_id: row.lineItemId,
       back_stage_pass: row.backStagePass ?? 0,
+      product_id: row.productId,
       created_at: row.createdAt,
       updated_at: row.updatedAt,
       tags: this._tagsFromRow(row),
@@ -278,6 +279,7 @@ class Order {
           price: baseData[12],          // price
           lineItemId: baseData[13],     // line_item_id
           backStagePass: parseInt(baseData[14], 10) || 0, // back_stage_pass
+          productId: baseData[15],  // product_id
           ...this._tagsToColumns(orderData.tags),
         };
       });
