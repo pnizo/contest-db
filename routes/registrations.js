@@ -610,8 +610,8 @@ router.post('/import-shopify', requireAdmin, async (req, res) => {
     }
 
     // 既存のRegistrationsデータを取得（player_no引き継ぎ用）
-    const existingRegistrations = await registrationModel.findByContestAndDate(contestName, contestDate);
-    console.log(`Found ${existingRegistrations.length} existing registrations for ${contestName} (${contestDate})`);
+    const existingRegistrations = await registrationModel.findByContestName(contestName);
+    console.log(`Found ${existingRegistrations.length} existing registrations for ${contestName}`);
 
     // player_no引き継ぎ用Map: fwj_card_no → player_no
     const existingPlayerNoMap = new Map();
@@ -633,7 +633,7 @@ router.post('/import-shopify', requireAdmin, async (req, res) => {
     // 既存データを削除（インポート前に削除）
     if (existingRegistrations.length > 0) {
       console.log(`Deleting ${existingRegistrations.length} existing registrations...`);
-      await registrationModel.deleteByContestAndDate(contestName, contestDate);
+      await registrationModel.deleteByContestName(contestName);
       console.log(`Deleted ${existingRegistrations.length} existing registrations`);
     }
 

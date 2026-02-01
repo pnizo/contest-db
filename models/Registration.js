@@ -103,6 +103,33 @@ class Registration {
     return { deleted: result.length };
   }
 
+  async findByContestName(contestName) {
+    const db = getDb();
+    const rows = await db
+      .select()
+      .from(registrations)
+      .where(and(
+        eq(registrations.contestName, contestName),
+        eq(registrations.isValid, true)
+      ))
+      .orderBy(asc(registrations.playerNo));
+
+    return rows.map(row => this._toResponse(row));
+  }
+
+  async deleteByContestName(contestName) {
+    const db = getDb();
+
+    const result = await db
+      .delete(registrations)
+      .where(
+        eq(registrations.contestName, contestName)
+      )
+      .returning();
+
+    return { deleted: result.length };
+  }
+
   async findByFwjCard(fwjCard) {
     const db = getDb();
     const rows = await db
