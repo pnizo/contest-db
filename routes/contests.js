@@ -5,6 +5,24 @@ const router = express.Router();
 
 const contestModel = new Contest();
 
+/**
+ * 外部サーバーのContestsキャッシュをクリアする
+ */
+async function clearContestsCache() {
+  const url = process.env.APP_CACHE_CLEAR_URL;
+  const secret = process.env.APP_CACHE_CLEAR_SECRET;
+  if (!url || !secret) return;
+
+  try {
+    const res = await fetch(`${url}?secret=${encodeURIComponent(secret)}&target=contests`);
+    if (!res.ok) {
+      console.error('Contests cache clear failed:', res.status, await res.text());
+    }
+  } catch (error) {
+    console.error('Contests cache clear error:', error.message);
+  }
+}
+
 // すべて認証が必要
 router.use(requireAuth);
 
@@ -110,6 +128,7 @@ router.post('/', async (req, res) => {
     }
 
     const result = await contestModel.create(contestData);
+    clearContestsCache();
     res.json(result);
   } catch (error) {
     console.error('Error creating contest:', error);
@@ -133,6 +152,7 @@ router.put('/:id', async (req, res) => {
     }
 
     const result = await contestModel.update(id, contestData);
+    clearContestsCache();
     res.json(result);
   } catch (error) {
     console.error('Error updating contest:', error);
@@ -159,6 +179,7 @@ router.delete('/:id', async (req, res) => {
       return res.status(400).json(result);
     }
 
+    clearContestsCache();
     res.json({ success: true, message: '大会情報を削除しました' });
   } catch (error) {
     console.error('Error deleting contest:', error);

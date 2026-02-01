@@ -139,18 +139,8 @@ function calculateAge(birthDate, referenceDate) {
   return age;
 }
 
-/**
- * Validate if a date string is valid
- * @param {string} dateString - Date string to validate
- * @returns {boolean} - True if valid
- */
-function isValidDate(dateString) {
-  return parseFlexibleDate(dateString) !== null;
-}
-
 module.exports = {
   parseFlexibleDate,
   formatToISODate,
-  calculateAge,
-  isValidDate
+  calculateAge
 };

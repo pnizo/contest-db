@@ -181,26 +181,6 @@ class Contest {
   }
 
   /**
-   * 開催日順にソートされたコンテスト一覧を取得
-   */
-  async findAllSorted(order = 'desc') {
-    try {
-      const db = getDb();
-      const orderFn = order === 'asc' ? asc : desc;
-      const rows = await db
-        .select()
-        .from(contests)
-        .where(sql`${contests.contestName} IS NOT NULL AND ${contests.contestName} != ''`)
-        .orderBy(orderFn(contests.contestDate));
-
-      return rows.map(row => this._toSnakeCase(row));
-    } catch (error) {
-      console.error('Error in findAllSorted:', error);
-      return [];
-    }
-  }
-
-  /**
    * 今日以降のコンテストを取得
    */
   async findUpcoming() {

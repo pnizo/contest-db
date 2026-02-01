@@ -184,10 +184,5 @@ function generateCheckinCode(ticketId) {
 
 module.exports = {
   verifyCheckinCode,
-  generateCheckinCode,
-  // テスト用にエクスポート
-  base32Encode,
-  base32Decode,
-  numberToBytes,
-  bytesToNumber
+  generateCheckinCode
 };

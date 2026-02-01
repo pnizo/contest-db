@@ -2166,7 +2166,9 @@ input[type="file"]:hover {
 /* Checkbox Group */
 .checkbox-group {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
+    gap: 4px 16px;
 }
 
 .checkbox-group label {

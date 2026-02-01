@@ -213,14 +213,6 @@ class RegistrationsManager {
             this.executeShopifyImport();
         });
 
-        document.getElementById('syncMembersBtn').addEventListener('click', () => {
-            this.syncMembersFromShopify();
-        });
-
-        document.getElementById('syncOrdersBtn').addEventListener('click', () => {
-            this.syncOrdersFromShopify();
-        });
-
         document.getElementById('modalExportBtn').addEventListener('click', () => {
             this.handleModalExport();
         });
@@ -631,98 +623,8 @@ class RegistrationsManager {
         const contestDate = document.getElementById('shopifyContestDate').value;
         const contestName = document.getElementById('shopifyContestName').value;
         const importBtn = document.getElementById('shopifyImportExecuteBtn');
-        const syncOrdersBtn = document.getElementById('syncOrdersBtn');
 
         importBtn.disabled = !(contestDate && contestName);
-        syncOrdersBtn.disabled = !contestName;
-    }
-
-    async syncMembersFromShopify() {
-        const syncBtn = document.getElementById('syncMembersBtn');
-        const originalText = syncBtn.textContent;
-        const statusElement = document.getElementById('syncStatus');
-
-        try {
-            syncBtn.disabled = true;
-            syncBtn.textContent = '同期中...';
-            statusElement.className = 'import-status';
-            statusElement.style.display = 'block';
-            statusElement.textContent = 'Membersを同期中...';
-
-            const response = await authFetch('/api/members/sync', {
-                method: 'POST'
-            });
-
-            const result = await response.json();
-
-            if (result.success) {
-                const message = result.message || `Members同期完了: ${result.synced}件を同期しました`;
-                this.showNotification(message, 'success');
-                statusElement.className = 'import-status success';
-                statusElement.textContent = message;
-            } else {
-                this.showNotification(result.error || 'Members同期に失敗しました', 'error');
-                statusElement.className = 'import-status error';
-                statusElement.textContent = 'Members同期に失敗しました: ' + (result.error || '');
-            }
-        } catch (error) {
-            this.showNotification('エラーが発生しました: ' + error.message, 'error');
-            statusElement.className = 'import-status error';
-            statusElement.textContent = 'エラーが発生しました: ' + error.message;
-        } finally {
-            syncBtn.disabled = false;
-            syncBtn.textContent = originalText;
-        }
-    }
-
-    async syncOrdersFromShopify() {
-        const contestName = document.getElementById('shopifyContestName').value;
-        if (!contestName) {
-            this.showNotification('大会名を選択してください', 'error');
-            return;
-        }
-
-        const syncBtn = document.getElementById('syncOrdersBtn');
-        const originalText = syncBtn.textContent;
-        const statusElement = document.getElementById('syncStatus');
-
-        try {
-            syncBtn.disabled = true;
-            syncBtn.textContent = '取得中...';
-            statusElement.className = 'import-status';
-            statusElement.style.display = 'block';
-            statusElement.textContent = 'エントリーを取得中...';
-
-            // タグで検索してOrdersシートに出力
-            const response = await authFetch('/api/orders/export', {
-                method: 'POST',
-                body: JSON.stringify({
-                    tag: `"${contestName}" "コンテストエントリー"`,
-                    paidOnly: true
-                })
-            });
-
-            const result = await response.json();
-
-            if (result.success) {
-                const message = result.message || `エントリー取得完了: ${result.exported}件`;
-                this.showNotification(message, 'success');
-                statusElement.className = 'import-status success';
-                statusElement.textContent = message;
-            } else {
-                this.showNotification(result.error || 'エントリー取得に失敗しました', 'error');
-                statusElement.className = 'import-status error';
-                statusElement.textContent = 'エントリー取得に失敗しました: ' + (result.error || '');
-            }
-        } catch (error) {
-            this.showNotification('エラーが発生しました: ' + error.message, 'error');
-            statusElement.className = 'import-status error';
-            statusElement.textContent = 'エラーが発生しました: ' + error.message;
-        } finally {
-            syncBtn.disabled = false;
-            syncBtn.textContent = originalText;
-            this.validateShopifyImportForm();
-        }
     }
 
     async executeShopifyImport() {
@@ -734,22 +636,48 @@ class RegistrationsManager {
             return;
         }
 
+        const importBtn = document.getElementById('shopifyImportExecuteBtn');
+        const statusElement = document.getElementById('shopifyImportStatus');
+
         try {
-            document.getElementById('shopifyImportExecuteBtn').disabled = true;
-            const statusElement = document.getElementById('shopifyImportStatus');
+            importBtn.disabled = true;
             statusElement.className = 'import-status';
             statusElement.style.display = 'block';
-            statusElement.textContent = 'インポート中...';
 
+            // Step 1: Members同期
+            statusElement.textContent = '(1/3) Membersを同期中...';
+            const membersResponse = await authFetch('/api/members/sync', {
+                method: 'POST'
+            });
+            const membersResult = await membersResponse.json();
+            if (!membersResult.success) {
+                throw new Error('Members同期に失敗しました: ' + (membersResult.error || ''));
+            }
+
+            // Step 2: エントリー取得
+            statusElement.textContent = '(2/3) エントリーを取得中...';
+            const ordersResponse = await authFetch('/api/orders/export', {
+                method: 'POST',
+                body: JSON.stringify({
+                    tag: `"${contestName}" "コンテストエントリー"`,
+                    paidOnly: true
+                })
+            });
+            const ordersResult = await ordersResponse.json();
+            if (!ordersResult.success) {
+                throw new Error('エントリー取得に失敗しました: ' + (ordersResult.error || ''));
+            }
+
+            // Step 3: Registrations作成
+            statusElement.textContent = '(3/3) Registrationsを作成中...';
             const response = await authFetch(`${this.apiUrl}/import-shopify`, {
                 method: 'POST',
                 body: JSON.stringify({ contestDate, contestName })
             });
-
             const result = await response.json();
 
             if (result.success) {
-                const { imported, skipped, memberNotFound, warnings } = result.data;
+                const { imported, memberNotFound, warnings } = result.data;
 
                 this.showNotification(`${imported}件のRegistrationをインポートしました`, 'success');
 
@@ -760,7 +688,6 @@ class RegistrationsManager {
                 }
                 statusElement.textContent = statusMessage;
 
-                // 警告がある場合はコンソールに出力
                 if (warnings && warnings.length > 0) {
                     console.log('Shopify import warnings:', warnings);
                 }
@@ -768,22 +695,18 @@ class RegistrationsManager {
                 await this.loadFilterOptions();
                 this.loadRegistrations();
 
-                // モーダルを閉じる
                 setTimeout(() => {
                     this.closeShopifyImportModal();
                 }, 2000);
             } else {
-                this.showNotification(result.error, 'error');
-                statusElement.className = 'import-status error';
-                statusElement.textContent = 'インポートに失敗しました: ' + result.error;
+                throw new Error('Registrations作成に失敗しました: ' + (result.error || ''));
             }
         } catch (error) {
             this.showNotification('エラーが発生しました: ' + error.message, 'error');
-            const statusElement = document.getElementById('shopifyImportStatus');
             statusElement.className = 'import-status error';
-            statusElement.textContent = 'エラーが発生しました: ' + error.message;
+            statusElement.textContent = error.message;
         } finally {
-            document.getElementById('shopifyImportExecuteBtn').disabled = false;
+            importBtn.disabled = false;
         }
     }
 

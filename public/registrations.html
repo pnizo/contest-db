@@ -34,10 +34,10 @@
                             <button type="button" id="searchBtn" class="search-btn" title="検索">検索</button>
                         </div>
                         <div class="control-buttons">
-                            <button id="shopifyImportBtn" class="admin-only">Shopifyインポート</button>
-                            <button id="contestOrderImportBtn" class="admin-only">開催順インポート</button>
-                            <button id="exportModalBtn">CSVエクスポート</button>
-                            <button id="csvImportBtn" class="admin-only">CSVインポート</button>
+                            <button id="shopifyImportBtn" class="admin-only">Shopifyから<br>最新データを取得</button>
+                            <button id="contestOrderImportBtn" class="admin-only">開催順CSVを適用</button>
+                            <button id="exportModalBtn">CSV出力</button>
+                            <button id="csvImportBtn" class="admin-only">全項目CSVを適用</button>
                         </div>
                     </div>
                 </div>
@@ -115,11 +115,11 @@
     <div id="shopifyImportModal" class="modal hidden">
         <div class="modal-content">
             <div class="modal-header">
-                <h2>Shopifyインポート</h2>
+                <h2>Shopifyから最新データを取得</h2>
                 <button class="modal-close" onclick="registrationsManager.closeShopifyImportModal()">&times;</button>
             </div>
             <div class="modal-form">
-                <p class="modal-description">Ordersシートのデータを元に、Membersシートと紐付けてRegistrationsを作成します。</p>
+                <p class="modal-description">Shopifyのデータを元に、Registrationsを作成します。</p>
                 <div class="form-group">
                     <label for="shopifyContestName">大会名:</label>
                     <select id="shopifyContestName" required>
@@ -131,15 +131,6 @@
                     <input type="date" id="shopifyContestDate" readonly required>
                     <small>※大会名を選択すると自動的に設定されます</small>
                 </div>
-                <div class="form-group">
-                    <label>Shopifyから最新データを取得:</label>
-                    <div class="sync-buttons">
-                        <button type="button" id="syncMembersBtn" class="btn btn-secondary">最新のMembersをインポート</button>
-                        <button type="button" id="syncOrdersBtn" class="btn btn-secondary" disabled>最新のエントリーをインポート</button>
-                    </div>
-                    <small>※エントリーのインポートには大会名の選択が必要です</small>
-                </div>
-                <div id="syncStatus" class="import-status hidden"></div>
                 <div class="form-actions">
                     <button type="button" onclick="registrationsManager.closeShopifyImportModal()" class="btn btn-secondary">キャンセル</button>
                     <button type="button" id="shopifyImportExecuteBtn" disabled class="btn btn-primary">インポート実行</button>
@@ -182,7 +173,7 @@
     <div id="csvImportModal" class="modal hidden">
         <div class="modal-content">
             <div class="modal-header">
-                <h2>CSVインポート</h2>
+                <h2>全項目CSVを適用</h2>
                 <button class="modal-close" onclick="registrationsManager.closeCsvImportModal()">&times;</button>
             </div>
             <div class="modal-form">
