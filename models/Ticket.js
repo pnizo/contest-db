@@ -58,7 +58,6 @@ class Ticket {
       is_usable: row.isUsable ? 'TRUE' : 'FALSE',
       owner_shopify_id: row.ownerShopifyId,
       reserved_seat: row.reservedSeat,
-      color: row.color,
       used_at: row.usedAt,
       created_at: row.createdAt,
       updated_at: row.updatedAt,
@@ -335,7 +334,6 @@ class Ticket {
             fulfillmentStatus: baseData.fulfillment_status,
             isUsable,
             productId: baseData.product_id || '',
-            color: baseData.color || null,
             ...this._tagsToColumns(ticketData.tags),
             updatedAt: new Date(),
           }).where(eq(tickets.id, existing.id));
@@ -369,7 +367,6 @@ class Ticket {
             isUsable: baseData.is_usable !== 'FALSE',
             ownerShopifyId: baseData.owner_shopify_id,
             reservedSeat: baseData.reserved_seat || '',
-            color: baseData.color || '',
             ...this._tagsToColumns(ticketData.tags),
           };
         });
@@ -513,7 +510,6 @@ class Ticket {
             isUsable,
             ownerShopifyId: baseData.owner_shopify_id,
             reservedSeat: baseData.reserved_seat || '',
-            color: baseData.color || '',
             ...this._tagsToColumns(ticketData.tags),
           };
         });

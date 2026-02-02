@@ -1,10 +1,5 @@
 require('dotenv').config();
 
-// バリアントメタフィールドのキャッシュ（モジュールレベルで共有）
-// Map<variantId, { color: string, expiresAt: number }>
-const variantMetafieldCache = new Map();
-const METAFIELD_CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 1時間
-
 // 商品タグのキャッシュ（モジュールレベルで共有）
 // Map<productId, { tags: string[], expiresAt: number }>
 const productTagCache = new Map();
@@ -1213,16 +1208,6 @@ class ShopifyService {
       const quantity = item.quantity || 0;
       const currentQuantity = item.currentQuantity || 0;
 
-      // variantメタフィールドからcolorを取得
-      let color = '';
-      const variantMetafields = item.variant?.metafields?.edges || [];
-      const colorMetafield = variantMetafields.find(
-        mf => mf.node.namespace === 'custom' && mf.node.key === 'color'
-      );
-      if (colorMetafield) {
-        color = colorMetafield.node.value || '';
-      }
-
       // quantity分だけ行を生成
       // currentQuantity分はis_usable=TRUE、残りはis_usable=FALSE
       for (let i = 0; i < quantity; i++) {
@@ -1245,7 +1230,6 @@ class ShopifyService {
             item_sub_no: i + 1,           // 枝番（1から開始）
             owner_shopify_id: customerId, // 初期値は購入者のshopify_id
             reserved_seat: '',            // 初期値は空欄
-            color: color,                 // variantメタフィールドから取得
             is_usable: isValid,
             current_quantity: currentQuantity  // fulfillable_quantityに基づく有効数
           },
@@ -1354,94 +1338,6 @@ class ShopifyService {
   }
 
   /**
-   * variant IDからメタフィールドを一括取得
-   * @param {Array<string|number>} variantIds - variant IDの配列
-   * @returns {Promise<Map<string, string>>} variant_id → colorのマップ
-   */
-  async getVariantMetafields(variantIds) {
-    if (!variantIds || variantIds.length === 0) return new Map();
-
-    const now = Date.now();
-    const colorMap = new Map();
-
-    // 1. 重複を除去してユニークなvariantIdを取得
-    const uniqueVariantIds = [...new Set(variantIds.map(id => String(id)))];
-
-    // 2. キャッシュをチェックし、キャッシュミスしたIDのみ収集
-    const uncachedIds = [];
-    for (const variantId of uniqueVariantIds) {
-      const cached = variantMetafieldCache.get(variantId);
-      if (cached && cached.expiresAt > now) {
-        // キャッシュヒット
-        colorMap.set(variantId, cached.color);
-      } else {
-        // キャッシュミスまたは期限切れ
-        if (cached) {
-          variantMetafieldCache.delete(variantId); // 期限切れを削除
-        }
-        uncachedIds.push(variantId);
-      }
-    }
-
-    // 3. キャッシュミスしたIDがあればAPIを呼び出す
-    if (uncachedIds.length > 0) {
-      console.log(`[Cache] Fetching ${uncachedIds.length} variant metafields (${uniqueVariantIds.length - uncachedIds.length} cached)`);
-      
-      const query = `
-        query getVariantMetafields($ids: [ID!]!) {
-          nodes(ids: $ids) {
-            ... on ProductVariant {
-              id
-              metafields(first: 10) {
-                edges {
-                  node {
-                    namespace
-                    key
-                    value
-                  }
-                }
-              }
-            }
-          }
-        }
-      `;
-
-      const gids = uncachedIds.map(id => `gid://shopify/ProductVariant/${id}`);
-      const response = await this.makeRequest('/graphql.json', {
-        method: 'POST',
-        body: JSON.stringify({ query, variables: { ids: gids } })
-      });
-
-      // 4. 結果を処理してキャッシュに保存
-      const expiresAt = now + METAFIELD_CACHE_TTL_MS;
-      (response.data?.nodes || []).forEach(node => {
-        if (!node) return;
-        const variantId = node.id.replace('gid://shopify/ProductVariant/', '');
-        const colorMf = (node.metafields?.edges || []).find(
-          e => e.node.namespace === 'custom' && e.node.key === 'color'
-        );
-        const color = colorMf?.node?.value || '';
-        
-        // キャッシュに保存
-        variantMetafieldCache.set(variantId, { color, expiresAt });
-        colorMap.set(variantId, color);
-      });
-
-      // APIから返されなかったIDも空でキャッシュ（存在しないvariantの場合）
-      for (const variantId of uncachedIds) {
-        if (!colorMap.has(variantId)) {
-          variantMetafieldCache.set(variantId, { color: '', expiresAt });
-          colorMap.set(variantId, '');
-        }
-      }
-    } else {
-      console.log(`[Cache] All ${uniqueVariantIds.length} variant metafields served from cache`);
-    }
-
-    return colorMap;
-  }
-
-  /**
    * Webhook形式の注文データをTicket形式に変換
    * REST API形式（Webhook）からGraphQL形式に近い構造に変換し、
    * 既存のformatOrderForTicketSheet()を再利用
@@ -1449,14 +1345,10 @@ class ShopifyService {
    * @returns {Promise<Array>} Ticket形式のデータ配列
    */
   async formatWebhookOrderForTicket(order) {
-    // variant_idを収集してメタフィールドを一括取得、product_idから商品タグを一括取得
+    // product_idから商品タグを一括取得
     const lineItems = order.line_items || [];
-    const variantIds = lineItems.map(item => item.variant_id).filter(id => id);
     const productIds = lineItems.map(item => item.product_id).filter(id => id);
-    const [colorMap, productTagMap] = await Promise.all([
-      this.getVariantMetafields(variantIds),
-      this.getProductTags(productIds)
-    ]);
+    const productTagMap = await this.getProductTags(productIds);
 
     // REST API形式のデータをGraphQL形式に変換
     const graphqlLikeOrder = {
@@ -1497,13 +1389,6 @@ class ShopifyService {
               product: {
                 id: `gid://shopify/Product/${item.product_id}`,
                 tags: productTagMap.get(String(item.product_id)) || []
-              },
-              variant: {
-                metafields: {
-                  edges: item.variant_id && colorMap.has(String(item.variant_id))
-                    ? [{ node: { namespace: 'custom', key: 'color', value: colorMap.get(String(item.variant_id)) } }]
-                    : []
-                }
               }
             }
           };
