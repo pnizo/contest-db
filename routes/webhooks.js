@@ -28,9 +28,9 @@ router.post('/shopify/:topic', async (req, res) => {
       return res.status(200).json({ message: `Topic ${topic} is not supported` });
     }
 
-    // 4. チケット対象の注文かチェック
-    const hasTicketProduct = await shopifyService.orderHasTag(order.id, '観戦チケット');
-    if (!hasTicketProduct) {
+    // 4. チケット対象の注文かチェック（ペイロードのtagsから判定）
+    const tags = (order.tags || '').split(',').map(t => t.trim());
+    if (!tags.includes('観戦チケット')) {
       console.log('[Webhook] Not a ticket order (no ticket tag), skipped');
       return res.status(200).json({ message: 'Not a ticket order, skipped' });
     }

@@ -281,6 +281,7 @@ class Ticket {
     }
   }
 
+
   /**
    * チェックイン実行（is_usableをfalseに更新し、used_atに現在時刻を記録）
    * @param {number} id - チケットID
