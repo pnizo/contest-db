@@ -3,7 +3,7 @@ require('dotenv').config();
 // バリアントメタフィールドのキャッシュ（モジュールレベルで共有）
 // Map<variantId, { color: string, expiresAt: number }>
 const variantMetafieldCache = new Map();
-const CACHE_TTL_MS = 60 * 60 * 1000; // 1時間
+const METAFIELD_CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 1時間
 
 // 商品タグのキャッシュ（モジュールレベルで共有）
 // Map<productId, { tags: string[], expiresAt: number }>
@@ -1207,6 +1207,7 @@ class ShopifyService {
     lineItems.forEach(edge => {
       const item = edge.node;
       const productTags = item.product?.tags || [];
+      if (!productTags.includes('観戦チケット')) return;
       const lineItemId = item.id ? item.id.replace('gid://shopify/LineItem/', '') : '';
       const price = item.originalUnitPriceSet?.shopMoney?.amount || '';
       const quantity = item.quantity || 0;
@@ -1412,7 +1413,7 @@ class ShopifyService {
       });
 
       // 4. 結果を処理してキャッシュに保存
-      const expiresAt = now + CACHE_TTL_MS;
+      const expiresAt = now + METAFIELD_CACHE_TTL_MS;
       (response.data?.nodes || []).forEach(node => {
         if (!node) return;
         const variantId = node.id.replace('gid://shopify/ProductVariant/', '');
