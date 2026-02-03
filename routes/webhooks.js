@@ -35,8 +35,15 @@ router.post('/shopify/:topic', async (req, res) => {
       return res.status(200).json({ message: 'Not a ticket order, skipped' });
     }
 
-    // 5. チケット更新
+    // 5. キャンセル済みの場合は該当注文のチケットを削除、それ以外はupsert
     const ticket = new Ticket();
+    if (order.cancelled_at) {
+      console.log(`[Webhook] Order ${order.name} is cancelled, deleting tickets...`);
+      const result = await ticket.deleteByOrderNo(order.name);
+      console.log(`[Webhook] Delete result:`, result);
+      return res.status(200).json({ success: true, result });
+    }
+
     const result = await ticket.upsertByOrder(order);
     console.log(`[Webhook] Upsert result:`, result);
 

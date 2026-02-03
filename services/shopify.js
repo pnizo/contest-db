@@ -256,9 +256,9 @@ class ShopifyService {
         }).join(' ') + ' ';
       }
       
-      // paidOnlyがtrueの場合は支払い済み、オープン状態、キャンセルされていない注文のみ取得
-      // paidOnlyがfalseの場合は全ての支払い状態・オープン状態・キャンセル状態を含む
-      let searchQuery = tagQueries.trim();
+      // キャンセル済みの注文は常に除外
+      // paidOnlyがtrueの場合はさらに支払い済み・オープン状態のみに絞り込む
+      let searchQuery = `${tagQueries}-status:cancelled`.trim();
       if (paidOnly) {
         searchQuery = `${tagQueries}financial_status:paid status:open -status:cancelled`;
       }
@@ -978,8 +978,8 @@ class ShopifyService {
 
       console.log(`Fetching ticket orders with tag: "${tag}", since: ${dateStr}`);
 
-      // タグと日付でクエリを構築
-      const searchQuery = `tag:"${tag}" created_at:>${dateStr}`;
+      // タグと日付でクエリを構築（キャンセル済み注文を除外）
+      const searchQuery = `tag:"${tag}" created_at:>${dateStr} -status:cancelled`;
 
       console.log(`Ticket order search query: ${searchQuery}`);
 

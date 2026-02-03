@@ -676,16 +676,8 @@ router.post('/import-shopify', requireAdmin, async (req, res) => {
       // Memberを検索
       const member = membersMap.get(String(shopifyId));
 
-      // class_nameを生成: product_name + " - " + variant（contest_nameを除去）
-      const productName = order.product_name || '';
-      const variant = order.variant || '';
-      let className = variant ? `${productName} - ${variant}` : productName;
-      // contest_nameを除去
-      if (contestName && className.includes(contestName)) {
-        className = className.replace(contestName, '').trim();
-        // 先頭や末尾の不要な記号を除去
-        className = className.replace(/^[\s\-–—:：]+|[\s\-–—:：]+$/g, '').trim();
-      }
+      // class_nameを生成: variant名をそのまま使用
+      const className = order.variant || '';
 
       // 年齢を計算（fwj_birthday と contestDate から）
       let age = '';

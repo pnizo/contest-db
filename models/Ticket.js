@@ -282,6 +282,21 @@ class Ticket {
 
 
   /**
+   * 注文番号でチケットを削除
+   * @param {string} orderNo - 注文番号
+   */
+  async deleteByOrderNo(orderNo) {
+    try {
+      const db = getDb();
+      const deleted = await db.delete(tickets).where(eq(tickets.orderNo, orderNo)).returning({ id: tickets.id });
+      return { success: true, deleted: deleted.length };
+    } catch (error) {
+      console.error('Error in deleteByOrderNo:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
    * チェックイン実行（is_usableをfalseに更新し、used_atに現在時刻を記録）
    * @param {number} id - チケットID
    * @returns {Promise<Object>} 更新結果
