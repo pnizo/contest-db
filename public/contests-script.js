@@ -270,12 +270,13 @@ class ContestsManager {
             { key: 'contest_name', label: '大会名' },
             { key: 'contest_place', label: '開催地' },
             { key: 'is_ready', label: '公開' },
+            { key: 'is_test', label: 'テスト用' },
             { key: '_actions', label: '操作' }
         ];
 
         headers.forEach((header, index) => {
             const th = document.createElement('th');
-            if (header.key === '_actions' || header.key === 'is_ready') {
+            if (header.key === '_actions' || header.key === 'is_ready' || header.key === 'is_test') {
                 th.textContent = header.label;
                 if (header.key === '_actions') {
                     th.className = 'actions-header';
@@ -355,6 +356,15 @@ class ContestsManager {
                     const checkbox = document.createElement('input');
                     checkbox.type = 'checkbox';
                     checkbox.checked = isReady === 'TRUE' || isReady === true || isReady === '○';
+                    checkbox.disabled = true;
+                    td.appendChild(checkbox);
+                } else if (header.key === 'is_test') {
+                    // テストチェックボックス（表示のみ）
+                    td.className = 'center-cell';
+                    const checkbox = document.createElement('input');
+                    checkbox.type = 'checkbox';
+                    const isTest = contest.is_test;
+                    checkbox.checked = isTest === 'TRUE' || isTest === true || isTest === '○';
                     checkbox.disabled = true;
                     td.appendChild(checkbox);
                 } else {
@@ -570,6 +580,11 @@ class ContestsManager {
         document.getElementById('edit_is_ready').checked =
             isReady === 'TRUE' || isReady === true || isReady === '○';
 
+        // is_testの設定
+        const isTest = contest.is_test;
+        document.getElementById('edit_is_test').checked =
+            isTest === 'TRUE' || isTest === true || isTest === '○';
+
         document.getElementById('editDialog').classList.remove('hidden');
     }
 
@@ -587,7 +602,8 @@ class ContestsManager {
             contest_name: document.getElementById('edit_contest_name').value,
             contest_date: document.getElementById('edit_contest_date').value,
             contest_place: document.getElementById('edit_contest_place').value,
-            is_ready: document.getElementById('edit_is_ready').checked ? 'TRUE' : 'FALSE'
+            is_ready: document.getElementById('edit_is_ready').checked ? 'TRUE' : 'FALSE',
+            is_test: document.getElementById('edit_is_test').checked ? 'TRUE' : 'FALSE'
         };
         
         console.log('Contest data to save:', contestData);
