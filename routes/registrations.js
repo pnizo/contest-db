@@ -779,7 +779,6 @@ router.post('/import-shopify', requireAdmin, async (req, res) => {
     const CLASS_PRIORITY = [
       'First Challenge', 'ファーストチャレンジ',
       'Beginner', 'ビギナー',
-      'Novice', 'ノービス',
       'Teen', 'ティーン',
       'Junior', 'ジュニア',
       'Masters', 'マスターズ',
