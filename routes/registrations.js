@@ -524,6 +524,7 @@ router.get('/export/all_fields/:contestName', requireAuth, async (req, res) => {
       'instagram': reg.instagram || '',
       'biography': reg.biography || '',
       'back_stage_pass': reg.back_stage_pass ?? 0,
+      'is_member': reg.is_member ?? false,
       'createdAt': reg.createdAt || '',
       'isValid': reg.isValid || '',
       'deletedAt': reg.deletedAt || '',
@@ -706,7 +707,9 @@ router.post('/import-shopify', requireAdmin, async (req, res) => {
       // Registrationレコードを生成
       const registration = {
         // Members由来のデータ（memberが見つからない場合は空白）
-        name_ja: member ? `${member.fwj_lastname || ''} ${member.fwj_firstname || ''}`.trim() : '',
+        name_ja: member
+          ? `${member.fwj_lastname || ''} ${member.fwj_firstname || ''}`.trim()
+          : (order.full_name || ''),
         name_ja_kana: member ? `${member.fwj_kanalastname || ''} ${member.fwj_kanafirstname || ''}`.trim() : '',
         first_name: member ? (member.first_name || '') : '',
         last_name: member ? (member.last_name || '') : '',
@@ -721,6 +724,7 @@ router.post('/import-shopify', requireAdmin, async (req, res) => {
         email: order.email || '',
         class_name: className,
         back_stage_pass: order.back_stage_pass ?? 0,
+        is_member: !!member,
 
         // player_no: 決定済みの値を設定
         player_no: playerNo,
@@ -775,6 +779,7 @@ router.post('/import-shopify', requireAdmin, async (req, res) => {
     const CLASS_PRIORITY = [
       'First Challenge', 'ファーストチャレンジ',
       'Beginner', 'ビギナー',
+      'Novice', 'ノービス',
       'Teen', 'ティーン',
       'Junior', 'ジュニア',
       'Masters', 'マスターズ',

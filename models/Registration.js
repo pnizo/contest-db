@@ -34,6 +34,7 @@ class Registration {
       instagram: row.instagram || '',
       biography: row.biography || '',
       back_stage_pass: row.backStagePass ?? 0,
+      is_member: row.isMember ?? false,
       isValid: row.isValid ? 'TRUE' : 'FALSE',
       createdAt: row.createdAt ? row.createdAt.toISOString() : '',
       updatedAt: row.updatedAt ? row.updatedAt.toISOString() : '',
@@ -348,6 +349,7 @@ class Registration {
     if (data.instagram !== undefined) updateData.instagram = data.instagram || null;
     if (data.biography !== undefined) updateData.biography = data.biography || null;
     if (data.back_stage_pass !== undefined) updateData.backStagePass = parseInt(data.back_stage_pass, 10) || 0;
+    if (data.is_member !== undefined) updateData.isMember = data.is_member === true || data.is_member === 'true';
 
     if (data.isValid !== undefined) {
       updateData.isValid = data.isValid === 'TRUE' || data.isValid === true;

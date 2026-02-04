@@ -47,6 +47,7 @@ class RegistrationsManager {
         { key: 'occupation', label: '職業' },
         { key: 'biography', label: '自己紹介' },
         { key: 'back_stage_pass', label: 'BSP' },
+        { key: 'is_member', label: 'カード会員' },
     ];
 
     constructor() {
@@ -958,7 +959,8 @@ class RegistrationsManager {
             { key: 'occupation', label: '職業' },
             { key: 'instagram', label: 'Instagram' },
             { key: 'biography', label: '自己紹介' },
-            { key: 'back_stage_pass', label: 'BSP' }
+            { key: 'back_stage_pass', label: 'BSP' },
+            { key: 'is_member', label: 'カード会員' }
         ];
 
         headers.forEach(header => {
@@ -998,7 +1000,15 @@ class RegistrationsManager {
                     value = new Date(value).toLocaleDateString('ja-JP');
                 }
 
-                td.textContent = value;
+                if (header.key === 'is_member') {
+                    const checkbox = document.createElement('input');
+                    checkbox.type = 'checkbox';
+                    checkbox.checked = value === true || value === 'true';
+                    checkbox.disabled = true;
+                    td.appendChild(checkbox);
+                } else {
+                    td.textContent = value;
+                }
 
                 row.appendChild(td);
             });
