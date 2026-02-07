@@ -56,6 +56,8 @@ class Order {
       line_item_id: row.lineItemId,
       back_stage_pass: row.backStagePass ?? 0,
       product_id: row.productId,
+      occupation: row.occupation || '',
+      biography: row.biography || '',
       created_at: row.createdAt,
       updated_at: row.updatedAt,
       tags: this._tagsFromRow(row),
@@ -280,6 +282,8 @@ class Order {
           lineItemId: baseData[13],     // line_item_id
           backStagePass: parseInt(baseData[14], 10) || 0, // back_stage_pass
           productId: baseData[15],  // product_id
+          occupation: baseData[16] || '',      // occupation
+          biography: baseData[17] || '',       // biography
           ...this._tagsToColumns(orderData.tags),
         };
       });

@@ -312,6 +312,10 @@ class ShopifyService {
                             currencyCode
                           }
                         }
+                        customAttributes {
+                          key
+                          value
+                        }
                         product {
                           id
                           tags
@@ -394,7 +398,6 @@ class ShopifyService {
     const financialStatus = this.translateFinancialStatus(order.displayFinancialStatus);
     const fulfillmentStatus = this.translateFulfillmentStatus(order.displayFulfillmentStatus);
 
-    const backStagePass = order.metafield?.value || '';
     const lineItems = order.lineItems?.edges || [];
 
     if (lineItems.length === 0) {
@@ -409,6 +412,14 @@ class ShopifyService {
         const productTags = item.product?.tags || [];
         // line_item_id を GID から数値部分のみ抽出
         const lineItemId = item.id ? item.id.replace('gid://shopify/LineItem/', '') : '';
+        // customAttributesから職業、プロフィール、バックステージパスを抽出
+        const occupation = item.customAttributes?.find(a => a.key === '職業')?.value || '';
+        // biographyは'プロフィール'を優先、なければ'参加者'をフォールバック
+        const biography = item.customAttributes?.find(a => a.key === 'プロフィール')?.value
+          || item.customAttributes?.find(a => a.key === '参加者')?.value || '';
+        // 'バックステージパス購入予定'から数字のみ抽出して整数に変換（例: '2枚' → 2）
+        const backStagePassStr = item.customAttributes?.find(a => a.key === 'バックステージパス購入予定')?.value || '0';
+        const backStagePass = parseInt(backStagePassStr.replace(/[^0-9]/g, ''), 10) || 0;
         return {
           baseData: [
             orderName,
@@ -426,7 +437,9 @@ class ShopifyService {
             item.originalUnitPriceSet?.shopMoney?.amount || '',
             lineItemId,                    // line_item_id
             backStagePass,                 // back_stage_pass
-            item.product?.id?.replace('gid://shopify/Product/', '') || ''  // product_id
+            item.product?.id?.replace('gid://shopify/Product/', '') || '',  // product_id
+            occupation,                    // occupation (職業)
+            biography                      // biography (プロフィール)
           ],
           tags: productTags
         };
@@ -1263,6 +1276,170 @@ class ShopifyService {
       .digest('base64');
     
     return hash === hmac;
+  }
+
+  /**
+   * Order IDから注文詳細を取得
+   * @param {string} orderId - 注文ID（数値またはGID形式）
+   * @returns {Promise<object>} 注文データ
+   */
+  async getOrderById(orderId) {
+    const orderGid = orderId.toString().startsWith('gid://')
+      ? orderId
+      : `gid://shopify/Order/${orderId}`;
+
+    const query = `
+      query getOrder($id: ID!) {
+        order(id: $id) {
+          id
+          name
+          createdAt
+          totalPriceSet { shopMoney { amount currencyCode } }
+          displayFinancialStatus
+          displayFulfillmentStatus
+          tags
+          customer {
+            id
+            email
+            firstName
+            lastName
+          }
+          lineItems(first: 100) {
+            edges {
+              node {
+                id
+                title
+                variantTitle
+                quantity
+                currentQuantity
+                originalUnitPriceSet { shopMoney { amount } }
+                product { id tags }
+              }
+            }
+          }
+        }
+      }
+    `;
+
+    const response = await this.makeRequest('/graphql.json', {
+      method: 'POST',
+      body: JSON.stringify({ query, variables: { id: orderGid } })
+    });
+
+    if (response.errors) {
+      throw new Error(`GraphQL error: ${response.errors.map(e => e.message).join(', ')}`);
+    }
+
+    return response.data?.order || null;
+  }
+
+  /**
+   * LineItem IDからラインアイテム詳細を取得
+   * @param {string} lineItemId - ラインアイテムID（数値またはGID形式）
+   * @returns {Promise<object>} ラインアイテムデータ
+   */
+  async getLineItemById(lineItemId) {
+    const lineItemGid = lineItemId.toString().startsWith('gid://')
+      ? lineItemId
+      : `gid://shopify/LineItem/${lineItemId}`;
+
+    const query = `
+      query getLineItem($id: ID!) {
+        node(id: $id) {
+          ... on LineItem {
+            id
+            name
+            title
+            variantTitle
+            sku
+            vendor
+            quantity
+            currentQuantity
+            nonFulfillableQuantity
+            fulfillableQuantity
+            fulfillmentStatus
+            requiresShipping
+            restockable
+            isGiftCard
+            taxable
+            taxLines {
+              title
+              rate
+              ratePercentage
+              priceSet { shopMoney { amount currencyCode } }
+            }
+            originalTotalSet { shopMoney { amount currencyCode } }
+            originalUnitPriceSet { shopMoney { amount currencyCode } }
+            discountedTotalSet { shopMoney { amount currencyCode } }
+            discountedUnitPriceSet { shopMoney { amount currencyCode } }
+            unfulfilledDiscountedTotalSet { shopMoney { amount currencyCode } }
+            totalDiscountSet { shopMoney { amount currencyCode } }
+            customAttributes {
+              key
+              value
+            }
+            discountAllocations {
+              allocatedAmountSet { shopMoney { amount currencyCode } }
+              discountApplication {
+                index
+                allocationMethod
+                targetSelection
+                targetType
+                value {
+                  ... on MoneyV2 { amount currencyCode }
+                  ... on PricingPercentageValue { percentage }
+                }
+              }
+            }
+            duties {
+              id
+              harmonizedSystemCode
+              price { shopMoney { amount currencyCode } }
+              taxLines {
+                title
+                rate
+                ratePercentage
+                priceSet { shopMoney { amount currencyCode } }
+              }
+            }
+            product {
+              id
+              title
+              handle
+              tags
+              vendor
+              productType
+              status
+            }
+            variant {
+              id
+              title
+              sku
+              barcode
+              price
+              compareAtPrice
+              inventoryQuantity
+            }
+            image {
+              id
+              url
+              altText
+            }
+          }
+        }
+      }
+    `;
+
+    const response = await this.makeRequest('/graphql.json', {
+      method: 'POST',
+      body: JSON.stringify({ query, variables: { id: lineItemGid } })
+    });
+
+    if (response.errors) {
+      throw new Error(`GraphQL error: ${response.errors.map(e => e.message).join(', ')}`);
+    }
+
+    return response.data?.node || null;
   }
 
   /**

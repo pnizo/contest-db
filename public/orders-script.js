@@ -341,7 +341,7 @@ class OrdersManager {
         const headers = [
             '注文番号', '注文日時', '顧客ID', '顧客名', 'メールアドレス',
             '合計金額', '支払いステータス', '発送ステータス',
-            '商品名', 'バリエーション', '数量', '現在数量', '単価', 'BSP', 'タグ'
+            '商品名', 'バリエーション', '数量', '現在数量', '単価', 'BSP', '職業', '自己紹介', 'タグ'
         ];
         const headerRow = document.createElement('tr');
         headers.forEach(header => {
@@ -370,6 +370,8 @@ class OrdersManager {
                 order.current_quantity,
                 order.price ? `¥${Number(order.price).toLocaleString()}` : '',
                 order.back_stage_pass ?? 0,
+                order.occupation || '',
+                order.biography || '',
                 order.tags ? order.tags.join(', ') : ''
             ];
 

@@ -603,16 +603,32 @@ router.post('/import-shopify', requireAdmin, async (req, res) => {
     const ordersData = await orderModel.findAll();
     console.log(`Loaded ${ordersData.length} order rows from Orders table`);
 
-    if (ordersData.length === 0) {
-      return res.status(400).json({
-        success: false,
-        error: 'Ordersテーブルにデータがありません'
-      });
-    }
-
     // 既存のRegistrationsデータを取得（player_no引き継ぎ用）
     const existingRegistrations = await registrationModel.findByContestName(contestName);
     console.log(`Found ${existingRegistrations.length} existing registrations for ${contestName}`);
+
+    // Ordersが0件の場合は、既存Registrationsの削除のみ行う
+    if (ordersData.length === 0) {
+      let deletedCount = 0;
+      if (existingRegistrations.length > 0) {
+        await registrationModel.deleteByContestName(contestName);
+        deletedCount = existingRegistrations.length;
+        console.log(`Deleted ${deletedCount} existing registrations (Orders table is empty)`);
+      }
+      return res.json({
+        success: true,
+        data: {
+          total: 0,
+          imported: 0,
+          deleted: deletedCount,
+          skipped: 0,
+          memberNotFound: 0,
+          contestDate,
+          contestName,
+          message: `Ordersテーブルが空のため、${deletedCount}件を削除しました`
+        }
+      });
+    }
 
     // player_no引き継ぎ用Map: fwj_card_no → player_no
     const existingPlayerNoMap = new Map();
@@ -664,6 +680,12 @@ router.post('/import-shopify', requireAdmin, async (req, res) => {
 
       if (!shopifyId) {
         skippedOrders.push({ reason: 'shopify_id不明', order: order.order_no || 'unknown' });
+        continue;
+      }
+
+      // 返金済み（キャンセル）の注文をスキップ
+      if (order.financial_status === '返金済み') {
+        skippedOrders.push({ reason: '返金済み（キャンセル）', order: order.order_no || 'unknown' });
         continue;
       }
 
@@ -733,9 +755,9 @@ router.post('/import-shopify', requireAdmin, async (req, res) => {
         sort_index: '',
         score_card: '',
         contest_order: '',
-        occupation: '',
+        occupation: order.occupation || '',
         instagram: '',
-        biography: ''
+        biography: order.biography || ''
       };
 
       newRegistrations.push(registration);
