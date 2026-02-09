@@ -65,6 +65,15 @@ class Member {
     }
   }
 
+  async findAllUnfiltered() {
+    const db = getDb();
+    const rows = await db
+      .select()
+      .from(members)
+      .orderBy(desc(members.createdAt));
+    return rows.map(row => this._toSnakeCase(row));
+  }
+
   /**
    * ページング・フィルタリング・ソート付きでメンバーを取得
    */

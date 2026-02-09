@@ -655,7 +655,7 @@ router.post('/import-shopify', requireAdmin, async (req, res) => {
     }
 
     // Membersの全データを取得
-    const allMembers = await memberModel.findAll();
+    const allMembers = await memberModel.findAllUnfiltered();
     console.log(`Loaded ${allMembers.length} members from Members table`);
 
     // shopify_idでMembersをMapに変換（高速ルックアップ用）
