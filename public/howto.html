@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>使い方ガイド - FWJコンテストDB</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        .manual-container {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 40px 20px;
+            background: #fff;
+        }
+        .manual-header {
+            text-align: center;
+            margin-bottom: 40px;
+            padding-bottom: 20px;
+            border-bottom: 3px solid #4CAF50;
+        }
+        .manual-header h1 {
+            color: #333;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        .manual-toc {
+            background: #f8f9fa;
+            padding: 30px;
+            border-radius: 8px;
+            margin-bottom: 40px;
+        }
+        .manual-toc h2 {
+            color: #333;
+            margin-top: 0;
+            margin-bottom: 20px;
+        }
+        .manual-toc ol, .manual-toc ul {
+            line-height: 1.8;
+            padding-left: 30px;
+        }
+        .manual-toc li > ul, .manual-toc li > ol {
+            margin-top: 4px;
+            margin-bottom: 4px;
+        }
+        .manual-toc a {
+            color: #4CAF50;
+            text-decoration: none;
+        }
+        .manual-toc a:hover {
+            text-decoration: underline;
+        }
+        .manual-section {
+            margin-bottom: 50px;
+            padding: 30px;
+            border-left: 4px solid #4CAF50;
+            background: #fafafa;
+        }
+        .manual-section h2 {
+            color: #4CAF50;
+            font-size: 2em;
+            margin-top: 0;
+            margin-bottom: 20px;
+        }
+        .manual-section h3 {
+            color: #333;
+            font-size: 1.5em;
+            margin-top: 30px;
+            margin-bottom: 15px;
+        }
+        .manual-section h4 {
+            color: #555;
+            font-size: 1.2em;
+            margin-top: 20px;
+            margin-bottom: 10px;
+        }
+        .manual-section p, .manual-section li {
+            line-height: 1.8;
+            color: #555;
+        }
+        .manual-section ul, .manual-section ol {
+            margin: 15px 0;
+            padding-left: 30px;
+        }
+        .manual-section li > ul, .manual-section li > ol {
+            margin: 5px 0;
+        }
+        .manual-section li {
+            margin: 8px 0;
+        }
+        .manual-section strong {
+            color: #333;
+        }
+        .manual-section code {
+            background: #e8e8e8;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+        }
+        .note-box {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 15px 0;
+        }
+        .feature-badge {
+            display: inline-block;
+            background: #4CAF50;
+            color: white;
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-size: 0.85em;
+            margin-left: 10px;
+        }
+        .admin-badge {
+            background: #ff9800;
+        }
+        hr {
+            border: none;
+            border-top: 1px solid #ddd;
+            margin: 40px 0;
+        }
+        .back-to-top {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            background: #4CAF50;
+            color: white;
+            padding: 12px 20px;
+            border-radius: 25px;
+            text-decoration: none;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            transition: background 0.3s;
+        }
+        .back-to-top:hover {
+            background: #45a049;
+        }
+    </style>
+</head>
+<body>
+    <div class="manual-container">
+        <div class="manual-header">
+            <h1>FWJコンテストDB 使い方ガイド</h1>
+            <p>タスク別・ステップバイステップの操作手順</p>
+        </div>
+
+        <div class="manual-toc" id="toc">
+            <h2>目次</h2>
+            <ol>
+                <li>
+                    <a href="#contest-prep">大会の準備をする</a>
+                    <ul>
+                        <li><a href="#register-contest">大会基本情報を登録する</a></li>
+                        <li><a href="#import-registrations">Shopifyから出場登録データを取り込む</a></li>
+                        <li><a href="#set-contest-order">出場順を設定する（開催順CSV）</a></li>
+                    </ul>
+                </li>
+                <li>
+                    <a href="#contest-day">大会当日の運営</a>
+                    <ul>
+                        <li><a href="#add-notes">特記事項を記録する（欠席・クラス変更など）</a></li>
+                        <li><a href="#checkin-ticket">チケットのチェックインを行う</a></li>
+                        <li><a href="#manage-guests">関係者チケットを管理する</a></li>
+                    </ul>
+                </li>
+                <li>
+                    <a href="#after-contest">大会後の処理</a>
+                    <ul>
+                        <li><a href="#import-scores">大会成績をインポートする</a></li>
+                        <li><a href="#export-registrations">出場登録データをCSVで出力する</a></li>
+                    </ul>
+                </li>
+                <li>
+                    <a href="#ticket-management">チケット管理</a>
+                    <ul>
+                        <li><a href="#import-tickets">Shopifyからチケットをインポートする</a></li>
+                        <li><a href="#assign-seats">指定席を割り当てる（指定席CSV）</a></li>
+                        <li><a href="#export-tickets">商品名別にCSVを出力する</a></li>
+                    </ul>
+                </li>
+                <li>
+                    <a href="#shopify-search">Shopifyデータの検索</a>
+                    <ul>
+                        <li><a href="#search-members">FWJ会員を検索する</a></li>
+                        <li><a href="#search-orders">注文をタグで検索する</a></li>
+                    </ul>
+                </li>
+                <li>
+                    <a href="#user-management">ユーザー管理</a>
+                    <ul>
+                        <li><a href="#add-user">新しいユーザーを追加する</a></li>
+                        <li><a href="#change-password">パスワードを変更する</a></li>
+                    </ul>
+                </li>
+                <li>
+                    <a href="#data-management">データの削除と復元</a>
+                    <ul>
+                        <li><a href="#soft-delete">データを削除する（論理削除）</a></li>
+                        <li><a href="#restore-data">削除したデータを復元する</a></li>
+                        <li><a href="#hard-delete">データを完全に削除する</a></li>
+                    </ul>
+                </li>
+            </ol>
+        </div>
+
+        <!-- 1. 大会の準備をする -->
+        <div class="manual-section" id="contest-prep">
+            <h2>1. 大会の準備をする</h2>
+
+            <h3 id="register-contest">大会基本情報を登録するには</h3>
+            <ol>
+                <li>ナビゲーションバーの「大会運営」→「大会基本情報」をクリック</li>
+                <li>「新規追加」ボタンをクリック</li>
+                <li>以下の情報を入力：
+                    <ul>
+                        <li><strong>大会名</strong>（必須）: 大会の正式名称</li>
+                        <li><strong>開催日</strong>: 大会の日付</li>
+                        <li><strong>開催地</strong>: 会場名・住所</li>
+                        <li><strong>公開設定（isReady）</strong>: FWJアプリに公開する場合はチェック</li>
+                        <li><strong>テスト大会（isTest）</strong>: テスト用データの場合はチェック</li>
+                    </ul>
+                </li>
+                <li>「保存」ボタンをクリック</li>
+            </ol>
+            <div class="note-box">
+                <strong>ポイント</strong>: 公開設定（isReady）を変更するとFWJアプリのキャッシュが自動的にクリアされます。
+            </div>
+
+            <h3 id="import-registrations">Shopifyから出場登録データを取り込むには</h3>
+            <ol>
+                <li>ナビゲーションバーの「大会運営」→「出場登録」をクリック</li>
+                <li>「Shopifyから最新データを取得」ボタンをクリック</li>
+                <li>インポートモーダルが表示されたら、以下を順番に実行：
+                    <ol type="a">
+                        <li>「最新のMembersをインポート」をクリック → 会員データをShopifyから同期</li>
+                        <li>「最新のエントリーをインポート」をクリック → 注文データをShopifyから取得</li>
+                        <li>「インポート実行」をクリック → 出場登録データを生成</li>
+                    </ol>
+                </li>
+                <li>インポート結果（件数、新規/更新など）を確認</li>
+            </ol>
+            <div class="note-box">
+                <strong>ポイント</strong>: 既存の選手番号（player_no）は引き継がれます。新規登録分にのみ新しい番号が発行されます。
+            </div>
+
+            <h3 id="set-contest-order">出場順を設定するには（開催順CSV）</h3>
+            <ol>
+                <li>ナビゲーションバーの「大会運営」→「出場登録」をクリック</li>
+                <li>「開催順CSVを適用」ボタンをクリック</li>
+                <li>対象の大会名をドロップダウンから選択</li>
+                <li>CSVファイルを選択
+                    <ul>
+                        <li>必須列: <code>class_name</code>, <code>score_card</code>, <code>contest_order</code></li>
+                    </ul>
+                </li>
+                <li>「インポート実行」をクリック</li>
+            </ol>
+        </div>
+
+        <!-- 2. 大会当日の運営 -->
+        <div class="manual-section" id="contest-day">
+            <h2>2. 大会当日の運営</h2>
+
+            <h3 id="add-notes">特記事項を記録するには（欠席・クラス変更など）</h3>
+            <ol>
+                <li>ナビゲーションバーの「大会運営」→「特記事項」をクリック</li>
+                <li>「新規追加」ボタンをクリック</li>
+                <li>以下の情報を入力：
+                    <ul>
+                        <li><strong>コンテスト名</strong>（必須）: ドロップダウンから選択</li>
+                        <li><strong>ゼッケン番号</strong> または <strong>FWJカード番号</strong></li>
+                        <li><strong>氏名</strong>（必須）</li>
+                        <li><strong>登録内容</strong>: 「欠席」「クラス変更」「チェックイン時刻変更」「当日クラス追加」「FWJカード現地支払」「帰宅」「その他」から選択</li>
+                        <li><strong>詳細メモ</strong>: 具体的な内容を記載</li>
+                    </ul>
+                </li>
+                <li>選手情報を自動入力したい場合は「出場登録データから検索して自動入力」をクリック</li>
+                <li>「保存」ボタンをクリック</li>
+            </ol>
+
+            <h3 id="checkin-ticket">チケットのチェックインを行うには</h3>
+            <ol>
+                <li>チェックイン専用ページ（<code>ticket-checkin.fwj.jp</code>）にアクセス</li>
+                <li>チェックインコード（XXXX-XXXX-XXXX形式）を入力
+                    <ul>
+                        <li>入力は自動的に大文字化・フォーマットされます</li>
+                    </ul>
+                </li>
+                <li>チケット情報が表示されるので内容を確認：
+                    <ul>
+                        <li>注文番号、商品名、座席情報</li>
+                        <li>ステータス: 「使用可能」（緑）または「使用済み」（赤）</li>
+                    </ul>
+                </li>
+                <li>「使用可能」の場合、「チェックイン実行」ボタンをクリック</li>
+                <li>チェック結果（成功/エラー）を確認</li>
+                <li>次のチケットを処理する場合は「リセット」をクリック</li>
+            </ol>
+
+            <h3 id="manage-guests">関係者チケットを管理するには</h3>
+            <ol>
+                <li>ナビゲーションバーの「入場管理」→「関係者チケット」をクリック</li>
+                <li>「新規追加」ボタンをクリック</li>
+                <li>以下の情報を入力：
+                    <ul>
+                        <li><strong>大会名</strong>: ドロップダウンから選択（開催日は自動入力）</li>
+                        <li><strong>チケット種別</strong>: 関係者席、前売VVIP席 などから選択</li>
+                        <li><strong>団体/個人</strong>: 選択</li>
+                        <li><strong>付与パス</strong>: 関係者パス、撮影者パス などから選択</li>
+                        <li><strong>代表者氏名</strong>（必須）</li>
+                        <li><strong>団体名</strong>: 企業名・団体名</li>
+                        <li><strong>申請種別</strong>: メディア、出展者、招待、その他</li>
+                        <li><strong>合計付与枚数</strong></li>
+                        <li><strong>備考欄</strong>: 同伴者氏名など</li>
+                    </ul>
+                </li>
+                <li>「保存」ボタンをクリック</li>
+            </ol>
+            <p>当日のチェックインは、一覧テーブルの「Check-In」チェックボックスで管理できます。</p>
+        </div>
+
+        <!-- 3. 大会後の処理 -->
+        <div class="manual-section" id="after-contest">
+            <h2>3. 大会後の処理</h2>
+
+            <h3 id="import-scores">大会成績をインポートするには</h3>
+            <ol>
+                <li>ナビゲーションバーの「大会運営」→「大会成績」をクリック</li>
+                <li>「インポート」ボタンをクリック</li>
+                <li>対象の大会をドロップダウンから選択</li>
+                <li>CSVファイルを選択（NPC Worldwide Results形式）</li>
+                <li>「CSVをインポート」ボタンをクリック</li>
+                <li>インポート結果を確認
+                    <ul>
+                        <li>フォールバック件数の警告が表示された場合は、該当選手の情報を確認してください</li>
+                    </ul>
+                </li>
+            </ol>
+            <div class="note-box">
+                <strong>ポイント</strong>: インポート時に選手番号（player_no）とカテゴリーで出場登録データを自動的にルックアップします。完全一致しない場合は他クラスでフォールバック検索します。
+            </div>
+
+            <h3 id="export-registrations">出場登録データをCSVで出力するには</h3>
+            <ol>
+                <li>ナビゲーションバーの「大会運営」→「出場登録」をクリック</li>
+                <li>「CSV出力」ボタンをクリック</li>
+                <li>対象の大会をドロップダウンから選択</li>
+                <li>リストの種類を選択：
+                    <ul>
+                        <li><strong>選手番号（ゼッケン表示用）</strong>: 出場順のリスト</li>
+                        <li><strong>全項目</strong>: すべてのフィールドを含むCSV</li>
+                    </ul>
+                </li>
+                <li>CSVファイルが自動的にダウンロードされます</li>
+            </ol>
+        </div>
+
+        <!-- 4. チケット管理 -->
+        <div class="manual-section" id="ticket-management">
+            <h2>4. チケット管理</h2>
+
+            <h3 id="import-tickets">Shopifyからチケットをインポートするには</h3>
+            <ol>
+                <li>ナビゲーションバーの「入場管理」→「チケット管理」をクリック</li>
+                <li>「Shopifyから最新データを取得」ボタンをクリック</li>
+                <li>インポートモーダルで以下を設定：
+                    <ul>
+                        <li><strong>タグ</strong>: 検索タグ（デフォルト：「観戦チケット」）</li>
+                        <li><strong>取得期間</strong>: 何ヶ月前からの注文を取得するか（デフォルト：6ヶ月）</li>
+                    </ul>
+                </li>
+                <li>「インポート実行」ボタンをクリック</li>
+                <li>インポート結果（新規/更新件数）を確認</li>
+            </ol>
+            <div class="note-box">
+                <strong>ポイント</strong>: 既に使用済み（チェックイン済み）のチケットはインポート時に保護され、上書きされません。
+            </div>
+
+            <h3 id="assign-seats">指定席を割り当てるには（指定席CSV）</h3>
+            <ol>
+                <li>ナビゲーションバーの「入場管理」→「チケット管理」をクリック</li>
+                <li>「指定席CSVを適用」ボタンをクリック</li>
+                <li>CSVファイルを選択
+                    <ul>
+                        <li>必須列: <code>id</code>, <code>reserved_seat</code></li>
+                    </ul>
+                </li>
+                <li>指定席番号が一括更新されます</li>
+            </ol>
+
+            <h3 id="export-tickets">商品名別にCSVを出力するには</h3>
+            <ol>
+                <li>ナビゲーションバーの「入場管理」→「チケット管理」をクリック</li>
+                <li>「CSV出力」ボタンをクリック</li>
+                <li>出力対象の商品名をドロップダウンから選択</li>
+                <li>CSVファイルが自動的にダウンロードされます</li>
+            </ol>
+        </div>
+
+        <!-- 5. Shopifyデータの検索 -->
+        <div class="manual-section" id="shopify-search">
+            <h2>5. Shopifyデータの検索</h2>
+
+            <h3 id="search-members">FWJ会員を検索するには</h3>
+            <ol>
+                <li>ナビゲーションバーの「Shopify検索」→「FWJ会員検索」をクリック</li>
+                <li>検索ボックスに以下のいずれかを入力：
+                    <ul>
+                        <li>メールアドレス</li>
+                        <li>氏名（日本語・英語）</li>
+                        <li>Shopify ID</li>
+                        <li>FWJカード番号</li>
+                    </ul>
+                </li>
+                <li>検索結果から該当する会員を確認</li>
+            </ol>
+            <div class="note-box">
+                <strong>ポイント</strong>: 会員データを最新にするには、「Shopifyから同期」ボタンをクリックしてください（管理者のみ）。「FWJカード会員」タグが付いている会員のみ同期されます。
+            </div>
+
+            <h3 id="search-orders">注文をタグで検索するには</h3>
+            <ol>
+                <li>ナビゲーションバーの「Shopify検索」→「注文検索」をクリック</li>
+                <li>「注文タグ」欄に検索したいタグを入力
+                    <ul>
+                        <li>複数タグはスペース区切りでAND検索</li>
+                        <li>スペースを含むタグは引用符で囲む（例: <code>"タグ名 スペース付き"</code>）</li>
+                    </ul>
+                </li>
+                <li>必要に応じて「支払済の注文のみ検索する」にチェック</li>
+                <li>「検索」ボタンをクリック</li>
+                <li>検索結果が表示されます（商品名、支払いステータスなどでフィルタ可能）</li>
+            </ol>
+        </div>
+
+        <!-- 6. ユーザー管理 -->
+        <div class="manual-section" id="user-management">
+            <h2>6. ユーザー管理</h2>
+
+            <h3 id="add-user">新しいユーザーを追加するには<span class="feature-badge admin-badge">管理者のみ</span></h3>
+            <ol>
+                <li>ナビゲーションバーの「ユーザー」をクリック</li>
+                <li>「新規ユーザー追加」ボタンをクリック</li>
+                <li>以下の情報を入力：
+                    <ul>
+                        <li><strong>ユーザー名</strong></li>
+                        <li><strong>メールアドレス</strong>（一意である必要があります）</li>
+                        <li><strong>パスワード</strong></li>
+                        <li><strong>権限</strong>: admin（管理者）/ user（一般ユーザー）/ guest（ゲスト）から選択</li>
+                    </ul>
+                </li>
+                <li>「追加」ボタンをクリック</li>
+            </ol>
+            <div class="note-box">
+                <strong>ポイント</strong>: 削除済みユーザーと同じメールアドレスで追加すると、自動的に既存のユーザーが復元されます。
+            </div>
+
+            <h3 id="change-password">パスワードを変更するには</h3>
+            <ol>
+                <li>ナビゲーションバーの「ユーザー」をクリック</li>
+                <li>対象ユーザーの「編集」ボタンをクリック</li>
+                <li>新しいパスワードを入力</li>
+                <li>「更新」ボタンをクリック</li>
+            </ol>
+            <div class="note-box">
+                <strong>注意</strong>: ゲストユーザーはパスワード変更ができません。
+            </div>
+        </div>
+
+        <!-- 7. データの削除と復元 -->
+        <div class="manual-section" id="data-management">
+            <h2>7. データの削除と復元</h2>
+
+            <h3 id="soft-delete">データを削除するには（論理削除）</h3>
+            <ol>
+                <li>削除したいレコードの「削除」ボタンをクリック</li>
+                <li>確認ダイアログで「OK」をクリック</li>
+                <li>データは論理削除され、通常の一覧には表示されなくなります</li>
+            </ol>
+            <div class="note-box">
+                <strong>ポイント</strong>: 論理削除されたデータはデータベースに残っているため、いつでも復元できます。
+            </div>
+
+            <h3 id="restore-data">削除したデータを復元するには</h3>
+            <ol>
+                <li>「削除済みを表示」ボタンをクリックして削除済みデータを表示</li>
+                <li>復元したいレコードの「復元」ボタンをクリック</li>
+                <li>データが復元され、通常の一覧に再表示されます</li>
+            </ol>
+
+            <h3 id="hard-delete">データを完全に削除するには<span class="feature-badge admin-badge">管理者のみ</span></h3>
+            <ol>
+                <li>「削除済みを表示」ボタンをクリックして削除済みデータを表示</li>
+                <li>完全に削除したいレコードの「完全削除」ボタンをクリック</li>
+                <li>確認ダイアログで「OK」をクリック</li>
+            </ol>
+            <div class="note-box">
+                <strong>注意</strong>: 完全削除を実行すると、データはデータベースから物理的に削除され、復元できなくなります。
+            </div>
+        </div>
+
+        <hr>
+
+        <div style="text-align: center; margin: 40px 0; color: #666;">
+            <p><strong>Document Version</strong>: 1.0</p>
+            <p><strong>Last Updated</strong>: 2026年2月9日</p>
+            <p style="margin-top: 20px;">各機能の詳細仕様は<a href="/manual.html" target="_blank" style="color: #4CAF50;">機能一覧マニュアル</a>を参照してください。</p>
+        </div>
+    </div>
+
+    <a href="#toc" class="back-to-top">&#8593; トップへ</a>
+</body>
+</html>

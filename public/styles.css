@@ -501,19 +501,23 @@ button:active {
     gap: 10px;
 }
 
-.manual-link {
+.manual-dropdown .dropdown-toggle {
     padding: 8px 16px;
     background: #3498db;
     color: white;
-    text-decoration: none;
     border-radius: 4px;
     font-size: 14px;
-    display: inline-block;
+    font-weight: 500;
     transition: background 0.3s;
 }
 
-.manual-link:hover {
+.manual-dropdown .dropdown-toggle:hover {
     background: #2980b9;
+}
+
+.manual-dropdown .dropdown-menu {
+    right: 0;
+    left: auto;
 }
 
 .logout-btn {

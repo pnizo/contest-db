@@ -27,7 +27,13 @@ const NAV_CONFIG = {
             ]
         }
     ],
-    manualLink: { href: '/manual.html', label: 'マニュアル' }
+    manualDropdown: {
+        label: 'マニュアル',
+        items: [
+            { href: '/howto.html', label: '使い方' },
+            { href: '/manual.html', label: '機能一覧' }
+        ]
+    }
 };
 
 /**
@@ -82,8 +88,18 @@ function renderNavigation() {
 
     navHtml += '</nav>';
 
-    // マニュアルリンク
-    navHtml += `<a href="${NAV_CONFIG.manualLink.href}" target="_blank" class="manual-link">${NAV_CONFIG.manualLink.label}</a>`;
+    // マニュアルドロップダウン
+    const md = NAV_CONFIG.manualDropdown;
+    navHtml += `
+        <div class="nav-dropdown manual-dropdown">
+            <button class="dropdown-toggle">${md.label} <span class="dropdown-arrow">▼</span></button>
+            <div class="dropdown-menu">`;
+    md.items.forEach(item => {
+        navHtml += `<a href="${item.href}" target="_blank" class="dropdown-item">${item.label}</a>`;
+    });
+    navHtml += `
+            </div>
+        </div>`;
 
     // ログアウトボタン
     navHtml += '<button id="logoutBtn" class="logout-btn">ログアウト</button>';

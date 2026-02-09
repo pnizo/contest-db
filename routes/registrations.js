@@ -459,6 +459,8 @@ router.get('/export/athlete_numbers/:contestName', requireAuth, async (req, res)
           'Athlete #': reg.player_no,
           'First Name': reg.first_name || '',
           'Last Name': reg.last_name || '',
+          'email': reg.email || '',
+          'shopify_id': reg.fwj_card_no || '',
           'Age': reg.age || '',
           'Height': reg.height || '',
           'Weight': reg.weight || ''
@@ -733,8 +735,8 @@ router.post('/import-shopify', requireAdmin, async (req, res) => {
           ? `${member.fwj_lastname || ''} ${member.fwj_firstname || ''}`.trim()
           : (order.full_name || ''),
         name_ja_kana: member ? `${member.fwj_kanalastname || ''} ${member.fwj_kanafirstname || ''}`.trim() : '',
-        first_name: member ? (member.first_name || '') : '',
-        last_name: member ? (member.last_name || '') : '',
+        first_name: member ? (member.fwj_firstname || '') : '',
+        last_name: member ? (member.fwj_lastname || '') : '',
         phone: member ? (member.phone || '') : '',
         height: member ? (member.fwj_height || '') : '',
         weight: member ? (member.fwj_weight || '') : '',
@@ -953,14 +955,22 @@ router.post('/import-csv', requireAdmin, async (req, res) => {
 
     console.log(`Starting CSV import: ${csvData.length} rows, fields: ${fields.join(', ')}`);
 
-    // バッチ更新用の配列を構築
+    // バッチ更新用・新規挿入用の配列を構築
     const updates = [];
+    const inserts = [];
     let skipped = 0;
 
     for (const row of csvData) {
       const id = row.id;
+
+      // id空白 → 新規INSERTとして収集
       if (!id) {
-        skipped++;
+        // contest_date, contest_name が行に含まれているか確認
+        if (!row.contest_date || !row.contest_name) {
+          skipped++;
+          continue;
+        }
+        inserts.push(row);
         continue;
       }
 
@@ -991,14 +1001,43 @@ router.post('/import-csv', requireAdmin, async (req, res) => {
       }
     }
 
+    // 新規レコードINSERT実行
+    let inserted = 0;
+    if (inserts.length > 0) {
+      // contest_date/contest_name でグループ化してbatchImport
+      const groupedByContest = {};
+      for (const row of inserts) {
+        const key = `${row.contest_date}||${row.contest_name}`;
+        if (!groupedByContest[key]) {
+          groupedByContest[key] = { contestDate: row.contest_date, contestName: row.contest_name, rows: [] };
+        }
+        groupedByContest[key].rows.push(row);
+      }
+
+      for (const group of Object.values(groupedByContest)) {
+        const result = await registrationModel.batchImport(group.rows, group.contestDate, group.contestName);
+        if (result.success) {
+          inserted += result.data.imported;
+        } else {
+          return res.status(500).json({ success: false, error: result.error });
+        }
+      }
+    }
+
+    const messageParts = [];
+    if (updated > 0) messageParts.push(`${updated}件を更新`);
+    if (inserted > 0) messageParts.push(`${inserted}件を新規追加`);
+    if (skipped > 0) messageParts.push(`${skipped}件スキップ`);
+
     res.json({
       success: true,
       data: {
         totalRows: csvData.length,
         updated,
+        inserted,
         skipped,
         fields: fields,
-        message: `${updated}件を更新しました（${skipped}件スキップ）`
+        message: messageParts.join('、') + 'しました'
       }
     });
 
