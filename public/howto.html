@@ -149,64 +149,62 @@
             <h2>目次</h2>
             <ol>
                 <li>
+                    <a href="#register-contest-info">コンテスト情報(Contestsテーブル)に年間の大会基本情報を入力しておく</a>
+                    <ul>
+                        <li><a href="#register-contest">大会基本情報を登録するには</a></li>
+                    </ul>
+                </li>
+                <li>
                     <a href="#contest-prep">大会の準備をする</a>
                     <ul>
-                        <li><a href="#register-contest">大会基本情報を登録する</a></li>
                         <li><a href="#import-registrations">Shopifyから出場登録データを取り込む</a></li>
-                        <li><a href="#set-contest-order">出場順を設定する（開催順CSV）</a></li>
+                        <li><a href="#set-contest-order">開催順CSVをインポートして出場順を設定する</a></li>
+                        <li><a href="#export-registrations">出場登録データをCSVで出力するには</a></li>
+                        <li><a href="#import-all-csv">全項目CSVデータをインポートするには</a></li>
                     </ul>
                 </li>
                 <li>
                     <a href="#contest-day">大会当日の運営</a>
                     <ul>
-                        <li><a href="#add-notes">特記事項を記録する（欠席・クラス変更など）</a></li>
-                        <li><a href="#checkin-ticket">チケットのチェックインを行う</a></li>
-                        <li><a href="#manage-guests">関係者チケットを管理する</a></li>
+                        <li><a href="#add-notes">特記事項を記録するには（欠席・クラス変更など）</a></li>
+                        <li><a href="#checkin-ticket">チケットのチェックインを行うには</a></li>
+                        <li><a href="#manage-guests">関係者チケットを管理するには</a></li>
                     </ul>
                 </li>
                 <li>
                     <a href="#after-contest">大会後の処理</a>
                     <ul>
-                        <li><a href="#import-scores">大会成績をインポートする</a></li>
-                        <li><a href="#export-registrations">出場登録データをCSVで出力する</a></li>
+                        <li><a href="#import-scores">大会成績をインポートするには</a></li>
                     </ul>
                 </li>
                 <li>
                     <a href="#ticket-management">チケット管理</a>
                     <ul>
-                        <li><a href="#import-tickets">Shopifyからチケットをインポートする</a></li>
-                        <li><a href="#assign-seats">指定席を割り当てる（指定席CSV）</a></li>
-                        <li><a href="#export-tickets">商品名別にCSVを出力する</a></li>
+                        <li><a href="#import-tickets">Shopifyからチケットをインポートするには</a></li>
+                        <li><a href="#assign-seats">指定席を割り当てるには（指定席CSV）</a></li>
+                        <li><a href="#export-tickets">商品名別にCSVを出力するには</a></li>
                     </ul>
                 </li>
                 <li>
                     <a href="#shopify-search">Shopifyデータの検索</a>
                     <ul>
-                        <li><a href="#search-members">FWJ会員を検索する</a></li>
-                        <li><a href="#search-orders">注文をタグで検索する</a></li>
+                        <li><a href="#search-members">FWJ会員を検索するには</a></li>
+                        <li><a href="#search-orders">注文をタグで検索するには</a></li>
                     </ul>
                 </li>
                 <li>
                     <a href="#user-management">ユーザー管理</a>
                     <ul>
-                        <li><a href="#add-user">新しいユーザーを追加する</a></li>
-                        <li><a href="#change-password">パスワードを変更する</a></li>
-                    </ul>
-                </li>
-                <li>
-                    <a href="#data-management">データの削除と復元</a>
-                    <ul>
-                        <li><a href="#soft-delete">データを削除する（論理削除）</a></li>
-                        <li><a href="#restore-data">削除したデータを復元する</a></li>
-                        <li><a href="#hard-delete">データを完全に削除する</a></li>
+                        <li><a href="#add-user">新しいユーザーを追加するには</a></li>
+                        <li><a href="#change-password">パスワードを変更するには</a></li>
                     </ul>
                 </li>
             </ol>
         </div>
 
-        <!-- 1. 大会の準備をする -->
-        <div class="manual-section" id="contest-prep">
-            <h2>1. 大会の準備をする</h2>
+        <!-- 1. コンテスト情報 -->
+        <div class="manual-section" id="register-contest-info">
+            <h2>1. コンテスト情報(Contestsテーブル)に年間の大会基本情報を入力しておく</h2>
 
             <h3 id="register-contest">大会基本情報を登録するには</h3>
             <ol>
@@ -216,9 +214,9 @@
                     <ul>
                         <li><strong>大会名</strong>（必須）: 大会の正式名称</li>
                         <li><strong>開催日</strong>: 大会の日付</li>
-                        <li><strong>開催地</strong>: 会場名・住所</li>
-                        <li><strong>公開設定（isReady）</strong>: FWJアプリに公開する場合はチェック</li>
-                        <li><strong>テスト大会（isTest）</strong>: テスト用データの場合はチェック</li>
+                        <li><strong>開催地</strong>: 会場名・住所（現在使われていないので未入力でも可）</li>
+                        <li><strong>公開設定（isReady）</strong>: 出場登録の情報が確定したらチェックする。チェックすると、ゼッケン番号がFWJアプリの「出場登録」画面に表示されるようになる。</li>
+                        <li><strong>テスト大会（isTest）</strong>: テスト用データの場合はチェック。チェックすると一般ユーザーのアプリ画面には大会情報が表示されなくなる。</li>
                     </ul>
                 </li>
                 <li>「保存」ボタンをクリック</li>
@@ -226,16 +224,29 @@
             <div class="note-box">
                 <strong>ポイント</strong>: 公開設定（isReady）を変更するとFWJアプリのキャッシュが自動的にクリアされます。
             </div>
+        </div>
 
-            <h3 id="import-registrations">Shopifyから出場登録データを取り込むには</h3>
+        <!-- 2. 大会の準備をする -->
+        <div class="manual-section" id="contest-prep">
+            <h2>2. 大会の準備をする</h2>
+
+            <ol>
+                <li>Shopifyからエントリーデータを同期する</li>
+                <li>開催順CSVを読み込んで開催順 / スコアカード番号をセットする</li>
+                <li>必要に応じて、全項目CSVのエクスポート→インポートで登録情報の修正と追加を行う</li>
+                <li>登録情報が完成したら、全項目CSVをエクスポートして、Registrations作成シートに読み込ませる</li>
+                <li>ゼッケン番号用CSVをエクスポートして、FWJ HPのゼッケン番号ページに読み込ませる</li>
+            </ol>
+
+            <h3 id="import-registrations">Shopifyから出場登録データを取り込む</h3>
+            <p>基本的にはエントリー受付終了後に行うこと</p>
             <ol>
                 <li>ナビゲーションバーの「大会運営」→「出場登録」をクリック</li>
                 <li>「Shopifyから最新データを取得」ボタンをクリック</li>
                 <li>インポートモーダルが表示されたら、以下を順番に実行：
                     <ol type="a">
-                        <li>「最新のMembersをインポート」をクリック → 会員データをShopifyから同期</li>
-                        <li>「最新のエントリーをインポート」をクリック → 注文データをShopifyから取得</li>
-                        <li>「インポート実行」をクリック → 出場登録データを生成</li>
+                        <li>コンテストを選択する</li>
+                        <li>「インポート実行」をクリック → 出場登録データ(Registrations)のひな型を生成する</li>
                     </ol>
                 </li>
                 <li>インポート結果（件数、新規/更新など）を確認</li>
@@ -244,7 +255,7 @@
                 <strong>ポイント</strong>: 既存の選手番号（player_no）は引き継がれます。新規登録分にのみ新しい番号が発行されます。
             </div>
 
-            <h3 id="set-contest-order">出場順を設定するには（開催順CSV）</h3>
+            <h3 id="set-contest-order">開催順CSVをインポートして出場順を設定する</h3>
             <ol>
                 <li>ナビゲーションバーの「大会運営」→「出場登録」をクリック</li>
                 <li>「開催順CSVを適用」ボタンをクリック</li>
@@ -256,11 +267,34 @@
                 </li>
                 <li>「インポート実行」をクリック</li>
             </ol>
+
+            <h3 id="export-registrations">出場登録データをCSVで出力するには</h3>
+            <ol>
+                <li>ナビゲーションバーの「大会運営」→「出場登録」をクリック</li>
+                <li>「CSV出力」ボタンをクリック</li>
+                <li>対象の大会をドロップダウンから選択</li>
+                <li>リストの種類を選択：
+                    <ul>
+                        <li><strong>選手番号（ゼッケン表示用）</strong>: 出場順のリスト</li>
+                        <li><strong>全項目</strong>: すべてのフィールドを含むCSV</li>
+                    </ul>
+                </li>
+                <li>CSVファイルが自動的にダウンロードされます</li>
+            </ol>
+
+            <h3 id="import-all-csv">全項目CSVデータをインポートするには</h3>
+            <ol>
+                <li>ナビゲーションバーの「大会運営」→「出場登録」をクリック</li>
+                <li>「全項目CSVを適用」ボタンをクリック</li>
+                <li>CSVファイルを指定する</li>
+                <li>インポートする項目をチェックする</li>
+                <li>「インポート実行」ボタンをクリック</li>
+            </ol>
         </div>
 
-        <!-- 2. 大会当日の運営 -->
+        <!-- 3. 大会当日の運営 -->
         <div class="manual-section" id="contest-day">
-            <h2>2. 大会当日の運営</h2>
+            <h2>3. 大会当日の運営</h2>
 
             <h3 id="add-notes">特記事項を記録するには（欠席・クラス変更など）</h3>
             <ol>
@@ -281,7 +315,7 @@
 
             <h3 id="checkin-ticket">チケットのチェックインを行うには</h3>
             <ol>
-                <li>チェックイン専用ページ（<code>ticket-checkin.fwj.jp</code>）にアクセス</li>
+                <li>チェックイン専用ページ（<code>https://ticket-checkin.fwj.jp/checkin</code>）にアクセス</li>
                 <li>チェックインコード（XXXX-XXXX-XXXX形式）を入力
                     <ul>
                         <li>入力は自動的に大文字化・フォーマットされます</li>
@@ -320,9 +354,9 @@
             <p>当日のチェックインは、一覧テーブルの「Check-In」チェックボックスで管理できます。</p>
         </div>
 
-        <!-- 3. 大会後の処理 -->
+        <!-- 4. 大会後の処理 -->
         <div class="manual-section" id="after-contest">
-            <h2>3. 大会後の処理</h2>
+            <h2>4. 大会後の処理</h2>
 
             <h3 id="import-scores">大会成績をインポートするには</h3>
             <ol>
@@ -340,25 +374,11 @@
             <div class="note-box">
                 <strong>ポイント</strong>: インポート時に選手番号（player_no）とカテゴリーで出場登録データを自動的にルックアップします。完全一致しない場合は他クラスでフォールバック検索します。
             </div>
-
-            <h3 id="export-registrations">出場登録データをCSVで出力するには</h3>
-            <ol>
-                <li>ナビゲーションバーの「大会運営」→「出場登録」をクリック</li>
-                <li>「CSV出力」ボタンをクリック</li>
-                <li>対象の大会をドロップダウンから選択</li>
-                <li>リストの種類を選択：
-                    <ul>
-                        <li><strong>選手番号（ゼッケン表示用）</strong>: 出場順のリスト</li>
-                        <li><strong>全項目</strong>: すべてのフィールドを含むCSV</li>
-                    </ul>
-                </li>
-                <li>CSVファイルが自動的にダウンロードされます</li>
-            </ol>
         </div>
 
-        <!-- 4. チケット管理 -->
+        <!-- 5. チケット管理 -->
         <div class="manual-section" id="ticket-management">
-            <h2>4. チケット管理</h2>
+            <h2>5. チケット管理</h2>
 
             <h3 id="import-tickets">Shopifyからチケットをインポートするには</h3>
             <ol>
@@ -438,6 +458,8 @@
         <div class="manual-section" id="user-management">
             <h2>6. ユーザー管理</h2>
 
+            <p>コンテストDBを使用するユーザーの追加、編集、削除ができます。</p>
+
             <h3 id="add-user">新しいユーザーを追加するには<span class="feature-badge admin-badge">管理者のみ</span></h3>
             <ol>
                 <li>ナビゲーションバーの「ユーザー」をクリック</li>
@@ -468,43 +490,11 @@
             </div>
         </div>
 
-        <!-- 7. データの削除と復元 -->
-        <div class="manual-section" id="data-management">
-            <h2>7. データの削除と復元</h2>
-
-            <h3 id="soft-delete">データを削除するには（論理削除）</h3>
-            <ol>
-                <li>削除したいレコードの「削除」ボタンをクリック</li>
-                <li>確認ダイアログで「OK」をクリック</li>
-                <li>データは論理削除され、通常の一覧には表示されなくなります</li>
-            </ol>
-            <div class="note-box">
-                <strong>ポイント</strong>: 論理削除されたデータはデータベースに残っているため、いつでも復元できます。
-            </div>
-
-            <h3 id="restore-data">削除したデータを復元するには</h3>
-            <ol>
-                <li>「削除済みを表示」ボタンをクリックして削除済みデータを表示</li>
-                <li>復元したいレコードの「復元」ボタンをクリック</li>
-                <li>データが復元され、通常の一覧に再表示されます</li>
-            </ol>
-
-            <h3 id="hard-delete">データを完全に削除するには<span class="feature-badge admin-badge">管理者のみ</span></h3>
-            <ol>
-                <li>「削除済みを表示」ボタンをクリックして削除済みデータを表示</li>
-                <li>完全に削除したいレコードの「完全削除」ボタンをクリック</li>
-                <li>確認ダイアログで「OK」をクリック</li>
-            </ol>
-            <div class="note-box">
-                <strong>注意</strong>: 完全削除を実行すると、データはデータベースから物理的に削除され、復元できなくなります。
-            </div>
-        </div>
-
         <hr>
 
         <div style="text-align: center; margin: 40px 0; color: #666;">
             <p><strong>Document Version</strong>: 1.0</p>
-            <p><strong>Last Updated</strong>: 2026年2月9日</p>
+            <p><strong>Last Updated</strong>: 2026年2月10日</p>
             <p style="margin-top: 20px;">各機能の詳細仕様は<a href="/manual.html" target="_blank" style="color: #4CAF50;">機能一覧マニュアル</a>を参照してください。</p>
         </div>
     </div>
