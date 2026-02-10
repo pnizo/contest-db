@@ -41,40 +41,101 @@ router.get('/export/:productName', async (req, res) => {
   }
 });
 
-// POST /import-reserved-seats - 指定席CSVインポート（管理者のみ）
-router.post('/import-reserved-seats', requireAdmin, async (req, res) => {
+// POST /import-csv - CSVインポート（管理者のみ）
+const ALLOWED_IMPORT_FIELDS = [
+  'reserved_seat',
+  'is_usable',
+  'full_name',
+  'email',
+  'product_name',
+  'variant',
+  'price',
+  'financial_status',
+  'fulfillment_status',
+  'owner_shopify_id',
+  'tag1', 'tag2', 'tag3', 'tag4', 'tag5',
+  'tag6', 'tag7', 'tag8', 'tag9', 'tag10',
+];
+
+router.post('/import-csv', requireAdmin, async (req, res) => {
   try {
-    const { csvData } = req.body;
+    const { csvData, fields } = req.body;
 
     if (!csvData || !Array.isArray(csvData)) {
-      return res.status(400).json({
-        success: false,
-        error: 'CSVデータが不正です'
-      });
+      return res.status(400).json({ success: false, error: 'CSVデータが不正です' });
+    }
+    if (!fields || !Array.isArray(fields) || fields.length === 0) {
+      return res.status(400).json({ success: false, error: 'インポートする項目を選択してください' });
     }
 
-    // 必須フィールドのチェック
-    const validData = csvData.filter(row => row.id && row.hasOwnProperty('reserved_seat'));
-
-    if (validData.length === 0) {
-      return res.status(400).json({
-        success: false,
-        error: 'id と reserved_seat 列が必要です'
-      });
+    // ホワイトリストチェック
+    const validFields = fields.filter(f => ALLOWED_IMPORT_FIELDS.includes(f));
+    if (validFields.length === 0) {
+      return res.status(400).json({ success: false, error: '許可されていない項目が指定されています' });
     }
 
-    const result = await ticketModel.bulkUpdateReservedSeats(validData);
+    console.log(`[import-csv] Received: ${csvData.length} rows, fields: [${validFields.join(', ')}]`);
+
+    // 行を分類
+    const updates = [];
+    const inserts = [];
+
+    for (const row of csvData) {
+      const id = row.id ? parseInt(row.id, 10) : NaN;
+      if (!row.id || row.id.toString().trim() === '' || isNaN(id)) {
+        // id空白 → 新規INSERT
+        inserts.push(row);
+      } else {
+        // id あり → 選択フィールドのみ抽出してUPDATE
+        const data = {};
+        for (const field of validFields) {
+          if (row.hasOwnProperty(field)) {
+            data[field] = row[field];
+          }
+        }
+        if (Object.keys(data).length > 0) {
+          updates.push({ id, data });
+        }
+      }
+    }
+
+    console.log(`[import-csv] Classification: updates=${updates.length}, inserts=${inserts.length}`);
+
+    let updated = 0;
+    let inserted = 0;
+    let skipped = 0;
+
+    // バッチUPDATE
+    if (updates.length > 0) {
+      const updateResult = await ticketModel.batchUpdate(updates);
+      if (!updateResult.success) {
+        return res.status(500).json({ success: false, error: updateResult.error });
+      }
+      updated = updateResult.updated;
+    }
+
+    // バッチINSERT
+    if (inserts.length > 0) {
+      const insertResult = await ticketModel.batchInsertFromCsv(inserts);
+      if (!insertResult.success) {
+        return res.status(500).json({ success: false, error: insertResult.error });
+      }
+      inserted = insertResult.inserted;
+      skipped = insertResult.skipped;
+    }
+
+    const messages = [];
+    if (updated > 0) messages.push(`${updated}件を更新`);
+    if (inserted > 0) messages.push(`${inserted}件を新規追加`);
+    if (skipped > 0) messages.push(`${skipped}件をスキップ`);
+    const message = messages.length > 0 ? messages.join('、') + 'しました' : '対象データがありませんでした';
 
     res.json({
       success: true,
-      data: {
-        total: result.total,
-        updated: result.updated,
-        message: `${result.updated}件の指定席を更新しました`
-      }
+      data: { updated, inserted, skipped, message }
     });
   } catch (error) {
-    console.error('Import reserved seats error:', error);
+    console.error('Import CSV error:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });

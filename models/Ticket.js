@@ -58,10 +58,19 @@ class Ticket {
       is_usable: row.isUsable ? 'TRUE' : 'FALSE',
       owner_shopify_id: row.ownerShopifyId,
       reserved_seat: row.reservedSeat,
+      tag1: row.tag1 || '',
+      tag2: row.tag2 || '',
+      tag3: row.tag3 || '',
+      tag4: row.tag4 || '',
+      tag5: row.tag5 || '',
+      tag6: row.tag6 || '',
+      tag7: row.tag7 || '',
+      tag8: row.tag8 || '',
+      tag9: row.tag9 || '',
+      tag10: row.tag10 || '',
       used_at: row.usedAt,
       created_at: row.createdAt,
       updated_at: row.updatedAt,
-      tags: this._tagsFromRow(row),
     };
   }
 
@@ -314,6 +323,8 @@ class Ticket {
       const db = getDb();
       const CHUNK_SIZE = 500;
 
+      console.log(`[importTickets] Start: ${ticketsData.length} rows from Shopify`);
+
       // Phase 1: 既存データを取得（キー: order_no|shopify_id|line_item_id|item_sub_no）
       const existingRows = await db.select().from(tickets);
       const existingMap = new Map();
@@ -321,6 +332,8 @@ class Ticket {
         const key = `${ticket.orderNo}|${ticket.shopifyId}|${ticket.lineItemId}|${ticket.itemSubNo}`;
         existingMap.set(key, ticket);
       });
+
+      console.log(`[importTickets] Existing rows in DB: ${existingRows.length}`);
 
       // Phase 2: INSERT/UPDATE を分類（メモリ内）
       const updateList = [];
@@ -335,8 +348,11 @@ class Ticket {
           updateList.push({ ticketData, existing });
         } else {
           insertList.push(ticketData);
+          console.log(`[importTickets] New: key=${key}, product=${baseData.product_name}`);
         }
       }
+
+      console.log(`[importTickets] Classification: update=${updateList.length}, insert=${insertList.length}`);
 
       // Phase 3: バッチ UPDATE（db.batch()）
       if (updateList.length > 0) {
@@ -358,6 +374,7 @@ class Ticket {
           const chunk = updateQueries.slice(i, i + CHUNK_SIZE);
           await db.batch(chunk);
         }
+        console.log(`[importTickets] Updated: ${updateList.length} rows`);
       }
 
       // Phase 4: バッチ INSERT（.values([...])）
@@ -390,8 +407,10 @@ class Ticket {
           const chunk = insertValues.slice(i, i + CHUNK_SIZE);
           await db.insert(tickets).values(chunk);
         }
+        console.log(`[importTickets] Inserted: ${insertValues.length} rows`);
       }
 
+      console.log(`[importTickets] Done: total=${ticketsData.length}, updated=${updateList.length}, inserted=${insertList.length}`);
       return { success: true, imported: ticketsData.length };
     } catch (error) {
       console.error('Error importing tickets:', error);
@@ -613,6 +632,146 @@ class Ticket {
     } catch (error) {
       console.error('Error in bulkUpdateReservedSeats:', error);
       throw error;
+    }
+  }
+
+  async batchUpdate(updates) {
+    const db = getDb();
+    const CHUNK_SIZE = 500;
+
+    const fieldMap = {
+      is_usable: 'isUsable',
+      owner_shopify_id: 'ownerShopifyId',
+      reserved_seat: 'reservedSeat',
+      financial_status: 'financialStatus',
+      fulfillment_status: 'fulfillmentStatus',
+      full_name: 'fullName',
+      product_name: 'productName',
+      email: 'email',
+      variant: 'variant',
+      price: 'price',
+      tag1: 'tag1', tag2: 'tag2', tag3: 'tag3', tag4: 'tag4', tag5: 'tag5',
+      tag6: 'tag6', tag7: 'tag7', tag8: 'tag8', tag9: 'tag9', tag10: 'tag10',
+    };
+
+    console.log(`[Ticket.batchUpdate] Start: ${updates.length} rows`);
+
+    try {
+      const updateQueries = updates.map(({ id, data }) => {
+        const updateData = { updatedAt: new Date() };
+        const mappedFields = [];
+        for (const [snakeKey, value] of Object.entries(data)) {
+          const camelKey = fieldMap[snakeKey];
+          if (camelKey) {
+            if (snakeKey === 'is_usable') {
+              updateData[camelKey] = value === 'TRUE' || value === true;
+            } else {
+              updateData[camelKey] = value;
+            }
+            mappedFields.push(snakeKey);
+          }
+        }
+        console.log(`[Ticket.batchUpdate] id=${id}, fields=[${mappedFields.join(', ')}]`);
+        return db.update(tickets).set(updateData).where(eq(tickets.id, parseInt(id)));
+      });
+
+      for (let i = 0; i < updateQueries.length; i += CHUNK_SIZE) {
+        const chunk = updateQueries.slice(i, i + CHUNK_SIZE);
+        await db.batch(chunk);
+      }
+
+      console.log(`[Ticket.batchUpdate] Done: updated=${updateQueries.length}`);
+      return { success: true, updated: updateQueries.length };
+    } catch (error) {
+      console.error('Ticket batchUpdate error:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  async batchInsertFromCsv(rows) {
+    const db = getDb();
+    const CHUNK_SIZE = 500;
+
+    const fieldMap = {
+      order_no: 'orderNo',
+      order_date: 'orderDate',
+      shopify_id: 'shopifyId',
+      full_name: 'fullName',
+      email: 'email',
+      total_price: 'totalPrice',
+      financial_status: 'financialStatus',
+      fulfillment_status: 'fulfillmentStatus',
+      product_name: 'productName',
+      variant: 'variant',
+      price: 'price',
+      line_item_id: 'lineItemId',
+      product_id: 'productId',
+      item_sub_no: 'itemSubNo',
+      is_usable: 'isUsable',
+      owner_shopify_id: 'ownerShopifyId',
+      reserved_seat: 'reservedSeat',
+      tag1: 'tag1', tag2: 'tag2', tag3: 'tag3', tag4: 'tag4', tag5: 'tag5',
+      tag6: 'tag6', tag7: 'tag7', tag8: 'tag8', tag9: 'tag9', tag10: 'tag10',
+    };
+
+    const requiredFields = ['order_no', 'shopify_id', 'full_name', 'email', 'product_name', 'owner_shopify_id'];
+
+    console.log(`[Ticket.batchInsertFromCsv] Start: ${rows.length} rows`);
+
+    try {
+      const insertValues = [];
+      let skipped = 0;
+
+      for (const row of rows) {
+        // 必須フィールドチェック
+        const missingFields = requiredFields.filter(f => !row[f] || row[f].toString().trim() === '');
+        if (missingFields.length > 0) {
+          console.log(`[Ticket.batchInsertFromCsv] Skipped: missing=[${missingFields.join(', ')}], row=${JSON.stringify(row).substring(0, 200)}`);
+          skipped++;
+          continue;
+        }
+
+        const insertData = {};
+        for (const [snakeKey, value] of Object.entries(row)) {
+          const camelKey = fieldMap[snakeKey];
+          if (camelKey) {
+            if (snakeKey === 'is_usable') {
+              insertData[camelKey] = value === 'TRUE' || value === true;
+            } else if (snakeKey === 'item_sub_no') {
+              insertData[camelKey] = parseInt(value, 10) || 0;
+            } else {
+              insertData[camelKey] = value;
+            }
+          }
+        }
+        // tags 列（カンマ区切り）→ tag1〜tag10 に展開
+        if (row.tags && !insertData.tag1) {
+          const tagValues = row.tags.split(',').map(t => t.trim()).filter(t => t !== '');
+          for (let i = 1; i <= 10; i++) {
+            insertData[`tag${i}`] = tagValues[i - 1] || null;
+          }
+        }
+        // order_date が空の場合は現在時刻を設定
+        if (!insertData.orderDate || insertData.orderDate.trim() === '') {
+          const now = new Date();
+          const pad = (n) => String(n).padStart(2, '0');
+          insertData.orderDate = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+        }
+        insertValues.push(insertData);
+      }
+
+      console.log(`[Ticket.batchInsertFromCsv] Inserting: ${insertValues.length}, skipped: ${skipped}`);
+
+      for (let i = 0; i < insertValues.length; i += CHUNK_SIZE) {
+        const chunk = insertValues.slice(i, i + CHUNK_SIZE);
+        await db.insert(tickets).values(chunk);
+      }
+
+      console.log(`[Ticket.batchInsertFromCsv] Done: inserted=${insertValues.length}, skipped=${skipped}`);
+      return { success: true, inserted: insertValues.length, skipped };
+    } catch (error) {
+      console.error('Ticket batchInsertFromCsv error:', error);
+      return { success: false, error: error.message };
     }
   }
 

@@ -34,6 +34,20 @@ async function authFetch(url, options = {}) {
 }
 
 class TicketsManager {
+    static CSV_IMPORT_FIELDS = [
+        { key: 'reserved_seat', label: '指定席' },
+        { key: 'is_usable', label: '使用可否' },
+        { key: 'full_name', label: '氏名' },
+        { key: 'email', label: 'メール' },
+        { key: 'product_name', label: '商品名' },
+        { key: 'variant', label: 'バリエーション' },
+        { key: 'price', label: '価格' },
+        { key: 'financial_status', label: '支払状況' },
+        { key: 'fulfillment_status', label: '発送状況' },
+        { key: 'owner_shopify_id', label: 'オーナーShopify ID' },
+        { key: 'tags', label: 'タグ' },
+    ];
+
     constructor() {
         this.apiUrl = '/api/tickets';
         this.currentUser = null;
@@ -188,7 +202,7 @@ class TicketsManager {
 
         // CSVインポート実行ボタン
         document.getElementById('executeCsvImportBtn').addEventListener('click', () => {
-            this.executeReservedSeatImport();
+            this.executeCsvImport();
         });
 
         // 編集保存ボタン
@@ -764,83 +778,129 @@ class TicketsManager {
     // ====== 指定席CSVインポート ======
 
     openCsvImportModal() {
+        const modal = document.getElementById('csvImportModal');
+        modal.classList.remove('hidden');
+
+        // フォームをリセット
         document.getElementById('csvImportFile').value = '';
-        document.getElementById('csvImportStatus').classList.add('hidden');
-        document.getElementById('csvImportModal').classList.remove('hidden');
+        document.getElementById('executeCsvImportBtn').disabled = true;
+        document.getElementById('csvImportStatus').className = 'import-status hidden';
+        document.getElementById('csvImportStatus').textContent = '';
+
+        // チェックボックスを動的生成（全OFF）
+        const container = document.getElementById('csvImportFields');
+        container.innerHTML = '';
+        TicketsManager.CSV_IMPORT_FIELDS.forEach(field => {
+            const label = document.createElement('label');
+            label.className = 'checkbox-label';
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.name = 'csvImportField';
+            checkbox.value = field.key;
+            checkbox.addEventListener('change', () => this.validateCsvImportForm());
+            label.appendChild(checkbox);
+            label.appendChild(document.createTextNode(' ' + field.label));
+            container.appendChild(label);
+        });
+
+        // ファイル選択時のバリデーション
+        const fileInput = document.getElementById('csvImportFile');
+        fileInput.removeEventListener('change', this.csvImportFileChangeBound);
+        this.csvImportFileChangeBound = () => this.validateCsvImportForm();
+        fileInput.addEventListener('change', this.csvImportFileChangeBound);
     }
 
     closeCsvImportModal() {
         document.getElementById('csvImportModal').classList.add('hidden');
     }
 
-    async executeReservedSeatImport() {
-        const fileInput = document.getElementById('csvImportFile');
-        const file = fileInput.files[0];
+    validateCsvImportForm() {
+        const csvFile = document.getElementById('csvImportFile').files[0];
+        const checkedFields = document.querySelectorAll('input[name="csvImportField"]:checked');
+        const importBtn = document.getElementById('executeCsvImportBtn');
+        importBtn.disabled = !(csvFile && checkedFields.length > 0);
+    }
 
-        if (!file) {
-            this.showNotification('ファイルを選択してください', 'error');
+    async executeCsvImport() {
+        const csvFile = document.getElementById('csvImportFile').files[0];
+        const statusEl = document.getElementById('csvImportStatus');
+        const importBtn = document.getElementById('executeCsvImportBtn');
+
+        if (!csvFile) {
+            statusEl.textContent = 'CSVファイルを選択してください';
+            statusEl.className = 'import-status error';
             return;
         }
 
-        const executeBtn = document.getElementById('executeCsvImportBtn');
-        const statusDiv = document.getElementById('csvImportStatus');
-        const originalText = executeBtn.textContent;
+        // チェック済みフィールドを取得
+        const checkedFields = Array.from(
+            document.querySelectorAll('input[name="csvImportField"]:checked')
+        ).map(cb => cb.value);
+
+        if (checkedFields.length === 0) {
+            statusEl.textContent = 'インポートする項目を1つ以上選択してください';
+            statusEl.className = 'import-status error';
+            return;
+        }
+
+        // tags チェック時は tag1〜tag10 に展開
+        const fields = [];
+        for (const f of checkedFields) {
+            if (f === 'tags') {
+                for (let i = 1; i <= 10; i++) {
+                    fields.push(`tag${i}`);
+                }
+            } else {
+                fields.push(f);
+            }
+        }
 
         try {
-            executeBtn.disabled = true;
-            executeBtn.textContent = 'インポート中...';
-            statusDiv.classList.remove('hidden');
-            statusDiv.className = 'import-status';
-            statusDiv.textContent = 'CSVを読み込んでいます...';
+            importBtn.disabled = true;
+            statusEl.textContent = 'CSVファイルを読み込み中...';
+            statusEl.className = 'import-status';
 
-            // ファイルを読み込み
-            const csvText = await this.readFileAsText(file);
+            // CSVファイルを読み込み
+            const csvText = await this.readFileAsText(csvFile);
             const csvData = this.parseCSV(csvText);
 
             if (csvData.length === 0) {
-                statusDiv.className = 'import-status error';
-                statusDiv.textContent = 'CSVにデータがありません';
+                statusEl.textContent = 'CSVファイルにデータがありません';
+                statusEl.className = 'import-status error';
+                importBtn.disabled = false;
                 return;
             }
 
-            // id と reserved_seat 列の存在確認
-            const firstRow = csvData[0];
-            if (!firstRow.hasOwnProperty('id') || !firstRow.hasOwnProperty('reserved_seat')) {
-                statusDiv.className = 'import-status error';
-                statusDiv.textContent = 'CSVに「id」列と「reserved_seat」列が必要です';
-                return;
-            }
+            statusEl.textContent = `${csvData.length}件のデータをインポート中...`;
 
-            statusDiv.textContent = 'データを送信しています...';
-
-            const response = await authFetch(`${this.apiUrl}/import-reserved-seats`, {
+            // APIを呼び出し
+            const response = await authFetch(`${this.apiUrl}/import-csv`, {
                 method: 'POST',
-                body: JSON.stringify({ csvData })
+                body: JSON.stringify({ csvData, fields })
             });
 
             const result = await response.json();
 
             if (result.success) {
-                statusDiv.className = 'import-status success';
-                statusDiv.textContent = result.data.message;
+                statusEl.textContent = result.data.message;
+                statusEl.className = 'import-status success';
                 this.showNotification(result.data.message, 'success');
 
-                // 少し待ってからモーダルを閉じてデータをリロード
+                // データを再読み込み
                 setTimeout(() => {
                     this.closeCsvImportModal();
                     this.loadTickets();
-                }, 2000);
+                }, 1500);
             } else {
-                statusDiv.className = 'import-status error';
-                statusDiv.textContent = `エラー: ${result.error}`;
+                statusEl.textContent = `エラー: ${result.error}`;
+                statusEl.className = 'import-status error';
+                importBtn.disabled = false;
             }
         } catch (error) {
             console.error('CSV import error:', error);
-            statusDiv.className = 'import-status error';
-            statusDiv.textContent = `エラー: ${error.message}`;
-        } finally {
-            executeBtn.disabled = false;
-            executeBtn.textContent = originalText;
+            statusEl.textContent = `エラー: ${error.message}`;
+            statusEl.className = 'import-status error';
+            importBtn.disabled = false;
         }
     }
 

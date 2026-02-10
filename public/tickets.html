@@ -36,7 +36,7 @@
                             <button id="importBtn" class="admin-only">Shopifyから<br>最新データを取得</button>
                         <div class="control-buttons">
                             <button id="csvExportBtn">CSV出力</button>
-                            <button id="csvImportBtn">指定席CSVを適用</button>
+                            <button id="csvImportBtn">CSVをインポート</button>
 
                         </div>
                     </div>
@@ -211,22 +211,25 @@
     <div id="csvImportModal" class="modal hidden">
         <div class="modal-content">
             <div class="modal-header">
-                <h2>指定席CSVインポート</h2>
+                <h2>CSVインポート</h2>
                 <button class="modal-close" onclick="ticketsManager.closeCsvImportModal()">&times;</button>
             </div>
             <div class="modal-form">
-                <p class="modal-description">CSVファイルから指定席（reserved_seat）を一括更新します。</p>
+                <p class="modal-description">エクスポートしたCSVファイルから、選択した項目を一括更新します。idが空の行は新規追加されます。</p>
                 <div class="form-group">
-                    <label for="csvImportFile">CSVファイルを選択:</label>
-                    <input type="file" id="csvImportFile" accept=".csv" class="form-input">
-                    <small>※CSVには「id」列と「reserved_seat」列が必要です</small>
+                    <label for="csvImportFile">CSVファイル:</label>
+                    <input type="file" id="csvImportFile" accept=".csv" required>
+                    <small>※エクスポートしたCSVファイルを選択してください</small>
                 </div>
-                <div class="form-warning">
-                    <strong>注意:</strong> CSVに含まれるidに対応するチケットのreserved_seatが上書きされます。
+                <div class="form-group">
+                    <label>インポートする項目:</label>
+                    <div id="csvImportFields" class="checkbox-group">
+                        <!-- チェックボックスはJSで動的生成 -->
+                    </div>
                 </div>
                 <div class="form-actions">
                     <button type="button" onclick="ticketsManager.closeCsvImportModal()" class="btn btn-secondary">キャンセル</button>
-                    <button type="button" id="executeCsvImportBtn" class="btn btn-primary">インポート実行</button>
+                    <button type="button" id="executeCsvImportBtn" disabled class="btn btn-primary">インポート実行</button>
                 </div>
                 <div id="csvImportStatus" class="import-status hidden"></div>
             </div>
