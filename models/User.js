@@ -112,8 +112,8 @@ class User {
     }
 
     if (!userData.email || userData.email.trim() === '') {
-      errors.push('メールアドレスは必須です');
-    } else if (!/\S+@\S+\.\S+/.test(userData.email)) {
+      errors.push(userData.role === 'guest' ? 'IDは必須です' : 'メールアドレスは必須です');
+    } else if (userData.role !== 'guest' && !/\S+@\S+\.\S+/.test(userData.email)) {
       errors.push('有効なメールアドレスを入力してください');
     }
 

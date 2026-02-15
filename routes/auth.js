@@ -116,7 +116,7 @@ router.post('/login', async (req, res) => {
     if (!email || !password) {
       return res.status(400).json({
         success: false,
-        error: 'メールアドレスとパスワードが必要です'
+        error: 'IDとパスワードが必要です'
       });
     }
 

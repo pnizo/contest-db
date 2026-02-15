@@ -136,6 +136,20 @@ class UserManager {
     }
 
     // モーダル関連のメソッド
+    // roleに応じてメール欄のラベル・typeを切り替え
+    updateEmailFieldVisibility(role) {
+        const emailField = document.getElementById('modalEmail');
+        const emailLabel = emailField.closest('.form-group').querySelector('label');
+
+        if (role === 'guest') {
+            emailLabel.textContent = 'ID:';
+            emailField.type = 'text';
+        } else {
+            emailLabel.textContent = 'メールアドレス:';
+            emailField.type = 'email';
+        }
+    }
+
     // roleに応じてパスワード欄の表示/必須を制御
     updatePasswordFieldVisibility(role, isEditMode) {
         const passwordField = document.getElementById('modalPassword');
@@ -194,6 +208,7 @@ class UserManager {
                 this.updatePasswordFieldVisibility(user.role || 'user', true);
             }
 
+            this.updateEmailFieldVisibility(user.role || 'user');
             this.editingUserId = user.id;
         } else {
             // 新規作成モード
@@ -209,15 +224,17 @@ class UserManager {
             roleField.style.backgroundColor = '';
             roleField.style.cursor = '';
 
-            // 初期role（user）に応じてパスワード欄を制御
+            // 初期role（user）に応じてパスワード欄・メール欄を制御
             this.updatePasswordFieldVisibility('user', false);
+            this.updateEmailFieldVisibility('user');
 
             this.editingUserId = null;
         }
 
-        // roleの変更時にパスワード欄を動的に制御
+        // roleの変更時にパスワード欄・メール欄を動的に制御
         roleField.onchange = () => {
             this.updatePasswordFieldVisibility(roleField.value, !!this.editingUserId);
+            this.updateEmailFieldVisibility(roleField.value);
         };
 
         modal.classList.remove('hidden');
@@ -306,7 +323,7 @@ class UserManager {
         // ヘッダー作成
         const headers = [
             { key: 'name', label: '名前' },
-            { key: 'email', label: 'メール' },
+            { key: 'email', label: 'ID/メール' },
             { key: 'role', label: '役割' },
             { key: 'createdAt', label: '作成日' },
             { key: '_actions', label: '操作' }
