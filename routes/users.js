@@ -26,48 +26,6 @@ router.get('/', requireAuth, async (req, res) => {
   }
 });
 
-// 特定のルートを先に配置
-router.get('/deleted/list', requireAdmin, async (req, res) => {
-  try {
-    const allUsers = await userModel.findAllIncludingDeleted();
-    const deletedUsers = allUsers.filter(user => user.isValid === 'FALSE');
-    res.json({ success: true, data: deletedUsers });
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-router.put('/:id/restore', requireAdmin, async (req, res) => {
-  try {
-    const result = await userModel.update(req.params.id, { 
-      isValid: 'TRUE',
-      restoredAt: new Date().toISOString()
-    });
-    if (result.success) {
-      res.json({ success: true, message: 'ユーザーを復元しました', data: result.data });
-    } else {
-      res.status(404).json(result);
-    }
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-router.delete('/:id/permanent', requireAdmin, async (req, res) => {
-  try {
-    const result = await userModel.deleteById(req.params.id);
-    
-    if (result.success) {
-      res.json({ success: true, message: 'ユーザーを完全に削除しました' });
-    } else {
-      res.status(404).json(result);
-    }
-  } catch (error) {
-    console.error('Permanent delete error:', error);
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
 // 汎用的なルートは後に配置
 router.get('/:id', async (req, res) => {
   try {
@@ -140,9 +98,9 @@ router.put('/:id', requireAuth, async (req, res) => {
 
 router.delete('/:id', requireAdmin, async (req, res) => {
   try {
-    const result = await userModel.softDelete(req.params.id);
+    const result = await userModel.deleteById(req.params.id);
     if (result.success) {
-      res.json({ success: true, message: 'ユーザーを論理削除しました' });
+      res.json({ success: true, message: 'ユーザーを削除しました' });
     } else {
       res.status(404).json(result);
     }

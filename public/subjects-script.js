@@ -79,17 +79,9 @@ class SubjectManager {
             this.currentUser = result.user;
             this.isAdmin = result.user.role === 'admin';
 
-            // 一般ユーザー（非管理者）の場合はログアウトしてログイン画面に遷移
+            // 一般ユーザー（非管理者）の場合はアクセス拒否モーダルを表示
             if (!this.isAdmin) {
-                console.log('User is not admin, logging out and redirecting to /');
-                AuthToken.remove();
-                // ログアウトAPIを呼び出す
-                try {
-                    await authFetch('/api/auth/logout', { method: 'POST' });
-                } catch (logoutError) {
-                    console.error('Logout API error:', logoutError);
-                }
-                window.location.href = '/';
+                this.showAccessDeniedModal();
                 return;
             }
 
@@ -540,6 +532,35 @@ class SubjectManager {
                 notification.classList.add('hidden');
             }, 300);
         }, 3000);
+    }
+
+    showAccessDeniedModal() {
+        // モーダルを動的に作成
+        const overlay = document.createElement('div');
+        overlay.className = 'modal';
+        overlay.innerHTML = `
+            <div class="modal-content" style="max-width: 400px;">
+                <div class="modal-header">
+                    <h2>アクセス制限</h2>
+                </div>
+                <div class="modal-body" style="text-align: center; padding: 30px;">
+                    <p style="font-size: 16px; color: #333; margin-bottom: 20px;">管理者以外はアクセスできません</p>
+                </div>
+                <div class="modal-footer" style="justify-content: center;">
+                    <button id="accessDeniedOkBtn" class="btn-primary" style="padding: 10px 30px;">OK</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+
+        document.getElementById('accessDeniedOkBtn').addEventListener('click', () => {
+            // 前の画面に戻る。履歴がなければregistrationsへ
+            if (window.history.length > 1) {
+                window.history.back();
+            } else {
+                window.location.href = '/registrations';
+            }
+        });
     }
 
     async handleLogout() {

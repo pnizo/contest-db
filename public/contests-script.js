@@ -56,8 +56,11 @@ class ContestsManager {
         await this.checkAuthStatus();
         this.bindEvents();
         if (this.currentUser) {
+            // 管理者以外は新規追加ボタンを非表示
+            if (!this.isAdmin) {
+                document.getElementById('addNewBtn').style.display = 'none';
+            }
             setTimeout(async () => {
-                await this.loadFilterOptions();
                 await this.loadContests();
             }, 100);
         }
@@ -97,15 +100,6 @@ class ContestsManager {
     }
 
     bindEvents() {
-        // フィルター関連
-        document.getElementById('applyFiltersBtn').addEventListener('click', () => {
-            this.applyFilters();
-        });
-
-        document.getElementById('clearFiltersBtn').addEventListener('click', () => {
-            this.clearFilters();
-        });
-
         // 検索機能
         document.getElementById('searchBtn').addEventListener('click', () => {
             const searchTerm = document.getElementById('searchInput').value;
@@ -196,37 +190,6 @@ class ContestsManager {
         });
     }
 
-    async loadFilterOptions() {
-        try {
-            const response = await authFetch(`${this.apiUrl}/places`);
-            const result = await response.json();
-
-            if (result.success) {
-                this.populateFilterSelect('placeFilter', result.data);
-            }
-        } catch (error) {
-            console.error('Filter options loading failed:', error);
-        }
-    }
-
-    populateFilterSelect(selectId, options) {
-        const select = document.getElementById(selectId);
-        const currentValue = select.value;
-
-        select.innerHTML = select.querySelector('option').outerHTML;
-
-        options.forEach(option => {
-            const optionElement = document.createElement('option');
-            optionElement.value = option;
-            optionElement.textContent = option;
-            select.appendChild(optionElement);
-        });
-
-        if (currentValue && options.includes(currentValue)) {
-            select.value = currentValue;
-        }
-    }
-
     async loadContests() {
         try {
             const params = new URLSearchParams({
@@ -271,8 +234,10 @@ class ContestsManager {
             { key: 'contest_place', label: '開催地' },
             { key: 'is_ready', label: '公開' },
             { key: 'is_test', label: 'テスト用' },
-            { key: '_actions', label: '操作' }
         ];
+        if (this.isAdmin) {
+            headers.push({ key: '_actions', label: '操作' });
+        }
 
         headers.forEach((header, index) => {
             const th = document.createElement('th');
@@ -492,44 +457,6 @@ class ContestsManager {
         document.getElementById('pagination').classList.remove('hidden');
     }
 
-    applyFilters() {
-        this.currentFilters = {
-            contest_place: document.getElementById('placeFilter').value,
-            startDate: document.getElementById('startDate').value,
-            endDate: document.getElementById('endDate').value
-        };
-
-        // 空の値を削除
-        Object.keys(this.currentFilters).forEach(key => {
-            if (!this.currentFilters[key]) {
-                delete this.currentFilters[key];
-            }
-        });
-
-        // 日付範囲は両方必要
-        if (this.currentFilters.startDate && !this.currentFilters.endDate) {
-            delete this.currentFilters.startDate;
-        }
-        if (!this.currentFilters.startDate && this.currentFilters.endDate) {
-            delete this.currentFilters.endDate;
-        }
-
-        this.currentPage = 1;
-        this.loadContests();
-    }
-
-    clearFilters() {
-        document.getElementById('placeFilter').value = '';
-        document.getElementById('startDate').value = '';
-        document.getElementById('endDate').value = '';
-        document.getElementById('searchInput').value = '';
-        document.getElementById('clearSearchBtn').classList.add('hidden');
-
-        this.currentFilters = {};
-        this.currentPage = 1;
-        this.loadContests();
-    }
-
     handleSearch(searchTerm) {
         if (searchTerm.trim()) {
             this.currentFilters.search = searchTerm;
@@ -643,7 +570,6 @@ class ContestsManager {
                 this.showNotification(this.editingContest ? '更新しました' : '追加しました', 'success');
                 this.closeEditDialog();
                 await this.loadContests();
-                await this.loadFilterOptions();
             } else {
                 console.error('Save failed:', result.error);
                 this.showNotification(result.error || '保存に失敗しました', 'error');
@@ -696,7 +622,6 @@ class ContestsManager {
                 this.showNotification('削除しました', 'success');
                 this.closeDeleteDialog();
                 await this.loadContests();
-                await this.loadFilterOptions();
             } else {
                 this.showNotification(result.error || '削除に失敗しました', 'error');
             }

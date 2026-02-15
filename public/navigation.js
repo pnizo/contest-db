@@ -77,8 +77,12 @@ function renderNavigation() {
 
         dropdown.items.forEach(item => {
             const itemActive = isCurrentPath(item.href) ? ' active' : '';
-            const adminClass = item.adminOnly ? ' admin-only' : '';
-            navHtml += `<a href="${item.href}" class="dropdown-item${itemActive}${adminClass}">${item.label}</a>`;
+            if (item.adminOnly) {
+                // admin-onlyアイテムはグレーアウト状態で常に表示し、adminの場合のみ有効化
+                navHtml += `<span class="dropdown-item admin-only-disabled" data-href="${item.href}">${item.label}</span>`;
+            } else {
+                navHtml += `<a href="${item.href}" class="dropdown-item${itemActive}">${item.label}</a>`;
+            }
         });
 
         navHtml += `
@@ -118,6 +122,20 @@ function showAdminOnlyElements() {
         } else {
             el.style.display = 'inline-block';
         }
+    });
+
+    // グレーアウトされたadmin-onlyドロップダウンアイテムを有効なリンクに変換
+    document.querySelectorAll('.admin-only-disabled').forEach(el => {
+        const href = el.getAttribute('data-href');
+        const label = el.textContent;
+        const link = document.createElement('a');
+        link.href = href;
+        link.className = 'dropdown-item';
+        if (isCurrentPath(href)) {
+            link.classList.add('active');
+        }
+        link.textContent = label;
+        el.replaceWith(link);
     });
 }
 

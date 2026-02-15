@@ -222,13 +222,16 @@ class NotesManager {
             await this.loadCombinedContestNames();
 
             // 今日以降で最も近い大会をフィルターの初期値として設定
+            // ただし、フィルター選択肢に存在する場合のみ
             if (this.defaultContest) {
                 const [contestName] = this.defaultContest;
                 const contestFilter = document.getElementById('contestFilter');
                 if (contestFilter) {
-                    contestFilter.value = contestName;
-                    // フィルターを適用
-                    this.currentFilters.contest_name = contestName;
+                    const optionExists = Array.from(contestFilter.options).some(opt => opt.value === contestName);
+                    if (optionExists) {
+                        contestFilter.value = contestName;
+                        this.currentFilters.contest_name = contestName;
+                    }
                 }
             }
         } catch (error) {

@@ -43,7 +43,6 @@ async function authFetch(url, options = {}) {
 class UserManager {
     constructor() {
         this.apiUrl = '/api/users';
-        this.showingDeleted = false;
         this.currentUser = null;
         this.isAdmin = false;
         this.init();
@@ -111,14 +110,10 @@ class UserManager {
                 showAdminOnlyElements();
             }
 
-            // 管理者でない場合、新規追加ボタンと削除済み表示ボタンを非表示にする
+            // 管理者でない場合、新規追加ボタンを非表示にする
             if (!this.isAdmin) {
                 document.body.classList.add('readonly-mode');
                 document.getElementById('addUserModalBtn').style.display = 'none';
-                const toggleDeletedBtn = document.getElementById('toggleDeletedBtn');
-                if (toggleDeletedBtn) {
-                    toggleDeletedBtn.style.display = 'none';
-                }
             }
         }
     }
@@ -135,34 +130,51 @@ class UserManager {
             this.openUserModal();
         });
 
-        document.getElementById('toggleDeletedBtn').addEventListener('click', () => {
-            this.toggleDeletedView();
-        });
-
         document.getElementById('logoutBtn').addEventListener('click', () => {
             this.handleLogout();
         });
     }
 
     // モーダル関連のメソッド
+    // roleに応じてパスワード欄の表示/必須を制御
+    updatePasswordFieldVisibility(role, isEditMode) {
+        const passwordField = document.getElementById('modalPassword');
+        const passwordGroup = passwordField.closest('.form-group');
+
+        if (role === 'guest') {
+            // ゲストはパスワード必須
+            passwordGroup.style.display = '';
+            if (!isEditMode) {
+                passwordField.setAttribute('required', 'required');
+            } else {
+                passwordField.removeAttribute('required');
+            }
+        } else {
+            // admin/userはGoogle SSO認証のためパスワード不要
+            passwordGroup.style.display = 'none';
+            passwordField.removeAttribute('required');
+            passwordField.value = '';
+        }
+    }
+
     openUserModal(user = null) {
         const modal = document.getElementById('userModal');
         const modalTitle = document.getElementById('modalTitle');
         const submitBtn = document.getElementById('modalSubmitBtn');
-        
+        const roleField = document.getElementById('modalRole');
+
         if (user) {
             // 編集モード
             modalTitle.textContent = 'ユーザー編集';
             submitBtn.textContent = 'ユーザーを更新';
-            
+
             document.getElementById('modalName').value = user.name || '';
             document.getElementById('modalEmail').value = user.email || '';
-            document.getElementById('modalRole').value = user.role || 'user';
+            roleField.value = user.role || 'user';
             document.getElementById('modalPassword').value = '';
             document.getElementById('modalPassword').removeAttribute('required');
 
             // 一般ユーザーはroleフィールドを変更できない
-            const roleField = document.getElementById('modalRole');
             if (!this.isAdmin) {
                 roleField.disabled = true;
                 roleField.style.backgroundColor = '#f5f5f5';
@@ -172,13 +184,14 @@ class UserManager {
                 roleField.style.backgroundColor = '';
                 roleField.style.cursor = '';
             }
-            
+
             // ゲストユーザーは自分のパスワードを変更できない
             const passwordGroup = document.getElementById('modalPassword').closest('.form-group');
             if (!this.isAdmin && this.currentUser.role === 'guest' && String(user.id) === String(this.currentUser.id)) {
                 passwordGroup.style.display = 'none';
             } else {
-                passwordGroup.style.display = '';
+                // 編集モードではroleに応じてパスワード欄を制御
+                this.updatePasswordFieldVisibility(user.role || 'user', true);
             }
 
             this.editingUserId = user.id;
@@ -186,16 +199,27 @@ class UserManager {
             // 新規作成モード
             modalTitle.textContent = '新規ユーザー追加';
             submitBtn.textContent = 'ユーザーを追加';
-            
+
             document.getElementById('modalName').value = '';
             document.getElementById('modalEmail').value = '';
-            document.getElementById('modalRole').value = 'user';
+            roleField.value = 'user';
             document.getElementById('modalPassword').value = '';
-            document.getElementById('modalPassword').setAttribute('required', 'required');
-            
+
+            roleField.disabled = false;
+            roleField.style.backgroundColor = '';
+            roleField.style.cursor = '';
+
+            // 初期role（user）に応じてパスワード欄を制御
+            this.updatePasswordFieldVisibility('user', false);
+
             this.editingUserId = null;
         }
-        
+
+        // roleの変更時にパスワード欄を動的に制御
+        roleField.onchange = () => {
+            this.updatePasswordFieldVisibility(roleField.value, !!this.editingUserId);
+        };
+
         modal.classList.remove('hidden');
     }
 
@@ -236,8 +260,7 @@ class UserManager {
             const result = await response.json();
 
             if (result.success) {
-                const message = result.restored ? 'ユーザーが復元されました' : successMessage;
-                this.showNotification(message, 'success');
+                this.showNotification(successMessage, 'success');
                 this.closeUserModal();
                 this.loadUsers();
             } else {
@@ -254,9 +277,8 @@ class UserManager {
         container.innerHTML = '<div class="loading">読み込み中...</div>';
 
         try {
-            const url = this.showingDeleted ? `${this.apiUrl}/deleted/list` : this.apiUrl;
-            console.log('About to call authFetch for:', url);
-            const response = await authFetch(url);
+            console.log('About to call authFetch for:', this.apiUrl);
+            const response = await authFetch(this.apiUrl);
             console.log('loadUsers response status:', response.status);
             const result = await response.json();
 
@@ -268,21 +290,6 @@ class UserManager {
         } catch (error) {
             container.innerHTML = `<div class="empty-state">エラー: ${error.message}</div>`;
         }
-    }
-
-    toggleDeletedView() {
-        this.showingDeleted = !this.showingDeleted;
-        const toggleBtn = document.getElementById('toggleDeletedBtn');
-        
-        if (this.showingDeleted) {
-            toggleBtn.textContent = 'アクティブを表示';
-            toggleBtn.classList.add('active');
-        } else {
-            toggleBtn.textContent = '削除済みを表示';
-            toggleBtn.classList.remove('active');
-        }
-        
-        this.loadUsers();
     }
 
     renderUsers(users) {
@@ -319,11 +326,6 @@ class UserManager {
         // データ行作成
         users.forEach(user => {
             const row = document.createElement('tr');
-            const isDeleted = user.isValid === 'FALSE';
-
-            if (isDeleted) {
-                row.classList.add('deleted-row');
-            }
 
             headers.forEach(header => {
                 const td = document.createElement('td');
@@ -333,32 +335,18 @@ class UserManager {
                     actionsDiv.className = 'row-actions';
 
                     if (this.isAdmin) {
-                        if (isDeleted) {
-                            const restoreBtn = document.createElement('button');
-                            restoreBtn.className = 'btn-small btn-edit';
-                            restoreBtn.textContent = '復元';
-                            restoreBtn.addEventListener('click', () => this.restoreUser(user.id));
-                            actionsDiv.appendChild(restoreBtn);
+                        const editBtn = document.createElement('button');
+                        editBtn.className = 'btn-small btn-edit';
+                        editBtn.textContent = '編集';
+                        editBtn.addEventListener('click', () => this.editUser(user.id));
+                        actionsDiv.appendChild(editBtn);
 
-                            const deleteBtn = document.createElement('button');
-                            deleteBtn.className = 'btn-small btn-delete';
-                            deleteBtn.textContent = '完全削除';
-                            deleteBtn.addEventListener('click', () => this.permanentDeleteUser(user.id));
-                            actionsDiv.appendChild(deleteBtn);
-                        } else {
-                            const editBtn = document.createElement('button');
-                            editBtn.className = 'btn-small btn-edit';
-                            editBtn.textContent = '編集';
-                            editBtn.addEventListener('click', () => this.editUser(user.id));
-                            actionsDiv.appendChild(editBtn);
-
-                            const deleteBtn = document.createElement('button');
-                            deleteBtn.className = 'btn-small btn-delete';
-                            deleteBtn.textContent = '削除';
-                            deleteBtn.addEventListener('click', () => this.deleteUser(user.id));
-                            actionsDiv.appendChild(deleteBtn);
-                        }
-                    } else if (!isDeleted && this.currentUser.role !== 'guest') {
+                        const deleteBtn = document.createElement('button');
+                        deleteBtn.className = 'btn-small btn-delete';
+                        deleteBtn.textContent = '削除';
+                        deleteBtn.addEventListener('click', () => this.deleteUser(user.id));
+                        actionsDiv.appendChild(deleteBtn);
+                    } else if (this.currentUser.role !== 'guest') {
                         const editBtn = document.createElement('button');
                         editBtn.className = 'btn-small btn-edit';
                         editBtn.textContent = '編集';
@@ -369,13 +357,6 @@ class UserManager {
                     td.appendChild(actionsDiv);
                 } else if (header.key === 'name') {
                     td.textContent = user.name || '';
-                    if (isDeleted) {
-                        const badge = document.createElement('span');
-                        badge.className = 'status-badge deleted';
-                        badge.textContent = '削除済み';
-                        badge.style.marginLeft = '8px';
-                        td.appendChild(badge);
-                    }
                 } else if (header.key === 'role') {
                     const roleBadge = document.createElement('span');
                     roleBadge.className = `role-badge ${user.role || 'user'}`;
@@ -426,7 +407,7 @@ class UserManager {
 
 
     async deleteUser(id) {
-        if (!confirm('このユーザーを論理削除してもよろしいですか？\n（後で復元可能です）')) {
+        if (!confirm('削除してもよろしいですか？（取り消せません）')) {
             return;
         }
 
@@ -438,7 +419,7 @@ class UserManager {
             const result = await response.json();
 
             if (result.success) {
-                this.showNotification('ユーザーが論理削除されました', 'success');
+                this.showNotification('ユーザーが削除されました', 'success');
                 this.loadUsers();
             } else {
                 this.showNotification(result.error, 'error');
@@ -447,54 +428,6 @@ class UserManager {
             this.showNotification('エラーが発生しました: ' + error.message, 'error');
         }
     }
-
-    async restoreUser(id) {
-        if (!confirm('このユーザーを復元してもよろしいですか？')) {
-            return;
-        }
-
-        try {
-            const response = await authFetch(`${this.apiUrl}/${id}/restore`, {
-                method: 'PUT'
-            });
-
-            const result = await response.json();
-
-            if (result.success) {
-                this.showNotification('ユーザーが復元されました', 'success');
-                this.loadUsers();
-            } else {
-                this.showNotification(result.error, 'error');
-            }
-        } catch (error) {
-            this.showNotification('エラーが発生しました: ' + error.message, 'error');
-        }
-    }
-
-    async permanentDeleteUser(id) {
-        if (!confirm('このユーザーを完全に削除してもよろしいですか？\n※この操作は取り消せません！')) {
-            return;
-        }
-
-        try {
-            const response = await authFetch(`${this.apiUrl}/${id}/permanent`, {
-                method: 'DELETE'
-            });
-
-            const result = await response.json();
-
-            if (result.success) {
-                this.showNotification('ユーザーが完全に削除されました', 'success');
-                this.loadUsers();
-            } else {
-                this.showNotification(result.error, 'error');
-            }
-        } catch (error) {
-            this.showNotification('エラーが発生しました: ' + error.message, 'error');
-        }
-    }
-
-
 
     showNotification(message, type) {
         const notification = document.getElementById('notification');

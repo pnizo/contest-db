@@ -214,7 +214,7 @@
                 <li><strong>ロールベースアクセス制御</strong>: 管理者（admin）、一般ユーザー（user）、ゲスト（guest）の3ロール</li>
                 <li><strong>Shopify連携</strong>: Shopify Admin API（GraphQL）を使用した会員・注文・チケットデータの取得</li>
                 <li><strong>CSVインポート/エクスポート</strong>: 大量データの一括処理</li>
-                <li><strong>論理削除</strong>: データを物理的に削除せず、復元可能な状態で管理</li>
+                <li><strong>論理削除</strong>: データを物理的に削除せず、復元可能な状態で管理（大会成績・特記事項・違反認定者等）</li>
                 <li><strong>チェックインシステム</strong>: チケットのチェックイン（専用ドメイン対応）</li>
             </ul>
 
@@ -284,7 +284,6 @@
                 <li>権限（admin / user / guest）</li>
                 <li>作成日時</li>
                 <li>更新日時</li>
-                <li>状態（有効 / 削除済み）</li>
             </ul>
 
             <h4>2. 新規ユーザー追加<span class="feature-badge admin-badge">管理者のみ</span></h4>
@@ -312,18 +311,8 @@
             <ol>
                 <li>削除したいユーザーの「削除」ボタンをクリック</li>
                 <li>確認ダイアログで「OK」をクリック</li>
-                <li>ユーザーは論理削除され、<code>isValid</code>フラグが<code>false</code>に設定されます</li>
+                <li>ユーザーはデータベースから完全に削除されます（物理削除、復元不可）</li>
             </ol>
-
-            <h4>5. 削除済みユーザーの管理</h4>
-            <ul>
-                <li><strong>削除済み表示</strong>: 「削除済みを表示」ボタンで削除済みユーザーの表示/非表示を切り替え</li>
-                <li><strong>復元</strong>: 削除済みユーザーの「復元」ボタンをクリック</li>
-                <li><strong>完全削除</strong>: 削除済みユーザーの「完全削除」ボタンで物理削除（復元不可）</li>
-            </ul>
-
-            <h4>6. 自動復元機能</h4>
-            <p>削除済みユーザーと同じメールアドレスで新規ユーザーを作成すると、自動的に既存のユーザーが復元されます。</p>
 
             <h3>一般ユーザー・ゲストの制限</h3>
             <ul>
@@ -995,7 +984,7 @@
                 <li><span class="checkmark">&#x2705;</span> データの削除（Delete）</li>
                 <li><span class="checkmark">&#x2705;</span> CSVインポート/エクスポート</li>
                 <li><span class="checkmark">&#x2705;</span> Shopifyインポート・同期機能</li>
-                <li><span class="checkmark">&#x2705;</span> 削除済みデータの復元・完全削除</li>
+                <li><span class="checkmark">&#x2705;</span> 削除済みデータの復元・完全削除（大会成績・特記事項・違反認定者等）</li>
                 <li><span class="checkmark">&#x2705;</span> ユーザー管理（作成・編集・削除）</li>
                 <li><span class="checkmark">&#x2705;</span> 違反認定者情報へのアクセス</li>
                 <li><span class="checkmark">&#x2705;</span> パスワード変更</li>
@@ -1057,7 +1046,7 @@
             </ul>
 
             <h3>Q3: 削除したデータは復元できますか？</h3>
-            <p>A: はい。論理削除方式を採用しているため、管理者は削除済みデータを復元できます。ただし、「完全削除」を実行した場合は復元できません。</p>
+            <p>A: 大会成績・特記事項・違反認定者等は論理削除方式を採用しているため、管理者は削除済みデータを復元できます。ただし、「完全削除」を実行した場合は復元できません。ユーザーは物理削除のため復元できません。</p>
 
             <h3>Q4: スマートフォンでも使えますか？</h3>
             <p>A: はい。レスポンシブデザインを採用しており、スマートフォンやタブレットでも利用できます。チェックインシステムは特にモバイル端末に最適化されています。</p>
@@ -1151,8 +1140,8 @@
         <hr>
 
         <div style="text-align: center; margin: 40px 0; color: #666;">
-            <p><strong>Document Version</strong>: 3.0</p>
-            <p><strong>Last Updated</strong>: 2026年2月9日</p>
+            <p><strong>Document Version</strong>: 3.1</p>
+            <p><strong>Last Updated</strong>: 2026年2月15日</p>
             <p style="margin-top: 20px;">本マニュアルに記載されていない内容や、使い方で不明な点がある場合は、<br>システム管理者にお問い合わせください。</p>
         </div>
     </div>

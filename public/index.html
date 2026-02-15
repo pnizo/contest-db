@@ -14,19 +14,33 @@
                 <p>コンテスト成績データベース</p>
             </header>
 
-            <form id="loginForm" class="login-form">
-                <div class="form-group">
-                    <label for="email">メールアドレス</label>
-                    <input type="email" id="email" name="email" required>
+            <div class="login-form">
+                <!-- Google SSO セクション -->
+                <div class="google-sso-section">
+                    <div id="googleBtnContainer"></div>
+                    <div id="googleError" class="google-error hidden"></div>
                 </div>
 
-                <div class="form-group">
-                    <label for="password">パスワード</label>
-                    <input type="password" id="password" name="password" required>
+                <!-- 区切り線 -->
+                <div class="login-divider">
+                    <span>ゲストアカウント</span>
                 </div>
 
-                <button type="submit" class="login-btn">ログイン</button>
-            </form>
+                <!-- ゲストログインフォーム -->
+                <form id="loginForm" class="guest-login-form">
+                    <div class="form-group">
+                        <label for="email">メールアドレス</label>
+                        <input type="email" id="email" name="email" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="password">パスワード</label>
+                        <input type="password" id="password" name="password" required>
+                    </div>
+
+                    <button type="submit" class="guest-login-btn">ゲストログイン</button>
+                </form>
+            </div>
         </div>
 
         <div id="notification" class="notification hidden"></div>
@@ -52,6 +66,7 @@
 
         class LoginManager {
             constructor() {
+                this.googleClientId = null;
                 this.init();
             }
 
@@ -69,9 +84,10 @@
                 return '/registrations';
             }
 
-            init() {
-                this.checkAuthStatus();
+            async init() {
+                await this.checkAuthStatus();
                 this.bindEvents();
+                await this.initGoogleSSO();
             }
 
             async checkAuthStatus() {
@@ -79,7 +95,7 @@
                     console.log('Checking auth status on login page...');
                     const token = AuthToken.get();
                     console.log('Token exists in localStorage:', !!token);
-                    
+
                     const response = await fetch('/api/auth/status', {
                         headers: {
                             ...AuthToken.getHeaders(),
@@ -88,11 +104,10 @@
                         credentials: 'include'
                     });
                     const result = await response.json();
-                    
+
                     console.log('Auth status result:', result);
-                    
+
                     if (result.isAuthenticated) {
-                        // チェックイン専用ドメインでは自動リダイレクトしない（無限ループ防止）
                         if (this.isCheckinDomain()) {
                             console.log('User is authenticated on checkin domain, staying on login page');
                         } else {
@@ -105,6 +120,85 @@
                     }
                 } catch (error) {
                     console.error('Auth check error:', error);
+                }
+            }
+
+            async initGoogleSSO() {
+                try {
+                    // サーバーからGoogle Client IDを取得
+                    const response = await fetch('/api/auth/config');
+                    const config = await response.json();
+                    this.googleClientId = config.googleClientId;
+
+                    if (!this.googleClientId) {
+                        console.log('Google Client ID not configured, hiding SSO section');
+                        document.querySelector('.google-sso-section').innerHTML =
+                            '<p class="google-not-configured">Google SSOは設定されていません</p>';
+                        return;
+                    }
+
+                    // Google Identity Services SDKを読み込み
+                    const script = document.createElement('script');
+                    script.src = 'https://accounts.google.com/gsi/client';
+                    script.async = true;
+                    script.defer = true;
+                    script.onload = () => this.renderGoogleButton();
+                    document.head.appendChild(script);
+                } catch (error) {
+                    console.error('Failed to init Google SSO:', error);
+                }
+            }
+
+            renderGoogleButton() {
+                if (!window.google || !this.googleClientId) return;
+
+                google.accounts.id.initialize({
+                    client_id: this.googleClientId,
+                    callback: (response) => this.handleGoogleCallback(response),
+                });
+
+                google.accounts.id.renderButton(
+                    document.getElementById('googleBtnContainer'),
+                    {
+                        theme: 'outline',
+                        size: 'large',
+                        width: '100%',
+                        text: 'signin_with',
+                        locale: 'ja',
+                    }
+                );
+            }
+
+            async handleGoogleCallback(response) {
+                const errorEl = document.getElementById('googleError');
+                errorEl.classList.add('hidden');
+
+                try {
+                    const res = await fetch('/api/auth/google', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ credential: response.credential }),
+                        credentials: 'include'
+                    });
+
+                    const result = await res.json();
+
+                    if (result.success) {
+                        if (result.token) {
+                            AuthToken.set(result.token);
+                        }
+                        this.showNotification('ログインしました', 'success');
+                        const redirectTo = this.getRedirectUrl();
+                        setTimeout(() => {
+                            window.location.href = redirectTo;
+                        }, 1000);
+                    } else {
+                        errorEl.textContent = result.error;
+                        errorEl.classList.remove('hidden');
+                    }
+                } catch (error) {
+                    errorEl.textContent = 'Google認証エラーが発生しました';
+                    errorEl.classList.remove('hidden');
                 }
             }
 
@@ -121,7 +215,6 @@
                 const submitBtn = e.target.querySelector('button[type="submit"]');
                 const originalText = submitBtn.textContent;
 
-                // ボタンを無効化
                 submitBtn.disabled = true;
                 submitBtn.textContent = 'ログイン中...';
 
@@ -139,34 +232,22 @@
                     console.log('Login response:', result);
 
                     if (result.success) {
-                        // JWTトークンを保存
                         if (result.token) {
                             AuthToken.set(result.token);
-                            console.log('JWT token saved:', result.token.substring(0, 20) + '...');
-                            console.log('Verifying token storage...');
-                            const storedToken = AuthToken.get();
-                            console.log('Token retrieved from storage:', storedToken ? storedToken.substring(0, 20) + '...' : 'null');
-                        } else {
-                            console.log('No token received in login response');
-                            console.log('Full response object:', result);
                         }
                         this.showNotification('ログインしました', 'success');
                         submitBtn.textContent = 'リダイレクト中...';
                         const redirectTo = this.getRedirectUrl();
                         setTimeout(() => {
-                            console.log('Redirecting to ' + redirectTo + ' after login...');
-                            console.log('Final token check before redirect:', AuthToken.get() ? 'exists' : 'missing');
                             window.location.href = redirectTo;
                         }, 1000);
                     } else {
                         this.showNotification(result.error, 'error');
-                        // ボタンを再有効化
                         submitBtn.disabled = false;
                         submitBtn.textContent = originalText;
                     }
                 } catch (error) {
                     this.showNotification('ログインエラーが発生しました: ' + error.message, 'error');
-                    // ボタンを再有効化
                     submitBtn.disabled = false;
                     submitBtn.textContent = originalText;
                 }
@@ -177,7 +258,7 @@
                 notification.textContent = message;
                 notification.className = `notification ${type}`;
                 notification.classList.remove('hidden');
-                
+
                 setTimeout(() => {
                     notification.classList.add('show');
                 }, 100);

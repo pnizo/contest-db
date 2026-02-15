@@ -381,6 +381,86 @@ button:active {
     box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
 }
 
+/* Google SSO Section */
+.google-sso-section {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+}
+
+#googleBtnContainer {
+    display: flex;
+    justify-content: center;
+    width: 100%;
+}
+
+.google-error {
+    color: #e74c3c;
+    font-size: 14px;
+    text-align: center;
+    padding: 8px;
+    background: #fdecea;
+    border-radius: 6px;
+    width: 100%;
+}
+
+.google-not-configured {
+    color: #7f8c8d;
+    font-size: 14px;
+    text-align: center;
+    padding: 15px;
+}
+
+/* Login Divider */
+.login-divider {
+    display: flex;
+    align-items: center;
+    text-align: center;
+    margin: 25px 0 20px;
+    color: #95a5a6;
+    font-size: 13px;
+}
+
+.login-divider::before,
+.login-divider::after {
+    content: '';
+    flex: 1;
+    border-bottom: 1px solid #ddd;
+}
+
+.login-divider span {
+    padding: 0 15px;
+    white-space: nowrap;
+}
+
+/* Guest Login Form */
+.guest-login-form .form-group {
+    margin-bottom: 20px;
+}
+
+.guest-login-btn {
+    width: 100%;
+    padding: 12px;
+    background: #95a5a6;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.2s, transform 0.2s;
+}
+
+.guest-login-btn:hover {
+    background: #7f8c8d;
+    transform: translateY(-1px);
+}
+
+.guest-login-btn:active {
+    transform: translateY(0);
+}
+
 .login-btn {
     width: 100%;
     padding: 15px;
@@ -1961,6 +2041,15 @@ input[type="file"]:hover {
 /* Admin-only navigation link (hidden by default) */
 .admin-only {
     display: none;
+}
+
+/* Admin-only disabled dropdown item (grayed out) */
+.dropdown-item.admin-only-disabled {
+    display: block;
+    color: #bbb;
+    cursor: not-allowed;
+    pointer-events: none;
+    user-select: none;
 }
 
 /* ドロップダウンメニュー */

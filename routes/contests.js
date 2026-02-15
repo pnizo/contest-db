@@ -1,6 +1,6 @@
 const express = require('express');
 const Contest = require('../models/Contest');
-const { requireAuth } = require('../middleware/auth');
+const { requireAuth, requireAdmin } = require('../middleware/auth');
 const router = express.Router();
 
 const contestModel = new Contest();
@@ -117,8 +117,8 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// 新規コンテスト作成
-router.post('/', async (req, res) => {
+// 新規コンテスト作成（管理者のみ）
+router.post('/', requireAdmin, async (req, res) => {
   try {
     const contestData = req.body;
 
@@ -136,8 +136,8 @@ router.post('/', async (req, res) => {
   }
 });
 
-// コンテスト更新
-router.put('/:id', async (req, res) => {
+// コンテスト更新（管理者のみ）
+router.put('/:id', requireAdmin, async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     if (isNaN(id) || id < 1) {
@@ -160,8 +160,8 @@ router.put('/:id', async (req, res) => {
   }
 });
 
-// コンテスト削除
-router.delete('/:id', async (req, res) => {
+// コンテスト削除（管理者のみ）
+router.delete('/:id', requireAdmin, async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     if (isNaN(id) || id < 1) {

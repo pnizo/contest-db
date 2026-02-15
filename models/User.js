@@ -1,6 +1,6 @@
 const { getDb } = require('../lib/db');
 const { users } = require('../lib/db/schema');
-const { eq, and, sql } = require('drizzle-orm');
+const { eq, sql } = require('drizzle-orm');
 const bcrypt = require('bcrypt');
 
 /**
@@ -18,12 +18,10 @@ class User {
       name: row.name,
       email: row.email,
       password: row.password,
+      googleId: row.googleId || null,
       role: row.role,
-      isValid: row.isValid ? 'TRUE' : 'FALSE',
       createdAt: row.createdAt?.toISOString(),
       updatedAt: row.updatedAt?.toISOString(),
-      deletedAt: row.deletedAt?.toISOString() || '',
-      restoredAt: row.restoredAt?.toISOString() || '',
     };
   }
 
@@ -35,26 +33,11 @@ class User {
       const db = getDb();
       const rows = await db
         .select()
-        .from(users)
-        .where(eq(users.isValid, true));
+        .from(users);
 
       return rows.map(row => this._toApiFormat(row));
     } catch (error) {
       console.error('Error in User.findAll:', error);
-      return [];
-    }
-  }
-
-  /**
-   * 削除済みを含む全ユーザーを取得
-   */
-  async findAllIncludingDeleted() {
-    try {
-      const db = getDb();
-      const rows = await db.select().from(users);
-      return rows.map(row => this._toApiFormat(row));
-    } catch (error) {
-      console.error('Error in User.findAllIncludingDeleted:', error);
       return [];
     }
   }
@@ -84,22 +67,13 @@ class User {
   /**
    * メールアドレスでユーザーを検索
    */
-  async findByEmail(email, includeDeleted = false) {
+  async findByEmail(email) {
     try {
       const db = getDb();
-      let rows;
-
-      if (includeDeleted) {
-        rows = await db
-          .select()
-          .from(users)
-          .where(eq(users.email, email));
-      } else {
-        rows = await db
-          .select()
-          .from(users)
-          .where(and(eq(users.email, email), eq(users.isValid, true)));
-      }
+      const rows = await db
+        .select()
+        .from(users)
+        .where(eq(users.email, email));
 
       if (rows.length === 0) {
         return null;
@@ -110,13 +84,6 @@ class User {
       console.error('Error in User.findByEmail:', error);
       return null;
     }
-  }
-
-  /**
-   * 有効なユーザーのみ取得
-   */
-  async findAllActive() {
-    return this.findAll();
   }
 
   /**
@@ -162,13 +129,14 @@ class User {
    */
   async authenticateUser(email, password) {
     try {
-      const user = await this.findByEmail(email, false);
+      const user = await this.findByEmail(email);
       if (!user) {
         return { success: false, error: 'ユーザーが見つかりません' };
       }
 
-      if (user.isValid === 'FALSE') {
-        return { success: false, error: 'このアカウントは無効化されています' };
+      // admin/userロールはGoogle SSOのみ
+      if (user.role !== 'guest') {
+        return { success: false, error: 'Google SSOでログインしてください' };
       }
 
       if (!user.password) {
@@ -196,21 +164,26 @@ class User {
     try {
       const db = getDb();
 
-      // パスワードをハッシュ化
-      let hashedPassword = userData.password;
-      if (userData.password && !userData.password.startsWith('$2')) {
-        hashedPassword = await this.hashPassword(userData.password);
+      // パスワードをハッシュ化（パスワードがある場合のみ）
+      let hashedPassword = null;
+      if (userData.password) {
+        hashedPassword = userData.password.startsWith('$2')
+          ? userData.password
+          : await this.hashPassword(userData.password);
+      }
+
+      const insertData = {
+        name: userData.name,
+        email: userData.email,
+        role: userData.role || 'user',
+      };
+      if (hashedPassword) {
+        insertData.password = hashedPassword;
       }
 
       const insertResult = await db
         .insert(users)
-        .values({
-          name: userData.name,
-          email: userData.email,
-          password: hashedPassword,
-          role: userData.role || 'user',
-          isValid: true,
-        })
+        .values(insertData)
         .returning();
 
       return { 
@@ -230,35 +203,21 @@ class User {
    * ユーザー作成（バリデーション付き）
    */
   async createUser(userData) {
+    // guestロールの場合のみパスワード必須
+    const role = userData.role || 'user';
+    if (role === 'guest' && (!userData.password || userData.password.trim() === '')) {
+      return { success: false, errors: ['ゲストアカウントにはパスワードが必要です'] };
+    }
+
     const validation = await this.validateUser(userData);
     if (!validation.isValid) {
       return { success: false, errors: validation.errors };
     }
 
-    // 既存のアクティブユーザーをチェック
-    const existingActiveUser = await this.findByEmail(userData.email, false);
-    if (existingActiveUser) {
+    // 既存ユーザーをチェック
+    const existingUser = await this.findByEmail(userData.email);
+    if (existingUser) {
       return { success: false, errors: ['このメールアドレスは既に使用されています'] };
-    }
-
-    // 削除済みユーザーをチェック（復元の場合）
-    const existingDeletedUser = await this.findByEmail(userData.email, true);
-    if (existingDeletedUser && existingDeletedUser.isValid === 'FALSE') {
-      // パスワードをハッシュ化
-      const hashedPassword = await this.hashPassword(userData.password);
-      
-      const result = await this.update(existingDeletedUser.id, {
-        name: userData.name,
-        password: hashedPassword,
-        role: userData.role || 'user',
-        isValid: 'TRUE',
-        restoredAt: new Date().toISOString(),
-      });
-      
-      if (result.success) {
-        return { success: true, data: result.data, restored: true };
-      }
-      return result;
     }
 
     return await this.create(userData);
@@ -290,14 +249,8 @@ class User {
       if (data.role !== undefined) {
         updateData.role = data.role;
       }
-      if (data.isValid !== undefined) {
-        updateData.isValid = data.isValid === 'TRUE' || data.isValid === true;
-      }
-      if (data.deletedAt !== undefined) {
-        updateData.deletedAt = data.deletedAt ? new Date(data.deletedAt) : null;
-      }
-      if (data.restoredAt !== undefined) {
-        updateData.restoredAt = data.restoredAt ? new Date(data.restoredAt) : null;
+      if (data.googleId !== undefined) {
+        updateData.googleId = data.googleId;
       }
 
       const result = await db
@@ -330,30 +283,6 @@ class User {
     } catch (error) {
       console.error('Password update error:', error);
       return { success: false, error: 'パスワードの更新に失敗しました' };
-    }
-  }
-
-  /**
-   * 論理削除
-   */
-  async softDelete(id) {
-    try {
-      const user = await this.findById(id);
-      if (!user) {
-        return { success: false, error: 'ユーザーが見つかりません' };
-      }
-
-      if (user.isValid === 'FALSE') {
-        return { success: false, error: 'ユーザーは既に削除されています' };
-      }
-
-      return await this.update(id, {
-        isValid: 'FALSE',
-        deletedAt: new Date().toISOString(),
-      });
-    } catch (error) {
-      console.error('Error in softDelete:', error);
-      return { success: false, error: error.message };
     }
   }
 

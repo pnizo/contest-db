@@ -17,9 +17,9 @@ async function createAdminUser() {
 
     try {
         // 既存の管理者をチェック
-        const existingAdmin = await userModel.findByEmail(adminData.email, true);
-        
-        if (existingAdmin && existingAdmin.isValid !== 'FALSE') {
+        const existingAdmin = await userModel.findByEmail(adminData.email);
+
+        if (existingAdmin) {
             console.log('既に管理者アカウントが存在します:');
             console.log(`メールアドレス: ${existingAdmin.email}`);
             console.log(`名前: ${existingAdmin.name}`);
@@ -36,10 +36,6 @@ async function createAdminUser() {
             console.log(`メールアドレス: ${adminData.email}`);
             console.log(`パスワード: ${adminData.password}`);
             console.log('==================\n');
-            
-            if (result.restored) {
-                console.log('注意: 削除済みのアカウントが復元されました。');
-            }
             
             console.log('ブラウザで http://localhost:3000/login にアクセスしてログインしてください。');
         } else {
