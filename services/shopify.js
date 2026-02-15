@@ -91,7 +91,7 @@ class ShopifyService {
                   tags
                   createdAt
                   updatedAt
-                  addresses {
+                  defaultAddress {
                     address1
                     address2
                     city
@@ -99,6 +99,9 @@ class ShopifyService {
                     zip
                     phone
                     country
+                  }
+                  addresses {
+                    phone
                   }
                   metafields(first: 100) {
                     edges {
@@ -171,14 +174,14 @@ class ShopifyService {
       email: customer.email || '',
       first_name: customer.firstName || '',
       last_name: customer.lastName || '',
-      phone: customer.phone || customer.addresses?.find(a => a.phone)?.phone || '',
+      phone: customer.defaultAddress?.phone || customer.phone || customer.addresses?.find(a => a.phone)?.phone || '',
       tags: customer.tags.join(', '),
-      address1: customer.addresses[0]?.address1 || '',
-      address2: customer.addresses[0]?.address2 || '',
-      city: customer.addresses[0]?.city || '',
-      province: customer.addresses[0]?.province || '',
-      zip: customer.addresses[0]?.zip || '',
-      country: customer.addresses[0]?.country || '',
+      address1: customer.defaultAddress?.address1 || '',
+      address2: customer.defaultAddress?.address2 || '',
+      city: customer.defaultAddress?.city || '',
+      province: customer.defaultAddress?.province || '',
+      zip: customer.defaultAddress?.zip || '',
+      country: customer.defaultAddress?.country || '',
       created_at: customer.createdAt || '',
       updated_at: customer.updatedAt || '',
       // metafieldsを個別のフィールドとして展開（"custom."プレフィックスを除去）
