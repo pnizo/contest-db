@@ -131,6 +131,13 @@
                     <input type="date" id="shopifyContestDate" readonly required>
                     <small>※大会名を選択すると自動的に設定されます</small>
                 </div>
+                <div class="form-group">
+                    <label for="shopifyPlayerNoMode">ゼッケン番号:</label>
+                    <select id="shopifyPlayerNoMode">
+                        <option value="keep" selected>現在のゼッケン番号を維持する</option>
+                        <option value="reassign">ゼッケン番号を振り直す</option>
+                    </select>
+                </div>
                 <div class="form-actions">
                     <button type="button" onclick="registrationsManager.closeShopifyImportModal()" class="btn btn-secondary">キャンセル</button>
                     <button type="button" id="shopifyImportExecuteBtn" disabled class="btn btn-primary">インポート実行</button>

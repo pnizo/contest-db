@@ -631,6 +631,7 @@ class RegistrationsManager {
     async executeShopifyImport() {
         const contestDate = document.getElementById('shopifyContestDate').value;
         const contestName = document.getElementById('shopifyContestName').value;
+        const playerNoMode = document.getElementById('shopifyPlayerNoMode').value;
 
         if (!contestDate || !contestName) {
             this.showNotification('大会開催日と大会名を選択してください', 'error');
@@ -673,7 +674,7 @@ class RegistrationsManager {
             statusElement.textContent = '(3/3) Registrationsを作成中...';
             const response = await authFetch(`${this.apiUrl}/import-shopify`, {
                 method: 'POST',
-                body: JSON.stringify({ contestDate, contestName })
+                body: JSON.stringify({ contestDate, contestName, playerNoMode })
             });
             const result = await response.json();
 

@@ -590,7 +590,8 @@ router.put('/:id', requireAdmin, async (req, res) => {
 // POST /import-shopify - OrdersテーブルとMembersテーブルからRegistrationsを作成
 router.post('/import-shopify', requireAdmin, async (req, res) => {
   try {
-    const { contestDate, contestName } = req.body;
+    const { contestDate, contestName, playerNoMode } = req.body;
+    const reassignPlayerNo = (playerNoMode === 'reassign');
 
     if (!contestDate || !contestName) {
       return res.status(400).json({
@@ -634,20 +635,24 @@ router.post('/import-shopify', requireAdmin, async (req, res) => {
 
     // player_no引き継ぎ用Map: fwj_card_no → player_no
     const existingPlayerNoMap = new Map();
-    existingRegistrations.forEach(reg => {
-      if (reg.fwj_card_no && reg.player_no) {
-        existingPlayerNoMap.set(String(reg.fwj_card_no), reg.player_no);
-      }
-    });
+    if (!reassignPlayerNo) {
+      existingRegistrations.forEach(reg => {
+        if (reg.fwj_card_no && reg.player_no) {
+          existingPlayerNoMap.set(String(reg.fwj_card_no), reg.player_no);
+        }
+      });
+    }
 
     // 新規player_no用: 既存のplayer_no最大値を計算
     let playerNoCounter = 1;
-    existingRegistrations.forEach(reg => {
-      const pn = parseInt(reg.player_no, 10);
-      if (!isNaN(pn) && pn >= playerNoCounter) {
-        playerNoCounter = pn + 1;
-      }
-    });
+    if (!reassignPlayerNo) {
+      existingRegistrations.forEach(reg => {
+        const pn = parseInt(reg.player_no, 10);
+        if (!isNaN(pn) && pn >= playerNoCounter) {
+          playerNoCounter = pn + 1;
+        }
+      });
+    }
 
     // 既存データを削除（インポート前に削除）
     if (existingRegistrations.length > 0) {
