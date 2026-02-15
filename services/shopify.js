@@ -97,6 +97,7 @@ class ShopifyService {
                     city
                     province
                     zip
+                    phone
                     country
                   }
                   metafields(first: 100) {
@@ -170,7 +171,7 @@ class ShopifyService {
       email: customer.email || '',
       first_name: customer.firstName || '',
       last_name: customer.lastName || '',
-      phone: customer.phone || '',
+      phone: customer.phone || customer.addresses?.find(a => a.phone)?.phone || '',
       tags: customer.tags.join(', '),
       address1: customer.addresses[0]?.address1 || '',
       address2: customer.addresses[0]?.address2 || '',
