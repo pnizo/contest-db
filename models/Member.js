@@ -89,6 +89,13 @@ class Member {
 
       if (filters.search) {
         const searchTerm = `%${filters.search}%`;
+
+        // 日本国内番号 (0始まり) → 国際番号 (+81) への変換
+        const stripped = filters.search.replace(/[\s\-()]/g, '');
+        const phoneSearchTerm = /^0\d+$/.test(stripped)
+            ? `%+81${stripped.substring(1)}%`
+            : searchTerm;
+
         conditions.push(
           sql`(
             ${members.shopifyId} ILIKE ${searchTerm} OR
@@ -96,6 +103,7 @@ class Member {
             ${members.firstName} ILIKE ${searchTerm} OR
             ${members.lastName} ILIKE ${searchTerm} OR
             ${members.phone} ILIKE ${searchTerm} OR
+            ${members.phone} ILIKE ${phoneSearchTerm} OR
             ${members.fwjCardNo} ILIKE ${searchTerm} OR
             ${members.fwjFirstName} ILIKE ${searchTerm} OR
             ${members.fwjLastName} ILIKE ${searchTerm} OR
