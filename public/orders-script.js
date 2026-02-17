@@ -42,6 +42,10 @@ class OrdersManager {
         this.currentOrders = [];
         this.currentHeaders = [];
         this.currentPaidOnly = true;
+        this.currentPage = 1;
+        this.limit = 100;
+        this.totalPages = 0;
+        this.total = 0;
         this.init();
     }
 
@@ -97,6 +101,21 @@ class OrdersManager {
                 const tag = document.getElementById('tagInput').value.trim();
                 const paidOnly = document.getElementById('paidOnlyCheckbox').checked;
                 this.searchOrders(tag, paidOnly);
+            }
+        });
+
+        // ページネーション
+        document.getElementById('prevPageBtn').addEventListener('click', () => {
+            if (this.currentPage > 1) {
+                this.currentPage--;
+                this.loadOrdersPage();
+            }
+        });
+
+        document.getElementById('nextPageBtn').addEventListener('click', () => {
+            if (this.currentPage < this.totalPages) {
+                this.currentPage++;
+                this.loadOrdersPage();
             }
         });
 
@@ -231,7 +250,6 @@ class OrdersManager {
 
     async loadCurrentOrders() {
         const container = document.getElementById('ordersTableContainer');
-        const dbInfoSection = document.getElementById('currentDbInfo');
 
         try {
             container.innerHTML = '<div class="loading">読み込み中...</div>';
@@ -243,13 +261,13 @@ class OrdersManager {
                 // DB情報を表示
                 this.displayDbInfo(result.totalOrders, result.latestExport);
 
-                // 現在のデータがあれば表示
-                if (result.orders && result.orders.data && result.orders.data.length > 0) {
-                    this.displayCurrentOrders(result.orders.data);
-                    this.updateResultSummary(result.orders.total, result.orders.total);
-                    document.getElementById('searchResult').classList.remove('hidden');
+                // データがあればページネーション付きで表示
+                if (result.totalOrders > 0) {
+                    this.currentPage = 1;
+                    await this.loadOrdersPage();
                 } else {
                     container.innerHTML = '<div class="no-data">DBにデータがありません。タグを入力して検索してください</div>';
+                    document.getElementById('pagination').classList.add('hidden');
                 }
             } else {
                 console.error('Load current orders failed:', result);
@@ -259,6 +277,50 @@ class OrdersManager {
             console.error('Load current orders exception:', error);
             container.innerHTML = '<div class="no-data">タグを入力して検索してください</div>';
         }
+    }
+
+    async loadOrdersPage() {
+        const container = document.getElementById('ordersTableContainer');
+
+        try {
+            container.innerHTML = '<div class="loading">読み込み中...</div>';
+
+            const params = new URLSearchParams({
+                page: this.currentPage,
+                limit: this.limit,
+                sortBy: 'order_date',
+                sortOrder: 'desc'
+            });
+
+            const response = await authFetch(`${this.apiUrl}/list?${params}`);
+            const result = await response.json();
+
+            if (result.success) {
+                this.displayCurrentOrders(result.data);
+                this.updatePagination(result);
+                this.updateResultSummary(result.total, result.total);
+                document.getElementById('searchResult').classList.remove('hidden');
+            } else {
+                container.innerHTML = '<div class="no-data">データの読み込みに失敗しました</div>';
+            }
+        } catch (error) {
+            console.error('Load orders page exception:', error);
+            container.innerHTML = '<div class="no-data">エラーが発生しました</div>';
+        }
+    }
+
+    updatePagination(result) {
+        this.currentPage = result.page;
+        this.totalPages = result.totalPages;
+        this.total = result.total;
+
+        document.getElementById('pageInfo').textContent =
+            `ページ ${result.page} / ${result.totalPages} (全 ${result.total} 件)`;
+
+        document.getElementById('prevPageBtn').disabled = result.page <= 1;
+        document.getElementById('nextPageBtn').disabled = result.page >= result.totalPages;
+
+        document.getElementById('pagination').classList.remove('hidden');
     }
 
     displayDbInfo(totalOrders, latestExport) {

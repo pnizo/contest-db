@@ -72,28 +72,38 @@ router.get('/search', async (req, res) => {
     // 検索タグを配列として解析（引用符で囲まれたスペース含むタグに対応）
     const searchTags = tag ? shopify.parseTags(tag) : [];
 
+    // 商品タグでフィルタリング（検索タグが指定されている場合のみ）
+    const filteredRows = searchTags.length > 0
+      ? formattedRows.filter(row =>
+          row.tags && row.tags.some(t => searchTags.includes(t))
+        )
+      : formattedRows;
+
     // DBに保存
     const order = getOrderModel();
-    const importResult = await order.clearAndImport(formattedRows);
+    const importResult = await order.clearAndImport(filteredRows);
 
     if (!importResult.success) {
       console.error('Failed to save orders to DB:', importResult.error);
     }
 
+    // フィルタ後のユニークな注文数を算出
+    const uniqueOrderCount = new Set(filteredRows.map(row => row.baseData[0])).size;
+
     // 検索メタデータを保存（order_export_meta）
     await order.saveExportMeta({
       searchTags,
       paidOnly: paidOnlyBool,
-      orderCount: orders.length,
-      rowCount: formattedRows.length,
+      orderCount: uniqueOrderCount,
+      rowCount: filteredRows.length,
     });
 
-    console.log(`Saved ${orders.length} orders (${formattedRows.length} rows) to database`);
+    console.log(`Saved ${uniqueOrderCount} orders (${filteredRows.length} rows) to database`);
 
     res.json({
       success: true,
-      count: orders.length,
-      rowCount: formattedRows.length,
+      count: uniqueOrderCount,
+      rowCount: filteredRows.length,
     });
   } catch (error) {
     console.error('Order search error:', error);
@@ -127,32 +137,42 @@ router.post('/export', requireAdmin, async (req, res) => {
       formattedRows.push(...orderRows);
     });
 
+    // 検索タグを配列として解析（引用符で囲まれたスペース含むタグに対応）
+    const searchTags = tag ? shopify.parseTags(tag) : [];
+
+    // 商品タグでフィルタリング（検索タグが指定されている場合のみ）
+    const filteredRows = searchTags.length > 0
+      ? formattedRows.filter(row =>
+          row.tags && row.tags.some(t => searchTags.includes(t))
+        )
+      : formattedRows;
+
     // DBに保存（全削除→一括追加）
     const order = getOrderModel();
-    const result = await order.clearAndImport(formattedRows);
+    const result = await order.clearAndImport(filteredRows);
 
     if (!result.success) {
       throw new Error(result.error || 'DB保存に失敗しました');
     }
 
-    // 検索タグを配列として解析（引用符で囲まれたスペース含むタグに対応）
-    const searchTags = tag ? shopify.parseTags(tag) : [];
+    // フィルタ後のユニークな注文数を算出
+    const uniqueOrderCount = new Set(filteredRows.map(row => row.baseData[0])).size;
 
     // エクスポートメタデータを保存
     await order.saveExportMeta({
       searchTags,
       paidOnly,
-      orderCount: ordersData.length,
-      rowCount: formattedRows.length,
+      orderCount: uniqueOrderCount,
+      rowCount: filteredRows.length,
     });
 
-    console.log(`Exported ${ordersData.length} orders (${formattedRows.length} rows) to database`);
+    console.log(`Exported ${uniqueOrderCount} orders (${filteredRows.length} rows) to database`);
 
     res.json({
       success: true,
-      message: `${ordersData.length}件の注文（${formattedRows.length}行）をデータベースに保存しました`,
-      exported: ordersData.length,
-      rowCount: formattedRows.length
+      message: `${uniqueOrderCount}件の注文（${filteredRows.length}行）をデータベースに保存しました`,
+      exported: uniqueOrderCount,
+      rowCount: filteredRows.length
     });
   } catch (error) {
     console.error('Order export error:', error);
