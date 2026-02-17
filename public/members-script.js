@@ -136,6 +136,14 @@ class MembersManager {
             }
         });
 
+        // CSVエクスポートボタン
+        const csvExportBtn = document.getElementById('csvExportBtn');
+        if (csvExportBtn) {
+            csvExportBtn.addEventListener('click', () => {
+                this.exportCsv();
+            });
+        }
+
         // 同期ボタン（管理者のみ）
         const syncBtn = document.getElementById('syncBtn');
         if (syncBtn) {
@@ -296,6 +304,77 @@ class MembersManager {
         }
         this.currentPage = 1;
         this.loadMembers();
+    }
+
+    async exportCsv() {
+        const csvExportBtn = document.getElementById('csvExportBtn');
+        const originalText = csvExportBtn.textContent;
+
+        try {
+            csvExportBtn.disabled = true;
+            csvExportBtn.textContent = 'エクスポート中...';
+
+            const params = new URLSearchParams();
+            if (this.currentFilters.search) {
+                params.set('search', this.currentFilters.search);
+            }
+
+            const response = await authFetch(`${this.apiUrl}/export?${params}`);
+            const result = await response.json();
+
+            if (result.success) {
+                this.downloadCsv(result.data, result.filename);
+                this.showNotification(`${result.data.length}件のデータをエクスポートしました`, 'success');
+            } else {
+                this.showNotification(result.error || 'エクスポートに失敗しました', 'error');
+            }
+        } catch (error) {
+            console.error('CSV export error:', error);
+            this.showNotification('エクスポート中にエラーが発生しました', 'error');
+        } finally {
+            csvExportBtn.disabled = false;
+            csvExportBtn.textContent = originalText;
+        }
+    }
+
+    downloadCsv(data, filename) {
+        if (!data || data.length === 0) return;
+
+        const headers = Object.keys(data[0]);
+
+        // CSV生成（BOM付きUTF-8）
+        const csvContent = [
+            headers.join(','),
+            ...data.map(row => {
+                return headers.map(header => {
+                    let value = row[header];
+                    if (Array.isArray(value)) {
+                        value = value.join(';');
+                    }
+                    if (value === null || value === undefined) {
+                        value = '';
+                    }
+                    value = String(value);
+                    if (value.includes(',') || value.includes('\n') || value.includes('"')) {
+                        value = '"' + value.replace(/"/g, '""') + '"';
+                    }
+                    return value;
+                }).join(',');
+            })
+        ].join('\n');
+
+        // BOM付きでBlobを作成
+        const bom = new Uint8Array([0xEF, 0xBB, 0xBF]);
+        const blob = new Blob([bom, csvContent], { type: 'text/csv;charset=utf-8;' });
+
+        // ダウンロード
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(link.href);
     }
 
     async syncFromShopify() {

@@ -67,6 +67,24 @@ router.post('/sync', requireAdmin, async (req, res) => {
   }
 });
 
+// 全項目CSVエクスポート
+router.get('/export', async (req, res) => {
+  try {
+    const filters = {};
+    if (req.query.search) filters.search = req.query.search;
+
+    const result = await memberModel.findWithPaging(1, 100000, filters, 'created_at', 'desc');
+
+    const date = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    const filename = `FWJ会員_全項目_${date}.csv`;
+
+    res.json({ success: true, data: result.data, filename });
+  } catch (error) {
+    console.error('Members export error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // 特定の会員データ取得（Shopify ID）
 router.get('/:shopifyId', async (req, res) => {
   try {
