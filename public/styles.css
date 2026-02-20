@@ -2210,6 +2210,15 @@ input[type="file"]:hover {
     background: #c0392b;
 }
 
+.btn-notify {
+    background: #8e44ad;
+    color: white;
+}
+
+.btn-notify:hover {
+    background: #7d3c98;
+}
+
 /* Actions Header */
 .actions-header {
     text-align: center;
@@ -2276,6 +2285,16 @@ input[type="file"]:hover {
     width: 18px;
     height: 18px;
     cursor: pointer;
+}
+
+/* Notify Member Info */
+.notify-member-info {
+    background: #f8f9fa;
+    padding: 12px 15px;
+    border-radius: 6px;
+    margin-bottom: 20px;
+    border-left: 4px solid #8e44ad;
+    font-size: 14px;
 }
 
 /* Delete Dialog Styles */

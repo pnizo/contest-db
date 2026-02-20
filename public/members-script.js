@@ -47,6 +47,7 @@ class MembersManager {
             column: 'created_at',
             direction: 'desc'
         };
+        this.notifyingMember = null;
         this.init();
     }
 
@@ -152,6 +153,22 @@ class MembersManager {
             });
         }
 
+        // 通知モーダル
+        document.getElementById('closeNotifyDialog').addEventListener('click', () => {
+            this.closeNotifyDialog();
+        });
+        document.getElementById('cancelNotifyBtn').addEventListener('click', () => {
+            this.closeNotifyDialog();
+        });
+        document.getElementById('sendNotifyBtn').addEventListener('click', () => {
+            this.sendNotification();
+        });
+        document.getElementById('notifyDialog').addEventListener('click', (e) => {
+            if (e.target.id === 'notifyDialog') {
+                this.closeNotifyDialog();
+            }
+        });
+
         // ログアウト
         document.getElementById('logoutBtn').addEventListener('click', () => {
             this.logout();
@@ -197,6 +214,7 @@ class MembersManager {
         // ヘッダー作成
         const headerRow = document.createElement('tr');
         const headers = [
+            { key: '_actions', label: '操作' },
             { key: 'shopify_id', label: 'Shopify ID' },
             { key: 'email', label: 'メールアドレス' },
             { key: 'first_name', label: '名' },
@@ -220,10 +238,15 @@ class MembersManager {
 
         headers.forEach(header => {
             const th = document.createElement('th');
-            th.className = 'sortable';
-            th.setAttribute('data-column', header.key);
-            th.innerHTML = `${header.label}${this.getSortIcon(header.key)}`;
-            th.addEventListener('click', () => this.sortBy(header.key));
+            if (header.key !== '_actions') {
+                th.className = 'sortable';
+                th.setAttribute('data-column', header.key);
+                th.innerHTML = `${header.label}${this.getSortIcon(header.key)}`;
+                th.addEventListener('click', () => this.sortBy(header.key));
+            } else {
+                th.className = 'actions-header';
+                th.textContent = header.label;
+            }
             headerRow.appendChild(th);
         });
 
@@ -236,7 +259,20 @@ class MembersManager {
             headers.forEach(header => {
                 const td = document.createElement('td');
 
-                if (header.key === 'created_at' && member[header.key]) {
+                if (header.key === '_actions') {
+                    if (this.isAdmin && member.shopify_id && member.has_push_subscription) {
+                        const actionsDiv = document.createElement('div');
+                        actionsDiv.className = 'row-actions';
+
+                        const notifyBtn = document.createElement('button');
+                        notifyBtn.className = 'btn-small btn-notify';
+                        notifyBtn.textContent = '通知';
+                        notifyBtn.addEventListener('click', () => this.openNotifyDialog(member));
+
+                        actionsDiv.appendChild(notifyBtn);
+                        td.appendChild(actionsDiv);
+                    }
+                } else if (header.key === 'created_at' && member[header.key]) {
                     // 日付のフォーマット
                     const date = new Date(member[header.key]);
                     td.textContent = date.toLocaleDateString('ja-JP');
@@ -420,6 +456,63 @@ class MembersManager {
         setTimeout(() => {
             notification.classList.add('hidden');
         }, 5000);
+    }
+
+    openNotifyDialog(member) {
+        this.notifyingMember = member;
+        const info = document.getElementById('notifyMemberInfo');
+        const name = [member.last_name, member.first_name].filter(Boolean).join(' ') || '名前なし';
+        info.innerHTML = `<strong>送信先:</strong> ${name}${member.email ? ` (${member.email})` : ''}`;
+
+        document.getElementById('notifyForm').reset();
+        document.getElementById('notifyDialog').classList.remove('hidden');
+    }
+
+    closeNotifyDialog() {
+        document.getElementById('notifyDialog').classList.add('hidden');
+        this.notifyingMember = null;
+    }
+
+    async sendNotification() {
+        const title = document.getElementById('notifyTitle').value.trim();
+        const body = document.getElementById('notifyBody').value.trim();
+        const url = document.getElementById('notifyUrl').value.trim();
+
+        if (!title || !body) {
+            this.showNotification('タイトルと本文は必須です', 'error');
+            return;
+        }
+
+        const sendBtn = document.getElementById('sendNotifyBtn');
+        const originalText = sendBtn.textContent;
+
+        try {
+            sendBtn.disabled = true;
+            sendBtn.textContent = '送信中...';
+
+            const payload = { title, body };
+            if (url) payload.url = url;
+
+            const response = await authFetch(`${this.apiUrl}/${this.notifyingMember.shopify_id}/notify`, {
+                method: 'POST',
+                body: JSON.stringify(payload)
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                this.showNotification('通知を送信しました', 'success');
+                this.closeNotifyDialog();
+            } else {
+                this.showNotification(result.error || '通知の送信に失敗しました', 'error');
+            }
+        } catch (error) {
+            console.error('Notification send failed:', error);
+            this.showNotification('通知の送信中にエラーが発生しました', 'error');
+        } finally {
+            sendBtn.disabled = false;
+            sendBtn.textContent = originalText;
+        }
     }
 
     async logout() {

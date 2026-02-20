@@ -9,8 +9,9 @@ const contestModel = new Contest();
  * 外部サーバーのContestsキャッシュをクリアする
  */
 async function clearContestsCache() {
-  const url = process.env.APP_CACHE_CLEAR_URL;
-  const secret = process.env.APP_CACHE_CLEAR_SECRET;
+  const baseUrl = process.env.FITNESS_APP_URL;
+  const secret = process.env.FITNESS_APP_API_SECRET;
+  const url = baseUrl ? `${baseUrl}/api/cache/clear` : null;
   if (!url || !secret) return;
 
   try {

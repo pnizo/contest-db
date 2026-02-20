@@ -2,6 +2,7 @@ const express = require('express');
 const Member = require('../models/Member');
 const ShopifyService = require('../services/shopify');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
+const { sendPushNotification } = require('../services/notification');
 const router = express.Router();
 
 const memberModel = new Member();
@@ -82,6 +83,37 @@ router.get('/export', async (req, res) => {
   } catch (error) {
     console.error('Members export error:', error);
     res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// プッシュ通知送信（管理者のみ）
+router.post('/:shopifyId/notify', requireAdmin, async (req, res) => {
+  try {
+    const { title, body } = req.body;
+
+    if (!title || !body) {
+      return res.status(400).json({ success: false, error: 'タイトルと本文は必須です' });
+    }
+
+    const shopifyId = req.params.shopifyId;
+    const result = await sendPushNotification({
+      shopifyId,
+      title,
+      body,
+      ...(req.body.url ? { url: req.body.url } : {})
+    });
+
+    if (!result.ok) {
+      if (result.status === 404) {
+        return res.status(404).json({ success: false, error: 'この会員はプッシュ通知を有効にしていません' });
+      }
+      return res.status(result.status).json({ success: false, error: result.data.error || '通知の送信に失敗しました' });
+    }
+
+    res.json({ success: true, message: '通知を送信しました' });
+  } catch (error) {
+    console.error('Notification send error:', error);
+    res.status(500).json({ success: false, error: '通知の送信中にエラーが発生しました' });
   }
 });
 

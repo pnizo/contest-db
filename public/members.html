@@ -58,6 +58,37 @@
         <div id="notification" class="notification hidden"></div>
     </div>
 
+    <!-- 通知送信ダイアログ -->
+    <div id="notifyDialog" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>プッシュ通知を送信</h3>
+                <button type="button" class="modal-close" id="closeNotifyDialog">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="notify-member-info" id="notifyMemberInfo"></div>
+                <form id="notifyForm">
+                    <div class="form-group">
+                        <label for="notifyTitle">タイトル <span class="required">*</span></label>
+                        <input type="text" id="notifyTitle" name="title" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="notifyBody">本文 <span class="required">*</span></label>
+                        <textarea id="notifyBody" name="body" rows="4" required></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="notifyUrl">URL（任意）</label>
+                        <input type="text" id="notifyUrl" name="url" placeholder="https://...">
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn-secondary" id="cancelNotifyBtn">キャンセル</button>
+                <button type="button" class="btn-primary" id="sendNotifyBtn">送信</button>
+            </div>
+        </div>
+    </div>
+
     <script src="navigation.js"></script>
     <script src="column-resize.js"></script>
     <script src="table-sort.js"></script>

@@ -2,6 +2,7 @@ const express = require('express');
 const { verifyCheckinCode } = require('../utils/checkin-code');
 const { requireAuth } = require('../middleware/auth');
 const Ticket = require('../models/Ticket');
+const { hasPushSubscription, sendPushNotification } = require('../services/notification');
 const router = express.Router();
 
 // ============================================
@@ -109,6 +110,24 @@ router.post('/', async (req, res) => {
 
     // チェックイン実行（is_usableをfalseに更新）
     await ticketModel.checkin(ticket.id);
+
+    // fire-and-forget: 購入者にプッシュ通知を送信
+    if (ticket.shopify_id) {
+      (async () => {
+        try {
+          const hasSubscription = await hasPushSubscription(ticket.shopify_id);
+          if (hasSubscription) {
+            await sendPushNotification({
+              shopifyId: ticket.shopify_id,
+              title: 'チケットがチェックインされました',
+              body: `${ticket.order_no} ${ticket.product_name} ${ticket.variant} のチケットが受付されました`
+            });
+          }
+        } catch (err) {
+          console.error('Checkin push notification error:', err);
+        }
+      })();
+    }
 
     res.json({
       success: true,

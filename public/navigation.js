@@ -20,7 +20,7 @@ const NAV_CONFIG = {
             ]
         },
         {
-            label: 'Shopify検索',
+            label: 'ユーティリティ',
             items: [
                 { href: '/members', label: 'FWJ会員検索' },
                 { href: '/orders', label: '注文検索' }

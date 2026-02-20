@@ -1,5 +1,5 @@
 const { getDb } = require('../lib/db');
-const { members } = require('../lib/db/schema');
+const { members, pushSubscriptions } = require('../lib/db/schema');
 const { eq, ilike, and, desc, asc, sql, isNotNull, ne } = require('drizzle-orm');
 
 /**
@@ -145,7 +145,21 @@ class Member {
         .limit(limit)
         .offset(offset);
 
-      const data = rows.map(row => this._toSnakeCase(row));
+      // push_subscriptions に登録がある shopify_id を取得
+      const shopifyIds = rows.map(r => r.shopifyId).filter(Boolean);
+      let pushEnabledIds = new Set();
+      if (shopifyIds.length > 0) {
+        const pushRows = await db
+          .select({ shopifyId: pushSubscriptions.shopifyId })
+          .from(pushSubscriptions)
+          .where(sql`${pushSubscriptions.shopifyId} IN (${sql.join(shopifyIds.map(id => sql`${id}`), sql`, `)})`);
+        pushEnabledIds = new Set(pushRows.map(r => r.shopifyId));
+      }
+
+      const data = rows.map(row => ({
+        ...this._toSnakeCase(row),
+        has_push_subscription: pushEnabledIds.has(row.shopifyId),
+      }));
       const totalPages = Math.ceil(total / limit);
 
       return { data, total, page, limit, totalPages };
