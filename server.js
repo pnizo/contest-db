@@ -31,16 +31,33 @@ app.set('trust proxy', true);
 // 他のbody parserより先に設定する必要がある
 app.use('/api/webhooks', express.raw({ type: 'application/json' }));
 
+// チェックイン専用ドメインのアクセス制御
+const CHECKIN_DOMAIN = 'ticket-checkin.fwj.jp';
+
 app.use(cors({
-  origin: process.env.NODE_ENV === 'production' ? process.env.VERCEL_URL : 'http://localhost:3000',
+  origin: function (origin, callback) {
+    // same-origin リクエスト（origin なし）は許可
+    if (!origin) return callback(null, true);
+
+    const allowed = [
+      'http://localhost:3000',
+      `https://${CHECKIN_DOMAIN}`,
+    ];
+    if (process.env.VERCEL_URL) {
+      allowed.push(`https://${process.env.VERCEL_URL}`);
+    }
+
+    if (allowed.includes(origin)) {
+      return callback(null, true);
+    }
+    callback(new Error('Not allowed by CORS'));
+  },
   credentials: true
 }));
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 app.use(cookieParser());
 
-// チェックイン専用ドメインのアクセス制御
-const CHECKIN_DOMAIN = 'ticket-checkin.fwj.jp';
 const ALLOWED_CHECKIN_PATHS = [
   '/',
   '/checkin',
