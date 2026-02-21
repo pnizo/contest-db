@@ -42,6 +42,7 @@ app.use(cors({
     const allowed = [
       'http://localhost:3000',
       `https://${CHECKIN_DOMAIN}`,
+      'https://contest-db.fwj.jp',
     ];
     if (process.env.VERCEL_URL) {
       allowed.push(`https://${process.env.VERCEL_URL}`);
