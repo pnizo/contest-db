@@ -117,7 +117,7 @@ function renderNavigation() {
 function showAdminOnlyElements() {
     document.querySelectorAll('.admin-only').forEach(el => {
         // ドロップダウンアイテムはblock、それ以外はinline-block
-        if (el.classList.contains('dropdown-item')) {
+        if (el.classList.contains('dropdown-item') || el.classList.contains('btn-dropdown-item')) {
             el.style.display = 'block';
         } else {
             el.style.display = 'inline-block';

@@ -34,10 +34,27 @@
                             <button type="button" id="searchBtn" class="search-btn" title="検索">検索</button>
                         </div>
                         <div class="control-buttons">
-                            <button id="shopifyImportBtn" class="admin-only">Shopifyから<br>最新データを取得</button>
-                            <button id="contestOrderImportBtn" class="admin-only">開催順CSVを適用</button>
-                            <button id="exportModalBtn">CSV出力</button>
-                            <button id="csvImportBtn" class="admin-only">全項目CSVを適用</button>
+                            <div class="btn-dropdown">
+                                <button id="dataRegDropdownBtn" class="btn-dropdown-toggle">データ追加 <span class="btn-dropdown-arrow">▼</span></button>
+                                <div id="dataRegDropdownMenu" class="btn-dropdown-menu hidden">
+                                    <button id="shopifyImportBtn" class="btn-dropdown-item admin-only">Shopify同期</button>
+                                    <button id="newRegistrationBtn" class="btn-dropdown-item">手動登録</button>
+                                </div>
+                            </div>
+                            <div class="btn-dropdown admin-only">
+                                <button id="dataNumberingDropdownBtn" class="btn-dropdown-toggle">データ採番 <span class="btn-dropdown-arrow">▼</span></button>
+                                <div id="dataNumberingDropdownMenu" class="btn-dropdown-menu hidden">
+                                    <button id="contestOrderImportBtn" class="btn-dropdown-item">開催順CSV適用</button>
+                                    <button id="assignPlayerNoBtn" class="btn-dropdown-item">ゼッケン採番</button>
+                                </div>
+                            </div>
+                            <div class="btn-dropdown admin-only">
+                                <button id="csvAllDropdownBtn" class="btn-dropdown-toggle">全項目CSV <span class="btn-dropdown-arrow">▼</span></button>
+                                <div id="csvAllDropdownMenu" class="btn-dropdown-menu hidden">
+                                    <button id="csvImportBtn" class="btn-dropdown-item">インポート</button>
+                                    <button id="exportModalBtn" class="btn-dropdown-item">エクスポート</button>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -80,6 +97,203 @@
         <div id="notification" class="notification hidden"></div>
     </div>
 
+    <!-- New Registration Modal -->
+    <div id="newRegistrationModal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>新規登録</h3>
+                <button class="modal-close" onclick="registrationsManager.closeNewRegistrationModal()">&times;</button>
+            </div>
+            <div class="modal-form">
+                <div class="form-group">
+                    <label>大会名 <span class="required">*</span></label>
+                    <select id="newRegContestName">
+                        <option value="">大会を選択してください</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>大会開催日 <span class="required">*</span></label>
+                    <input type="date" id="newRegContestDate" readonly>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>氏名 <span class="required">*</span></label>
+                        <input type="text" id="newRegNameJa" placeholder="山田 太郎">
+                    </div>
+                    <div class="form-group">
+                        <label>フリガナ</label>
+                        <input type="text" id="newRegNameJaKana" placeholder="ヤマダ タロウ">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>First Name</label>
+                        <input type="text" id="newRegFirstName">
+                    </div>
+                    <div class="form-group">
+                        <label>Last Name</label>
+                        <input type="text" id="newRegLastName">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>FWJカード番号</label>
+                        <input type="text" id="newRegFwjCardNo">
+                    </div>
+                    <div class="form-group">
+                        <label>ゼッケン番号</label>
+                        <input type="text" id="newRegPlayerNo">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group full-width">
+                        <button type="button" id="newRegSearchBtn" class="btn btn-secondary" disabled>
+                            出場登録データから検索して自動入力
+                        </button>
+                        <small>大会名とゼッケン番号またはFWJカード番号を入力すると検索できます</small>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>クラス</label>
+                    <input type="text" id="newRegClassName" placeholder="Men's Physique Open">
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Email</label>
+                        <input type="email" id="newRegEmail">
+                    </div>
+                    <div class="form-group">
+                        <label>電話番号</label>
+                        <input type="text" id="newRegPhone">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>国</label>
+                        <input type="text" id="newRegCountry">
+                    </div>
+                    <div class="form-group">
+                        <label>年齢</label>
+                        <input type="text" id="newRegAge">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>身長</label>
+                        <input type="text" id="newRegHeight">
+                    </div>
+                    <div class="form-group">
+                        <label>体重</label>
+                        <input type="text" id="newRegWeight">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>自己紹介</label>
+                    <textarea id="newRegBiography" rows="3"></textarea>
+                </div>
+                <div class="form-actions">
+                    <button type="button" onclick="registrationsManager.closeNewRegistrationModal()" class="btn btn-secondary">キャンセル</button>
+                    <button type="button" id="newRegSubmitBtn" disabled class="btn btn-primary">登録</button>
+                </div>
+                <div id="newRegStatus" class="import-status hidden"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Registration Modal -->
+    <div id="editRegistrationModal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>登録データ編集</h3>
+                <button class="modal-close" onclick="registrationsManager.closeEditRegistrationModal()">&times;</button>
+            </div>
+            <div class="modal-form">
+                <input type="hidden" id="editRegId">
+                <div class="form-group">
+                    <label>大会名</label>
+                    <input type="text" id="editRegContestName" readonly class="readonly-input">
+                </div>
+                <div class="form-group">
+                    <label>大会開催日</label>
+                    <input type="date" id="editRegContestDate" readonly class="readonly-input">
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>氏名 <span class="required">*</span></label>
+                        <input type="text" id="editRegNameJa">
+                    </div>
+                    <div class="form-group">
+                        <label>フリガナ</label>
+                        <input type="text" id="editRegNameJaKana">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>First Name</label>
+                        <input type="text" id="editRegFirstName">
+                    </div>
+                    <div class="form-group">
+                        <label>Last Name</label>
+                        <input type="text" id="editRegLastName">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>FWJカード番号</label>
+                        <input type="text" id="editRegFwjCardNo">
+                    </div>
+                    <div class="form-group">
+                        <label>ゼッケン番号</label>
+                        <input type="text" id="editRegPlayerNo">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>クラス</label>
+                    <input type="text" id="editRegClassName">
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Email</label>
+                        <input type="email" id="editRegEmail">
+                    </div>
+                    <div class="form-group">
+                        <label>電話番号</label>
+                        <input type="text" id="editRegPhone">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>国</label>
+                        <input type="text" id="editRegCountry">
+                    </div>
+                    <div class="form-group">
+                        <label>年齢</label>
+                        <input type="text" id="editRegAge">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>身長</label>
+                        <input type="text" id="editRegHeight">
+                    </div>
+                    <div class="form-group">
+                        <label>体重</label>
+                        <input type="text" id="editRegWeight">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>自己紹介</label>
+                    <textarea id="editRegBiography" rows="3"></textarea>
+                </div>
+                <div class="form-actions">
+                    <button type="button" onclick="registrationsManager.closeEditRegistrationModal()" class="btn btn-secondary">キャンセル</button>
+                    <button type="button" id="editRegSubmitBtn" class="btn btn-primary">更新</button>
+                </div>
+                <div id="editRegStatus" class="import-status hidden"></div>
+            </div>
+        </div>
+    </div>
+
     <!-- Export Modal -->
     <div id="exportModal" class="modal hidden">
         <div class="modal-content">
@@ -111,6 +325,37 @@
         </div>
     </div>
 
+    <!-- Assign Player Numbers Modal -->
+    <div id="assignPlayerNoModal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>ゼッケン採番</h3>
+                <button class="modal-close" onclick="registrationsManager.closeAssignPlayerNoModal()">&times;</button>
+            </div>
+            <div class="modal-form">
+                <p class="modal-description">選択した大会の出場登録レコードにゼッケン番号（player_no）を採番します。sort_index順に番号を付与します。</p>
+                <div class="form-group">
+                    <label for="assignPnoContestName">大会名:</label>
+                    <select id="assignPnoContestName">
+                        <option value="">大会を選択してください</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="assignPnoMode">採番モード:</label>
+                    <select id="assignPnoMode">
+                        <option value="keep" selected>既存番号を残す（未採番のみ付与）</option>
+                        <option value="reassign">全て振り直す（1から連番）</option>
+                    </select>
+                </div>
+                <div class="form-actions">
+                    <button type="button" onclick="registrationsManager.closeAssignPlayerNoModal()" class="btn btn-secondary">キャンセル</button>
+                    <button type="button" id="assignPnoExecuteBtn" disabled class="btn btn-primary">採番実行</button>
+                </div>
+                <div id="assignPnoStatus" class="import-status hidden"></div>
+            </div>
+        </div>
+    </div>
+
     <!-- Shopify Import Modal -->
     <div id="shopifyImportModal" class="modal hidden">
         <div class="modal-content">
@@ -130,13 +375,6 @@
                     <label for="shopifyContestDate">大会開催日:</label>
                     <input type="date" id="shopifyContestDate" readonly required>
                     <small>※大会名を選択すると自動的に設定されます</small>
-                </div>
-                <div class="form-group">
-                    <label for="shopifyPlayerNoMode">ゼッケン番号:</label>
-                    <select id="shopifyPlayerNoMode">
-                        <option value="keep" selected>現在のゼッケン番号を維持する</option>
-                        <option value="reassign">ゼッケン番号を振り直す</option>
-                    </select>
                 </div>
                 <div class="form-actions">
                     <button type="button" onclick="registrationsManager.closeShopifyImportModal()" class="btn btn-secondary">キャンセル</button>

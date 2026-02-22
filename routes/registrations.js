@@ -315,10 +315,25 @@ router.get('/:id', requireAuth, async (req, res) => {
   }
 });
 
-// 登録データ作成（管理者のみ）
-router.post('/', requireAdmin, async (req, res) => {
+// 登録データ作成
+router.post('/', requireAuth, async (req, res) => {
   try {
-    const result = await registrationModel.createRegistration(req.body);
+    const data = { ...req.body };
+
+    // sort_index が未指定の場合、同一大会の既存最大値+1をセット
+    if (!data.sort_index && data.contest_name) {
+      const existing = await registrationModel.findByContestName(data.contest_name);
+      let maxSortIndex = 0;
+      existing.forEach(reg => {
+        const si = parseInt(reg.sort_index, 10);
+        if (!isNaN(si) && si > maxSortIndex) {
+          maxSortIndex = si;
+        }
+      });
+      data.sort_index = String(maxSortIndex + 1);
+    }
+
+    const result = await registrationModel.createRegistration(data);
     if (result.success) {
       res.status(201).json(result);
     } else {
@@ -329,8 +344,8 @@ router.post('/', requireAdmin, async (req, res) => {
   }
 });
 
-// 登録データ更新（管理者のみ）
-router.put('/:id', requireAdmin, async (req, res) => {
+// 登録データ更新
+router.put('/:id', requireAuth, async (req, res) => {
   try {
     const updateData = {
       ...req.body,
@@ -347,8 +362,8 @@ router.put('/:id', requireAdmin, async (req, res) => {
   }
 });
 
-// 登録データ論理削除（管理者のみ）
-router.delete('/:id', requireAdmin, async (req, res) => {
+// 登録データ論理削除
+router.delete('/:id', requireAuth, async (req, res) => {
   try {
     const result = await registrationModel.softDelete(req.params.id);
     if (result.success) {
@@ -587,11 +602,132 @@ router.put('/:id', requireAdmin, async (req, res) => {
   }
 });
 
-// POST /import-shopify - OrdersテーブルとMembersテーブルからRegistrationsを作成
+// POST /assign-player-numbers - ゼッケン番号採番
+router.post('/assign-player-numbers', requireAuth, async (req, res) => {
+  try {
+    const { contestName, mode } = req.body;
+
+    if (!contestName) {
+      return res.status(400).json({ success: false, error: '大会名は必須です' });
+    }
+
+    if (!mode || !['keep', 'reassign'].includes(mode)) {
+      return res.status(400).json({ success: false, error: '採番モードが不正です' });
+    }
+
+    console.log(`Starting player number assignment for ${contestName} (mode: ${mode})`);
+
+    // 全有効レコードを取得
+    const registrations = await registrationModel.findByContestName(contestName);
+
+    if (registrations.length === 0) {
+      return res.json({
+        success: true,
+        data: { assigned: 0, skipped: 0, total: 0, contestName, message: '対象レコードがありません' }
+      });
+    }
+
+    // sort_index 順にソート（数値比較）
+    registrations.sort((a, b) => {
+      const ai = parseInt(a.sort_index, 10) || 99999;
+      const bi = parseInt(b.sort_index, 10) || 99999;
+      return ai - bi;
+    });
+
+    const updates = [];
+    // fwj_card_no → 割り当て済み player_no のマップ（同一人物に同じ番号を付与）
+    const cardToPlayerNo = new Map();
+
+    if (mode === 'reassign') {
+      // fwj_card_no があるレコードのみ採番し直し、空のレコードは既存値を保持
+      let counter = 1;
+      for (const reg of registrations) {
+        if (!reg.fwj_card_no || reg.fwj_card_no.trim() === '') {
+          continue;
+        }
+
+        const cardNo = reg.fwj_card_no.trim();
+        let playerNo;
+        if (cardToPlayerNo.has(cardNo)) {
+          playerNo = cardToPlayerNo.get(cardNo);
+        } else {
+          playerNo = String(counter);
+          cardToPlayerNo.set(cardNo, playerNo);
+          counter++;
+        }
+        updates.push({ id: reg.id, data: { player_no: playerNo } });
+      }
+    } else {
+      // keep: player_no が空かつ fwj_card_no があるレコードのみ採番
+      // まず既存の fwj_card_no → player_no マッピングを収集
+      for (const reg of registrations) {
+        if (reg.fwj_card_no && reg.fwj_card_no.trim() !== '' && reg.player_no && reg.player_no.trim() !== '') {
+          cardToPlayerNo.set(reg.fwj_card_no.trim(), reg.player_no.trim());
+        }
+      }
+
+      // 既存の最大値を取得
+      let maxNo = 0;
+      registrations.forEach(reg => {
+        const pn = parseInt(reg.player_no, 10);
+        if (!isNaN(pn) && pn > maxNo) {
+          maxNo = pn;
+        }
+      });
+
+      let counter = maxNo + 1;
+      for (const reg of registrations) {
+        if (reg.player_no && reg.player_no.trim() !== '') continue;
+        if (!reg.fwj_card_no || reg.fwj_card_no.trim() === '') continue;
+
+        const cardNo = reg.fwj_card_no.trim();
+        let playerNo;
+        if (cardToPlayerNo.has(cardNo)) {
+          playerNo = cardToPlayerNo.get(cardNo);
+        } else {
+          playerNo = String(counter);
+          cardToPlayerNo.set(cardNo, playerNo);
+          counter++;
+        }
+        updates.push({ id: reg.id, data: { player_no: playerNo } });
+      }
+    }
+
+    if (updates.length > 0) {
+      const result = await registrationModel.batchUpdate(updates);
+      if (!result.success) {
+        return res.status(400).json({ success: false, error: result.error });
+      }
+    }
+
+    const skippedCount = registrations.filter(r => !r.fwj_card_no || r.fwj_card_no.trim() === '').length;
+
+    const message = mode === 'reassign'
+      ? `${updates.length}件のゼッケン番号を振り直しました` + (skippedCount > 0 ? `（FWJカード番号なし${skippedCount}件は保持）` : '')
+      : `${updates.length}件にゼッケン番号を新規採番しました（既存${registrations.length - updates.length - skippedCount}件は保持）` + (skippedCount > 0 ? `（FWJカード番号なし${skippedCount}件はスキップ）` : '');
+
+    console.log(`Player number assignment completed: ${updates.length} updated, ${skippedCount} skipped (mode: ${mode})`);
+
+    res.json({
+      success: true,
+      data: {
+        assigned: updates.length,
+        skipped: skippedCount,
+        total: registrations.length,
+        contestName,
+        message
+      }
+    });
+
+  } catch (error) {
+    console.error('Assign player numbers error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+// POST /import-shopify - OrdersテーブルとMembersテーブルからRegistrationsを作成（UPSERT方式）
 router.post('/import-shopify', requireAdmin, async (req, res) => {
   try {
-    const { contestDate, contestName, playerNoMode } = req.body;
-    const reassignPlayerNo = (playerNoMode === 'reassign');
+    const { contestDate, contestName } = req.body;
 
     if (!contestDate || !contestName) {
       return res.status(400).json({
@@ -600,68 +736,18 @@ router.post('/import-shopify', requireAdmin, async (req, res) => {
       });
     }
 
-    console.log(`Starting Shopify import for ${contestName} (${contestDate})`);
+    console.log(`Starting Shopify import (UPSERT) for ${contestName} (${contestDate})`);
 
-    // Ordersテーブルから全データを取得
+    // 1. Orders・既存Registrations・Members を取得
     const ordersData = await orderModel.findAll();
     console.log(`Loaded ${ordersData.length} order rows from Orders table`);
 
-    // 既存のRegistrationsデータを取得（player_no引き継ぎ用）
-    const existingRegistrations = await registrationModel.findByContestName(contestName);
-    console.log(`Found ${existingRegistrations.length} existing registrations for ${contestName}`);
+    // ソフトデリート済みを含む全レコードを取得（UPSERTマッチング用）
+    const allExistingRegistrations = await registrationModel.findByContestNameAll(contestName);
+    // 有効なレコードのみ
+    const activeRegistrations = allExistingRegistrations.filter(r => r.isValid !== 'FALSE');
+    console.log(`Found ${allExistingRegistrations.length} existing registrations (${activeRegistrations.length} active) for ${contestName}`);
 
-    // Ordersが0件の場合は、既存Registrationsの削除のみ行う
-    if (ordersData.length === 0) {
-      let deletedCount = 0;
-      if (existingRegistrations.length > 0) {
-        await registrationModel.deleteByContestName(contestName);
-        deletedCount = existingRegistrations.length;
-        console.log(`Deleted ${deletedCount} existing registrations (Orders table is empty)`);
-      }
-      return res.json({
-        success: true,
-        data: {
-          total: 0,
-          imported: 0,
-          deleted: deletedCount,
-          skipped: 0,
-          memberNotFound: 0,
-          contestDate,
-          contestName,
-          message: `Ordersテーブルが空のため、${deletedCount}件を削除しました`
-        }
-      });
-    }
-
-    // player_no引き継ぎ用Map: fwj_card_no → player_no
-    const existingPlayerNoMap = new Map();
-    if (!reassignPlayerNo) {
-      existingRegistrations.forEach(reg => {
-        if (reg.fwj_card_no && reg.player_no) {
-          existingPlayerNoMap.set(String(reg.fwj_card_no), reg.player_no);
-        }
-      });
-    }
-
-    // 新規player_no用: 既存のplayer_no最大値を計算
-    let playerNoCounter = 1;
-    if (!reassignPlayerNo) {
-      existingRegistrations.forEach(reg => {
-        const pn = parseInt(reg.player_no, 10);
-        if (!isNaN(pn) && pn >= playerNoCounter) {
-          playerNoCounter = pn + 1;
-        }
-      });
-    }
-
-    // 既存データを削除（インポート前に削除）
-    if (existingRegistrations.length > 0) {
-      console.log(`Deleting ${existingRegistrations.length} existing registrations...`);
-      await registrationModel.deleteByContestName(contestName);
-      console.log(`Deleted ${existingRegistrations.length} existing registrations`);
-    }
-
-    // Membersの全データを取得
     const allMembers = await memberModel.findAllUnfiltered();
     console.log(`Loaded ${allMembers.length} members from Members table`);
 
@@ -673,43 +759,54 @@ router.post('/import-shopify', requireAdmin, async (req, res) => {
       }
     });
 
-    // 変換結果
-    const newRegistrations = [];
+    // 2. Orders を走査して「有効注文マップ」「返金注文セット」を構築
+    // key = fwjCardNo::className
+    const shopifyOrderStatus = new Map(); // key → 'valid' | 'refunded'
+    const validOrderData = new Map(); // key → order (有効注文のデータ保持用)
+
+    for (const order of ordersData) {
+      if (!order.shopify_id) continue;
+      const className = order.variant || '';
+      const key = `${order.shopify_id}::${className}`;
+
+      if (order.financial_status === '返金済み' || (parseInt(order.current_quantity, 10) || 0) <= 0) {
+        if (!shopifyOrderStatus.has(key)) {
+          shopifyOrderStatus.set(key, 'refunded');
+        }
+      } else {
+        shopifyOrderStatus.set(key, 'valid'); // valid は refunded を上書き
+        validOrderData.set(key, order);
+      }
+    }
+
+    console.log(`Order status map: ${shopifyOrderStatus.size} entries, ${validOrderData.size} valid orders`);
+
+    // 3. 既存レコードを (fwjCardNo::className) → record のマップ化
+    // fwjCardNo が空/null のレコードはマップに含めない（手動エントリーとして保護）
+    const existingMap = new Map();
+    for (const reg of activeRegistrations) {
+      if (reg.fwj_card_no) {
+        const key = `${reg.fwj_card_no}::${reg.class_name || ''}`;
+        existingMap.set(key, reg);
+      }
+    }
+
+    // 4. 各有効注文について UPDATE / INSERT を判定
+    const updates = [];      // { id, data } の配列
+    const inserts = [];       // batchImport 用の配列
+    const deleteIds = []; // DELETE 対象の ID 配列
+    const processedKeys = new Set(); // UPDATE 済みキーを記録
     const skippedOrders = [];
     const memberNotFoundOrders = [];
 
-    // 新規データ用のplayer_noマップ（同じfwj_card_noには同じplayer_noを付与）
-    const newPlayerNoMap = new Map();
-
-    // 各Orderレコードを処理
-    for (const order of ordersData) {
+    for (const [key, order] of validOrderData) {
       const shopifyId = order.shopify_id;
-
-      if (!shopifyId) {
-        skippedOrders.push({ reason: 'shopify_id不明', order: order.order_no || 'unknown' });
-        continue;
-      }
-
-      // 返金済み（キャンセル）の注文をスキップ
-      if (order.financial_status === '返金済み') {
-        skippedOrders.push({ reason: '返金済み（キャンセル）', order: order.order_no || 'unknown' });
-        continue;
-      }
-
-      // current_quantityが0以下（キャンセル・削除済み）の行をスキップ
-      const currentQty = parseInt(order.current_quantity, 10);
-      if (isNaN(currentQty) || currentQty <= 0) {
-        skippedOrders.push({ reason: 'current_quantity が 0 以下', order: order.order_no || 'unknown' });
-        continue;
-      }
-
-      // Memberを検索
-      const member = membersMap.get(String(shopifyId));
-
-      // class_nameを生成: variant名をそのまま使用
       const className = order.variant || '';
 
-      // 年齢を計算（fwj_birthday と contestDate から）
+      // Member を検索
+      const member = membersMap.get(String(shopifyId));
+
+      // 年齢を計算
       let age = '';
       if (member && member.fwj_birthday) {
         const calculatedAge = calculateAge(member.fwj_birthday, contestDate);
@@ -718,24 +815,8 @@ router.post('/import-shopify', requireAdmin, async (req, res) => {
         }
       }
 
-      // player_noを決定: 既存データにあれば引き継ぎ、なければ新規発行
-      let playerNo = '';
-      if (existingPlayerNoMap.has(String(shopifyId))) {
-        // 既存データからplayer_noを引き継ぐ
-        playerNo = existingPlayerNoMap.get(String(shopifyId));
-      } else if (newPlayerNoMap.has(String(shopifyId))) {
-        // 同じOrdersの中で既に新規発行済み
-        playerNo = newPlayerNoMap.get(String(shopifyId));
-      } else {
-        // 新規発行
-        playerNo = String(playerNoCounter);
-        newPlayerNoMap.set(String(shopifyId), playerNo);
-        playerNoCounter++;
-      }
-
-      // Registrationレコードを生成
-      const registration = {
-        // Members由来のデータ（memberが見つからない場合は空白）
+      // 共通フィールドデータを構築（player_noは採番機能で別途設定）
+      const regData = {
         name_ja: member
           ? `${member.fwj_lastname || ''} ${member.fwj_firstname || ''}`.trim()
           : (order.full_name || ''),
@@ -747,29 +828,30 @@ router.post('/import-shopify', requireAdmin, async (req, res) => {
         weight: member ? (member.fwj_weight || '') : '',
         country: member ? (member.fwj_nationality || '') : '',
         age: age,
-
-        // Orders由来のデータ
         fwj_card_no: shopifyId,
         email: order.email || '',
         class_name: className,
         back_stage_pass: order.back_stage_pass ?? 0,
         is_member: !!member,
-
-        // player_no: 決定済みの値を設定
-        player_no: playerNo,
-
-        // 空白のフィールド
         sort_index: '',
         score_card: '',
         contest_order: '',
         occupation: order.occupation || '',
         instagram: '',
-        biography: order.biography || ''
+        biography: order.biography || '',
       };
 
-      newRegistrations.push(registration);
+      // 既存レコードにマッチ → UPDATE（player_noは変更しない）
+      if (existingMap.has(key)) {
+        const existing = existingMap.get(key);
+        updates.push({ id: existing.id, data: regData });
+        processedKeys.add(key);
+      } else {
+        // 新規 → INSERT（player_noは空白）
+        inserts.push({ ...regData, player_no: '' });
+      }
 
-      // Memberが見つからなかった場合は記録
+      // Member が見つからなかった場合は記録
       if (!member) {
         memberNotFoundOrders.push({
           shopify_id: shopifyId,
@@ -779,14 +861,68 @@ router.post('/import-shopify', requireAdmin, async (req, res) => {
       }
     }
 
-    if (newRegistrations.length === 0) {
-      return res.status(400).json({
-        success: false,
-        error: 'インポート可能なデータがありませんでした'
-      });
+    // 5. 返金注文に対応する既存レコードをソフトデリート候補に追加
+    for (const [key, existingReg] of existingMap) {
+      // UPDATE 済み → スキップ
+      if (processedKeys.has(key)) continue;
+      // Orders に返金/キャンセルとして存在するもの → ソフトデリート
+      const status = shopifyOrderStatus.get(key);
+      if (status === 'refunded') {
+        deleteIds.push(existingReg.id);
+      }
+      // Orders に存在しない = 手動エントリー等 → 何もしない
     }
 
-    // class_nameでカスタムソート（2段階優先度ソート）
+    // 手動エントリー数（fwjCardNo が空 or Orders に存在しないレコード）
+    const preservedCount = activeRegistrations.filter(r => {
+      if (!r.fwj_card_no) return true;
+      const key = `${r.fwj_card_no}::${r.class_name || ''}`;
+      return !processedKeys.has(key) && !deleteIds.includes(r.id);
+    }).length;
+
+    // Orders からスキップされた行を集計
+    for (const order of ordersData) {
+      if (!order.shopify_id) {
+        skippedOrders.push({ reason: 'shopify_id不明', order: order.order_no || 'unknown' });
+      }
+    }
+
+    console.log(`UPSERT plan: ${inserts.length} inserts, ${updates.length} updates, ${deleteIds.length} deletes, ${preservedCount} preserved`);
+
+    // 6. DB操作を実行
+    // INSERT
+    let insertedCount = 0;
+    if (inserts.length > 0) {
+      const importResult = await registrationModel.batchImport(inserts, contestDate, contestName);
+      if (!importResult.success) {
+        return res.status(400).json({ success: false, error: importResult.error });
+      }
+      insertedCount = importResult.data.imported;
+    }
+
+    // UPDATE
+    let updatedCount = 0;
+    if (updates.length > 0) {
+      const updateResult = await registrationModel.batchUpdate(updates);
+      if (!updateResult.success) {
+        return res.status(400).json({ success: false, error: updateResult.error });
+      }
+      updatedCount = updateResult.updated || updates.length;
+    }
+
+    // DELETE（返金/キャンセル済み注文）
+    let deletedCount = 0;
+    if (deleteIds.length > 0) {
+      const deleteResult = await registrationModel.batchDelete(deleteIds);
+      if (!deleteResult.success) {
+        return res.status(400).json({ success: false, error: '削除に失敗しました' });
+      }
+      deletedCount = deleteResult.deleted;
+    }
+
+    // 7. sort_index 再計算: 全有効レコードを取得してソート
+    const allActiveRegs = await registrationModel.findByContestName(contestName);
+
     // カテゴリー辞書（優先度順）
     const CATEGORY_PRIORITY = [
       'Family Physique', 'ファミリーフィジーク',
@@ -818,9 +954,7 @@ router.post('/import-shopify', requireAdmin, async (req, res) => {
       'Heavyweight', 'ヘビーウェイト'
     ];
 
-    // ソートキーを取得する関数
     function getCustomSortKey(className) {
-      // カテゴリー優先度を取得（マッチしない場合は大きな値）
       let categoryIndex = CATEGORY_PRIORITY.length;
       for (let i = 0; i < CATEGORY_PRIORITY.length; i++) {
         if (className.includes(CATEGORY_PRIORITY[i])) {
@@ -828,8 +962,6 @@ router.post('/import-shopify', requireAdmin, async (req, res) => {
           break;
         }
       }
-
-      // クラス優先度を取得（マッチしない場合は大きな値）
       let classIndex = CLASS_PRIORITY.length;
       for (let i = 0; i < CLASS_PRIORITY.length; i++) {
         if (className.includes(CLASS_PRIORITY[i])) {
@@ -837,23 +969,19 @@ router.post('/import-shopify', requireAdmin, async (req, res) => {
           break;
         }
       }
-
       return { categoryIndex, classIndex, className };
     }
 
-    // 全データを2段階優先度ソート
-    newRegistrations.sort((a, b) => {
+    allActiveRegs.sort((a, b) => {
       const keyA = getCustomSortKey(a.class_name || '');
       const keyB = getCustomSortKey(b.class_name || '');
 
       const aMatchesBoth = keyA.categoryIndex < CATEGORY_PRIORITY.length && keyA.classIndex < CLASS_PRIORITY.length;
       const bMatchesBoth = keyB.categoryIndex < CATEGORY_PRIORITY.length && keyB.classIndex < CLASS_PRIORITY.length;
 
-      // マッチしたものを先に、マッチしないものを後に
       if (aMatchesBoth && !bMatchesBoth) return -1;
       if (!aMatchesBoth && bMatchesBoth) return 1;
 
-      // 両方マッチした場合: カテゴリー優先度 → クラス優先度 → 辞書順
       if (aMatchesBoth && bMatchesBoth) {
         if (keyA.categoryIndex !== keyB.categoryIndex) {
           return keyA.categoryIndex - keyB.categoryIndex;
@@ -863,46 +991,43 @@ router.post('/import-shopify', requireAdmin, async (req, res) => {
         }
       }
 
-      // 同じ優先度、または両方マッチしない場合は辞書順
       return keyA.className.localeCompare(keyB.className, 'ja');
     });
 
-    // 全データにsort_indexを付与（player_noは既に設定済み）
-    newRegistrations.forEach((reg, index) => {
-      // sort_index: 1から連番で振り直し
-      reg.sort_index = String(index + 1);
-    });
-
-    // 新規データをbatchImportで追加
-    const result = await registrationModel.batchImport(newRegistrations, contestDate, contestName);
-
-    if (!result.success) {
-      return res.status(400).json({
-        success: false,
-        error: result.error
-      });
+    // sort_index を振り直し
+    const sortIndexUpdates = allActiveRegs.map((reg, index) => ({
+      id: reg.id,
+      data: { sort_index: String(index + 1) }
+    }));
+    if (sortIndexUpdates.length > 0) {
+      await registrationModel.batchUpdate(sortIndexUpdates);
     }
 
     // 結果レスポンス
+    const total = insertedCount + updatedCount + deletedCount + preservedCount;
+    const message = `${insertedCount}件を新規追加、${updatedCount}件を更新、${deletedCount}件を削除しました`
+      + (preservedCount > 0 ? `（手動エントリー${preservedCount}件は保持）` : '');
+
     const responseData = {
-      total: ordersData.length,
-      imported: result.data.imported,
-      deleted: existingRegistrations.length,
+      total,
+      inserted: insertedCount,
+      updated: updatedCount,
+      deleted: deletedCount,
+      preserved: preservedCount,
       skipped: skippedOrders.length,
       memberNotFound: memberNotFoundOrders.length,
       contestDate,
       contestName,
-      message: `${existingRegistrations.length}件を削除し、${result.data.imported}件をインポートしました`
+      message
     };
 
-    // Memberが見つからなかったレコードがある場合は警告メッセージを追加
     if (memberNotFoundOrders.length > 0) {
       responseData.warnings = memberNotFoundOrders.map(o =>
         `shopify_id: ${o.shopify_id} (注文: ${o.order_no}, email: ${o.email}) - Memberが見つからないため、Members由来の項目は空白です`
       );
     }
 
-    console.log(`Shopify import completed: deleted ${existingRegistrations.length}, imported ${result.data.imported}, skipped ${skippedOrders.length}, member not found ${memberNotFoundOrders.length}`);
+    console.log(`Shopify import (UPSERT) completed: inserted ${insertedCount}, updated ${updatedCount}, deleted ${deletedCount}, preserved ${preservedCount}, skipped ${skippedOrders.length}`);
 
     res.json({
       success: true,

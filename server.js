@@ -33,6 +33,7 @@ app.use('/api/webhooks', express.raw({ type: 'application/json' }));
 
 // チェックイン専用ドメインのアクセス制御
 const CHECKIN_DOMAIN = 'ticket-checkin.fwj.jp';
+const MAIN_DOMAIN = 'contest-db.fwj.jp';
 
 app.use(cors({
   origin: function (origin, callback) {
@@ -40,9 +41,9 @@ app.use(cors({
     if (!origin) return callback(null, true);
 
     const allowed = [
-      'http://localhost:3000',
+      'http://localhost:3001',
       `https://${CHECKIN_DOMAIN}`,
-      'https://contest-db.fwj.jp',
+      `https://${MAIN_DOMAIN}`,
     ];
     if (process.env.VERCEL_URL) {
       allowed.push(`https://${process.env.VERCEL_URL}`);

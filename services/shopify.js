@@ -70,7 +70,7 @@ class ShopifyService {
   }
 
   // 特定のタグを持つ顧客を取得
-  async getCustomersByTag(tag, limit = 250) {
+  async getCustomersByTag(tag) {
     try {
       const allCustomers = [];
       let pageInfo = null;
@@ -126,7 +126,7 @@ class ShopifyService {
 
         const variables = {
           query: `tag:${tag}`,
-          first: Math.min(limit, 250), // Shopifyの制限は250
+          first: 250,
           after: pageInfo
         };
 
@@ -140,13 +140,14 @@ class ShopifyService {
           allCustomers.push(...customers);
 
           const { hasNextPage: hasNext, endCursor } = response.data.customers.pageInfo;
-          hasNextPage = hasNext && allCustomers.length < limit;
+          hasNextPage = hasNext;
           pageInfo = endCursor;
         } else {
           hasNextPage = false;
         }
       }
 
+      console.log(`Fetched all ${allCustomers.length} customers with tag "${tag}"`);
       return allCustomers;
     } catch (error) {
       console.error('Error fetching customers by tag:', error);

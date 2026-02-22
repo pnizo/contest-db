@@ -159,6 +159,7 @@
                     <ul>
                         <li><a href="#import-registrations">Shopifyから出場登録データを取り込む</a></li>
                         <li><a href="#set-contest-order">開催順CSVをインポートして出場順を設定する</a></li>
+                        <li><a href="#assign-player-numbers">ゼッケン番号を採番する</a></li>
                         <li><a href="#export-registrations">出場登録データをCSVで出力するには</a></li>
                         <li><a href="#import-all-csv">全項目CSVデータをインポートするには</a></li>
                     </ul>
@@ -242,7 +243,7 @@
             <p>基本的にはエントリー受付終了後に行うこと</p>
             <ol>
                 <li>ナビゲーションバーの「大会運営」→「出場登録」をクリック</li>
-                <li>「Shopifyから最新データを取得」ボタンをクリック</li>
+                <li>「データ追加」→「Shopify同期」をクリック</li>
                 <li>インポートモーダルが表示されたら、以下を順番に実行：
                     <ol type="a">
                         <li>コンテストを選択する</li>
@@ -258,7 +259,7 @@
             <h3 id="set-contest-order">開催順CSVをインポートして出場順を設定する</h3>
             <ol>
                 <li>ナビゲーションバーの「大会運営」→「出場登録」をクリック</li>
-                <li>「開催順CSVを適用」ボタンをクリック</li>
+                <li>「データ採番」→「開催順CSV適用」をクリック</li>
                 <li>対象の大会名をドロップダウンから選択</li>
                 <li>CSVファイルを選択
                     <ul>
@@ -266,6 +267,19 @@
                     </ul>
                 </li>
                 <li>「インポート実行」をクリック</li>
+            </ol>
+
+            <h3 id="assign-player-numbers">ゼッケン番号を採番する</h3>
+            <ol>
+                <li>ナビゲーションバーの「大会運営」→「出場登録」をクリック</li>
+                <li>「データ採番」→「ゼッケン採番」をクリック</li>
+                <li>対象の大会名をドロップダウンから選択</li>
+                <li>採番モードを選択
+                    <ul>
+                        <li>通常は「既存番号を残す（未裁判のみ付与）」でOK</li>
+                    </ul>
+                </li>
+                <li>「採番実行」をクリック</li>
             </ol>
 
             <h3 id="export-registrations">出場登録データをCSVで出力するには</h3>
@@ -383,11 +397,11 @@
             <h3 id="import-tickets">Shopifyからチケットをインポートするには</h3>
             <ol>
                 <li>ナビゲーションバーの「入場管理」→「チケット管理」をクリック</li>
-                <li>「Shopifyから最新データを取得」ボタンをクリック</li>
+                <li>「Shopify同期」ボタンをクリック</li>
                 <li>インポートモーダルで以下を設定：
                     <ul>
                         <li><strong>タグ</strong>: 検索タグ（デフォルト：「観戦チケット」）</li>
-                        <li><strong>取得期間</strong>: 何ヶ月前からの注文を取得するか（デフォルト：6ヶ月）</li>
+                        <li><strong>取得期間</strong>: 何ヶ月前からの注文を取得するか（デフォルト：3ヶ月）</li>
                     </ul>
                 </li>
                 <li>「インポート実行」ボタンをクリック</li>
@@ -494,7 +508,7 @@
 
         <div style="text-align: center; margin: 40px 0; color: #666;">
             <p><strong>Document Version</strong>: 1.0</p>
-            <p><strong>Last Updated</strong>: 2026年2月10日</p>
+            <p><strong>Last Updated</strong>: 2026年2月9日</p>
             <p style="margin-top: 20px;">各機能の詳細仕様は<a href="/manual.html" target="_blank" style="color: #4CAF50;">機能一覧マニュアル</a>を参照してください。</p>
         </div>
     </div>

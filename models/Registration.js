@@ -1,6 +1,6 @@
 const { getDb } = require('../lib/db');
 const { registrations } = require('../lib/db/schema');
-const { eq, and, or, ilike, gte, lte, desc, asc, sql } = require('drizzle-orm');
+const { eq, and, or, ilike, gte, lte, desc, asc, sql, inArray } = require('drizzle-orm');
 
 class Registration {
   constructor() {
@@ -118,6 +118,15 @@ class Registration {
     return rows.map(row => this._toResponse(row));
   }
 
+  // ソフトデリート済みを含む全レコードを返す（UPSERT マッチング用）
+  async findByContestNameAll(contestName) {
+    const db = getDb();
+    const rows = await db.select().from(registrations)
+      .where(eq(registrations.contestName, contestName))
+      .orderBy(asc(registrations.playerNo));
+    return rows.map(row => this._toResponse(row));
+  }
+
   async deleteByContestName(contestName) {
     const db = getDb();
 
@@ -203,11 +212,26 @@ class Registration {
       'id': registrations.id,
       'contest_date': registrations.contestDate,
       'contest_name': registrations.contestName,
-      'player_no': registrations.playerNo,
+      'player_no': sql`CAST(NULLIF(${registrations.playerNo}, '') AS INTEGER)`,
       'name_ja': registrations.nameJa,
+      'name_ja_kana': registrations.nameJaKana,
+      'first_name': registrations.firstName,
+      'last_name': registrations.lastName,
+      'email': registrations.email,
+      'phone': registrations.phone,
       'class_name': registrations.className,
       'fwj_card_no': registrations.fwjCardNo,
       'country': registrations.country,
+      'age': sql`CAST(NULLIF(${registrations.age}, '') AS INTEGER)`,
+      'sort_index': sql`CAST(NULLIF(${registrations.sortIndex}, '') AS INTEGER)`,
+      'score_card': sql`CAST(NULLIF(${registrations.scoreCard}, '') AS INTEGER)`,
+      'contest_order': sql`CAST(NULLIF(${registrations.contestOrder}, '') AS INTEGER)`,
+      'height': registrations.height,
+      'weight': registrations.weight,
+      'occupation': registrations.occupation,
+      'biography': registrations.biography,
+      'back_stage_pass': registrations.backStagePass,
+      'is_member': registrations.isMember,
     };
 
     const sortColumn = sortColumnMap[sortBy] || registrations.id;
@@ -254,10 +278,6 @@ class Registration {
 
     if (!registrationData.contest_name || registrationData.contest_name.trim() === '') {
       errors.push('大会名は必須です');
-    }
-
-    if (!registrationData.player_no) {
-      errors.push('Athlete #は必須です');
     }
 
     if (!registrationData.name_ja || registrationData.name_ja.trim() === '') {
@@ -427,6 +447,35 @@ class Registration {
       isValid: 'FALSE',
       deletedAt: new Date().toISOString()
     });
+  }
+
+  // 複数レコードを一括ソフトデリート
+  async batchSoftDelete(ids) {
+    if (!ids || ids.length === 0) {
+      return { success: true, softDeleted: 0 };
+    }
+    const db = getDb();
+    const now = new Date();
+    const result = await db.update(registrations)
+      .set({ isValid: false, deletedAt: now, updatedAt: now })
+      .where(and(
+        inArray(registrations.id, ids),
+        eq(registrations.isValid, true)
+      ))
+      .returning();
+    return { success: true, softDeleted: result.length };
+  }
+
+  // 複数レコードを一括ハードデリート
+  async batchDelete(ids) {
+    if (!ids || ids.length === 0) {
+      return { success: true, deleted: 0 };
+    }
+    const db = getDb();
+    const result = await db.delete(registrations)
+      .where(inArray(registrations.id, ids))
+      .returning();
+    return { success: true, deleted: result.length };
   }
 
   async delete(id) {

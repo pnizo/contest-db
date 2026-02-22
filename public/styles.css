@@ -1010,6 +1010,102 @@ button:active {
     flex-shrink: 0;
 }
 
+/* ボタンエリア用ドロップダウン */
+.btn-dropdown {
+    position: relative;
+    display: inline-block;
+}
+
+.btn-dropdown-toggle {
+    padding: 8px 16px;
+    background: #3498db;
+    color: white;
+    border: 1px solid #2980b9;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: background 0.2s;
+}
+
+.btn-dropdown-toggle:hover {
+    background: #2980b9;
+}
+
+.btn-dropdown-arrow {
+    font-size: 10px;
+    margin-left: 4px;
+}
+
+.btn-dropdown-menu {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    margin-top: 2px;
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    min-width: 100%;
+    z-index: 1000;
+}
+
+.btn-dropdown-item {
+    display: block;
+    width: 100%;
+    padding: 10px 16px;
+    background: none;
+    border: none;
+    color: #2c3e50;
+    font-size: 14px;
+    text-align: left;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.btn-dropdown-item:hover {
+    background-color: #ecf0f1;
+}
+
+/* テーブル操作列 */
+.actions-col {
+    white-space: nowrap;
+    text-align: center;
+}
+
+.btn-small {
+    padding: 3px 8px;
+    font-size: 12px;
+    border: none;
+    border-radius: 3px;
+    cursor: pointer;
+    margin: 0 2px;
+}
+
+.btn-edit {
+    background: #3498db;
+    color: white;
+}
+
+.btn-edit:hover {
+    background: #2980b9;
+}
+
+.btn-delete {
+    background: #e74c3c;
+    color: white;
+}
+
+.btn-delete:hover {
+    background: #c0392b;
+}
+
+/* 編集モーダルの読み取り専用入力 */
+.readonly-input {
+    background-color: #f0f0f0;
+    color: #666;
+}
+
 .score-card {
     background: #f8f9fa;
     border: 1px solid #e9ecef;
