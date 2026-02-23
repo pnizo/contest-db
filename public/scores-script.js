@@ -144,11 +144,35 @@ class ScoresManager {
                 // console.log('Contest names:', result.data.contestNames);
                 // console.log('Category names:', result.data.categoryNames);
                 this.populateFilterOptions(result.data);
+                this.selectDefaultContest(result.data.contestDates);
             } else {
                 console.error('Failed to load filter options:', result.error);
             }
         } catch (error) {
             console.error('Error loading filter options:', error);
+        }
+    }
+
+    selectDefaultContest(contestDates) {
+        const contestSelect = document.getElementById('contestFilter');
+        if (contestSelect.value) return;
+
+        const today = new Date().toISOString().split('T')[0];
+        let bestName = null;
+        let bestDate = null;
+
+        for (const [name, date] of Object.entries(contestDates)) {
+            if (date <= today) {
+                if (!bestDate || date > bestDate) {
+                    bestDate = date;
+                    bestName = name;
+                }
+            }
+        }
+
+        if (bestName) {
+            contestSelect.value = bestName;
+            this.currentFilters.contest_name = bestName;
         }
     }
 

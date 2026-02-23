@@ -69,10 +69,12 @@ router.get('/filter-options', requireAuth, async (req, res) => {
     console.log('Contest names (sorted by date desc):', contestNames.slice(0, 5)); // 最初の5個を表示
     console.log('Category names:', categoryNames.slice(0, 5)); // 最初の5個を表示
     
+    const contestDates = Object.fromEntries(contestMap);
     res.json({ 
       success: true, 
       data: {
         contestNames,
+        contestDates,
         categoryNames
       }
     });

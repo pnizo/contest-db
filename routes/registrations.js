@@ -192,6 +192,23 @@ router.get('/search/by-number', requireAuth, async (req, res) => {
   }
 });
 
+// 特定大会のクラス名一覧取得
+router.get('/class-names/:contestName', requireAuth, async (req, res) => {
+  try {
+    const contestName = decodeURIComponent(req.params.contestName);
+    const registrations = await registrationModel.findByContestName(contestName);
+    const classNames = [...new Set(
+      registrations
+        .map(reg => reg.class_name)
+        .filter(name => name && name.trim() !== '')
+    )].sort();
+    res.json({ success: true, data: classNames });
+  } catch (error) {
+    console.error('Class names fetch error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // 全登録データ取得（ページング対応）
 router.get('/', requireAuth, async (req, res) => {
   try {

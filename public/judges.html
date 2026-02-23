@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>審判採点 - FWJコンテストDB</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <div id="authHeader" class="auth-header" style="display: none;">
+            <div class="user-info-display">
+                <div class="user-avatar" id="userAvatar"></div>
+                <div class="user-details-display">
+                    <div class="name" id="userName"></div>
+                    <div class="role" id="userRole"></div>
+                </div>
+            </div>
+            <div class="auth-actions">
+                <!-- ナビゲーションはnavigation.jsで動的生成 -->
+            </div>
+        </div>
+
+        <main class="judges-main">
+            <section class="judges-section">
+                <h2>審判採点</h2>
+                <div class="section-controls">
+                    <div class="controls">
+                        <div class="search-container">
+                            <div class="search-input-wrapper">
+                                <input type="text" id="searchInput" placeholder="選手名/ゼッケン番号で検索..." class="search-input">
+                                <button type="button" id="clearSearchBtn" class="clear-btn hidden" title="検索をクリア">×</button>
+                            </div>
+                            <button type="button" id="searchBtn" class="search-btn" title="検索">検索</button>
+                        </div>
+                        <div class="control-buttons">
+                            <button id="addJudgeBtn" class="btn-primary admin-only" style="display:none;">新規追加</button>
+                            <div class="btn-dropdown admin-only" id="importDropdown" style="display:none;">
+                                <button type="button" class="btn-dropdown-toggle" id="importDropdownToggle">インポート <span class="btn-dropdown-arrow">▼</span></button>
+                                <div class="btn-dropdown-menu" id="importDropdownMenu" style="display:none;">
+                                    <button type="button" class="btn-dropdown-item" id="regImportModalBtn">出場登録からインポート</button>
+                                    <button type="button" class="btn-dropdown-item" id="importModalBtn">CSVインポート</button>
+                                </div>
+                            </div>
+                            <button id="exportBtn">エクスポート</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="filters">
+                    <div class="filter-row">
+                        <select id="contestFilter" class="filter-select">
+                            <option value="">大会名を選択</option>
+                        </select>
+                        <select id="classFilter" class="filter-select">
+                            <option value="">クラス名を選択</option>
+                        </select>
+                        <div class="filter-actions">
+                            <label class="toggle-label admin-only" style="display:none;">
+                                <input type="checkbox" id="showInvalidToggle"> 無効データを表示
+                            </label>
+                            <button id="applyFiltersBtn" class="filter-btn">絞り込み</button>
+                            <button id="clearFiltersBtn" class="filter-btn">クリア</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="judgesTableContainer" class="table-scroll-container">
+                    <div class="loading">読み込み中...</div>
+                </div>
+
+                <div id="pagination" class="pagination hidden">
+                    <button id="prevPageBtn" class="pagination-btn">前へ</button>
+                    <span id="pageInfo" class="page-info">ページ 1 / 1 (全 0 件)</span>
+                    <button id="nextPageBtn" class="pagination-btn">次へ</button>
+                </div>
+            </section>
+        </main>
+
+        <div id="notification" class="notification hidden"></div>
+    </div>
+
+    <!-- Add/Edit Judge Modal -->
+    <div id="judgeModal" class="modal hidden">
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <h2 id="modalTitle">審判採点データを追加</h2>
+                <button class="modal-close" onclick="judgesManager.closeModal()">&times;</button>
+            </div>
+            <div class="modal-form">
+                <form id="judgeForm">
+                    <input type="hidden" id="judgeId" name="id">
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="modalContestName">コンテスト名: <span class="required">*</span></label>
+                            <select id="modalContestName" name="contest_name" required>
+                                <option value="">大会を選択してください</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="modalContestDate">開催日:</label>
+                            <input type="text" id="modalContestDate" name="contest_date" placeholder="自動入力" readonly>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="modalClassName">クラス名: <span class="required">*</span></label>
+                            <input type="text" id="modalClassName" name="class_name" placeholder="クラス名を入力" required>
+                        </div>
+                        <div class="form-group"></div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="modalPlayerNo">ゼッケン番号: <span class="required">*</span></label>
+                            <input type="number" id="modalPlayerNo" name="player_no" placeholder="ゼッケン番号" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="modalPlayerName">プレイヤー名:</label>
+                            <input type="text" id="modalPlayerName" name="player_name" placeholder="プレイヤー名">
+                        </div>
+                    </div>
+
+
+
+                    <div class="form-row" style="grid-template-columns: 1fr 1fr 1fr 1fr 1fr; gap: 8px;">
+                        <div class="form-group">
+                            <label for="modalScoreJ1">J1:</label>
+                            <input type="number" id="modalScoreJ1" name="score_j1" placeholder="J1">
+                        </div>
+                        <div class="form-group">
+                            <label for="modalScoreJ2">J2:</label>
+                            <input type="number" id="modalScoreJ2" name="score_j2" placeholder="J2">
+                        </div>
+                        <div class="form-group">
+                            <label for="modalScoreJ3">J3:</label>
+                            <input type="number" id="modalScoreJ3" name="score_j3" placeholder="J3">
+                        </div>
+                        <div class="form-group">
+                            <label for="modalScoreJ4">J4:</label>
+                            <input type="number" id="modalScoreJ4" name="score_j4" placeholder="J4">
+                        </div>
+                        <div class="form-group">
+                            <label for="modalScoreJ5">J5:</label>
+                            <input type="number" id="modalScoreJ5" name="score_j5" placeholder="J5">
+                        </div>
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="button" onclick="judgesManager.closeModal()" class="btn btn-secondary">キャンセル</button>
+                        <button type="submit" class="btn btn-primary">保存</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Import Modal -->
+    <div id="importModal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>審判採点CSVインポート</h2>
+                <button class="modal-close" onclick="judgesManager.closeImportModal()">&times;</button>
+            </div>
+            <div class="modal-form">
+                <div class="form-group">
+                    <label for="importContestName">大会を選択: <span class="required">*</span></label>
+                    <select id="importContestName" required>
+                        <option value="">大会を選択してください</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="importClassName">クラス名: <span class="required">*</span></label>
+                    <input type="text" id="importClassName" placeholder="クラス名を入力" required>
+                    <small>※同じ大会名＋クラス名の既存データは上書きされます</small>
+                </div>
+                <div class="form-group">
+                    <label for="importCsvFile">CSVファイルを選択: <span class="required">*</span></label>
+                    <input type="file" id="importCsvFile" accept=".csv" required>
+                    <small>※必須カラム: player_no, placing / 任意: player_name, score_j1〜score_j5, score_t</small>
+                </div>
+                <div class="form-actions">
+                    <button type="button" onclick="judgesManager.closeImportModal()" class="btn btn-secondary">キャンセル</button>
+                    <button type="button" id="importBtn" disabled class="btn btn-primary">CSVをインポート</button>
+                </div>
+                <div id="importStatus" class="import-status hidden"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Registration Import Modal -->
+    <div id="registrationImportModal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>出場登録からインポート</h2>
+                <button class="modal-close" onclick="judgesManager.closeRegistrationImportModal()">&times;</button>
+            </div>
+            <div class="modal-form">
+                <div class="form-group">
+                    <label for="regImportContestName">大会を選択: <span class="required">*</span></label>
+                    <select id="regImportContestName" required>
+                        <option value="">大会を選択してください</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <small class="import-warning">※選択した大会の出場登録データから選手情報をインポートします。同じ大会の既存審判採点データは上書きされます。</small>
+                </div>
+                <div class="form-actions">
+                    <button type="button" onclick="judgesManager.closeRegistrationImportModal()" class="btn btn-secondary">キャンセル</button>
+                    <button type="button" id="regImportBtn" disabled class="btn btn-primary">インポート</button>
+                </div>
+                <div id="regImportStatus" class="import-status hidden"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="navigation.js"></script>
+    <script src="column-resize.js"></script>
+    <script src="table-sort.js"></script>
+    <script src="judges-script.js"></script>
+</body>
+</html>

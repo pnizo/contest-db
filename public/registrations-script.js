@@ -532,6 +532,26 @@ class RegistrationsManager {
         }
     }
 
+    // クラス名候補をdatalistに読み込む
+    async loadClassNamesForContest(contestName, datalistId) {
+        const datalist = document.getElementById(datalistId);
+        datalist.innerHTML = '';
+        if (!contestName) return;
+        try {
+            const response = await authFetch(`${this.apiUrl}/class-names/${encodeURIComponent(contestName)}`);
+            const result = await response.json();
+            if (result.success && result.data) {
+                result.data.forEach(name => {
+                    const option = document.createElement('option');
+                    option.value = name;
+                    datalist.appendChild(option);
+                });
+            }
+        } catch (error) {
+            console.error('Class names loading failed:', error);
+        }
+    }
+
     // 新規登録モーダル
     openNewRegistrationModal() {
         const modal = document.getElementById('newRegistrationModal');
@@ -577,6 +597,7 @@ class RegistrationsManager {
             contestSelect.value = this.defaultContest.contest_name;
             document.getElementById('newRegContestDate').value = this.formatDateForInput(this.defaultContest.contest_date);
             this.validateNewRegistrationForm();
+            this.loadClassNamesForContest(this.defaultContest.contest_name, 'newRegClassNameList');
         }
 
         // コンテスト名選択時に開催日を自動設定
@@ -590,6 +611,7 @@ class RegistrationsManager {
                 document.getElementById('newRegContestDate').value = '';
             }
             this.validateNewRegistrationForm();
+            this.loadClassNamesForContest(selectedName, 'newRegClassNameList');
         };
         contestSelect.addEventListener('change', this.newRegContestSelectChangeBound);
 
@@ -641,6 +663,8 @@ class RegistrationsManager {
         document.getElementById('editRegStatus').className = 'import-status hidden';
         document.getElementById('editRegStatus').textContent = '';
         document.getElementById('editRegSubmitBtn').disabled = false;
+
+        this.loadClassNamesForContest(reg.contest_name, 'editRegClassNameList');
     }
 
     closeEditRegistrationModal() {
