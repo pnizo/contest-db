@@ -187,11 +187,6 @@ class JudgesManager {
     }
 
     bindEvents() {
-        // 新規追加ボタン
-        document.getElementById('addJudgeBtn').addEventListener('click', () => {
-            this.openModal();
-        });
-
         // インポートドロップダウン
         document.getElementById('importDropdownToggle').addEventListener('click', () => {
             const menu = document.getElementById('importDropdownMenu');
@@ -252,8 +247,25 @@ class JudgesManager {
             this.exportCsv();
         });
 
-        // フィルター
-        document.getElementById('applyFiltersBtn').addEventListener('click', () => {
+        // 採点モーダル
+        document.getElementById('scoringBtn').addEventListener('click', () => {
+            this.openScoringModal();
+        });
+
+        document.getElementById('scoringContestName').addEventListener('change', () => {
+            this.updateScoringClassOptions();
+        });
+
+        document.getElementById('recalculateBtn').addEventListener('click', () => {
+            this.recalculateScores();
+        });
+
+        // フィルター（リストボックス変更で自動絞り込み）
+        document.getElementById('contestFilter').addEventListener('change', () => {
+            this.applyFilters();
+        });
+
+        document.getElementById('classFilter').addEventListener('change', () => {
             this.applyFilters();
         });
 
@@ -375,6 +387,8 @@ class JudgesManager {
                         <th class="sortable" data-column="score_j3">J3${getSortIcon('score_j3')}</th>
                         <th class="sortable" data-column="score_j4">J4${getSortIcon('score_j4')}</th>
                         <th class="sortable" data-column="score_j5">J5${getSortIcon('score_j5')}</th>
+                        <th class="sortable" data-column="score_j6">J6${getSortIcon('score_j6')}</th>
+                        <th class="sortable" data-column="score_j7">J7${getSortIcon('score_j7')}</th>
                         <th class="sortable" data-column="score_t">合計${getSortIcon('score_t')}</th>
                         <th>ステータス</th>
                         <th>操作</th>
@@ -417,6 +431,8 @@ class JudgesManager {
                     <td${this.isAdmin && !isDeleted ? ` class="editable-score" data-id="${judge.id}" data-field="score_j3"` : ''}>${judge.score_j3 != null ? judge.score_j3 : ''}</td>
                     <td${this.isAdmin && !isDeleted ? ` class="editable-score" data-id="${judge.id}" data-field="score_j4"` : ''}>${judge.score_j4 != null ? judge.score_j4 : ''}</td>
                     <td${this.isAdmin && !isDeleted ? ` class="editable-score" data-id="${judge.id}" data-field="score_j5"` : ''}>${judge.score_j5 != null ? judge.score_j5 : ''}</td>
+                    <td${this.isAdmin && !isDeleted ? ` class="editable-score" data-id="${judge.id}" data-field="score_j6"` : ''}>${judge.score_j6 != null ? judge.score_j6 : ''}</td>
+                    <td${this.isAdmin && !isDeleted ? ` class="editable-score" data-id="${judge.id}" data-field="score_j7"` : ''}>${judge.score_j7 != null ? judge.score_j7 : ''}</td>
                     <td class="score-total">${judge.score_t != null ? judge.score_t : ''}</td>
                     <td>${statusBadge}</td>
                     <td>${actions}</td>
@@ -520,18 +536,6 @@ class JudgesManager {
 
             // セルのテキストを更新
             td.textContent = result.data[field] != null ? result.data[field] : '';
-
-            // 同じ行の score_t を更新
-            const row = td.closest('tr');
-            const scoreTotalCell = row.querySelector('.score-total');
-            if (scoreTotalCell) {
-                scoreTotalCell.textContent = result.data.score_t != null ? result.data.score_t : '';
-            }
-
-            // 同一大会・クラスの行の placing をバックグラウンドで更新
-            const contestName = row.dataset.contest;
-            const className = row.dataset.class;
-            this.updatePlacingsInBackground(contestName, className);
         } catch (error) {
             td.textContent = originalValue;
             this.showNotification(error.message || '保存に失敗しました', 'error');
@@ -568,6 +572,134 @@ class JudgesManager {
             });
         } catch (e) {
             // placing更新失敗は致命的でないので無視
+        }
+    }
+
+    // --- 採点モーダル ---
+
+    openScoringModal() {
+        this.populateContestSelect('scoringContestName');
+
+        // 現在のフィルター値をプリセット
+        const contestFilter = document.getElementById('contestFilter').value;
+        if (contestFilter) {
+            document.getElementById('scoringContestName').value = contestFilter;
+            this.updateScoringClassOptions().then(() => {
+                const classFilter = document.getElementById('classFilter').value;
+                if (classFilter) {
+                    document.getElementById('scoringClassName').value = classFilter;
+                }
+            });
+        } else {
+            document.getElementById('scoringClassName').innerHTML = '<option value="">全クラス</option>';
+        }
+
+        document.getElementById('scoringExcludeMinMax').checked = true;
+        document.getElementById('scoringStatus').className = 'import-status hidden';
+        document.getElementById('scoringModal').classList.remove('hidden');
+    }
+
+    closeScoringModal() {
+        document.getElementById('scoringModal').classList.add('hidden');
+    }
+
+    async updateScoringClassOptions() {
+        const contestName = document.getElementById('scoringContestName').value;
+        const classSelect = document.getElementById('scoringClassName');
+        classSelect.innerHTML = '<option value="">全クラス</option>';
+
+        if (!contestName) return;
+
+        try {
+            const params = new URLSearchParams({
+                page: 1,
+                limit: 1,
+                contest_name: contestName
+            });
+            // filter-options からクラス名を取得するために全データのクラス名を検索
+            const response = await authFetch(`${this.apiUrl}?${params.toString()}`);
+            const result = await response.json();
+
+            if (!result.success) return;
+
+            // 全レコードからクラス名を取得するために別のアプローチ：filter-optionsを利用
+            const filterResponse = await authFetch(`${this.apiUrl}/filter-options`);
+            const filterResult = await filterResponse.json();
+
+            if (filterResult.success && filterResult.data.classNames) {
+                // 大会でフィルターした場合のクラス名を取得するために、
+                // 全クラスではなく大会に紐づくクラスのみ表示
+                const allParams = new URLSearchParams({
+                    page: 1,
+                    limit: 500,
+                    contest_name: contestName,
+                    sortBy: 'class_name',
+                    sortOrder: 'asc'
+                });
+                const allResponse = await authFetch(`${this.apiUrl}?${allParams.toString()}`);
+                const allResult = await allResponse.json();
+
+                if (allResult.success) {
+                    const classNames = [...new Set(allResult.data.map(j => j.class_name).filter(c => c))].sort();
+                    classNames.forEach(name => {
+                        const option = document.createElement('option');
+                        option.value = name;
+                        option.textContent = name;
+                        classSelect.appendChild(option);
+                    });
+                }
+            }
+        } catch (error) {
+            console.error('Error loading class options:', error);
+        }
+    }
+
+    async recalculateScores() {
+        const contestName = document.getElementById('scoringContestName').value;
+        if (!contestName) {
+            this.showNotification('大会を選択してください', 'error');
+            return;
+        }
+
+        const className = document.getElementById('scoringClassName').value;
+        const excludeMinMax = document.getElementById('scoringExcludeMinMax').checked;
+
+        const targetDesc = className ? `${contestName} / ${className}` : `${contestName}（全クラス）`;
+        if (!confirm(`「${targetDesc}」の採点を再計算します。よろしいですか？`)) {
+            return;
+        }
+
+        try {
+            document.getElementById('recalculateBtn').disabled = true;
+            document.getElementById('scoringStatus').className = 'import-status';
+            document.getElementById('scoringStatus').textContent = '再計算中...';
+
+            const response = await authFetch(`${this.apiUrl}/recalculate`, {
+                method: 'POST',
+                body: JSON.stringify({ contestName, className, excludeMinMax })
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                const { message } = result.data;
+                this.showNotification(message, 'success');
+                document.getElementById('scoringStatus').textContent = message;
+
+                this.loadJudges();
+
+                setTimeout(() => {
+                    this.closeScoringModal();
+                }, 2000);
+            } else {
+                this.showNotification(result.error, 'error');
+                document.getElementById('scoringStatus').textContent = '再計算に失敗しました';
+            }
+        } catch (error) {
+            this.showNotification('エラーが発生しました: ' + error.message, 'error');
+            document.getElementById('scoringStatus').textContent = 'エラーが発生しました';
+        } finally {
+            document.getElementById('recalculateBtn').disabled = false;
         }
     }
 
@@ -616,6 +748,8 @@ class JudgesManager {
                 document.getElementById('modalScoreJ3').value = judge.score_j3 != null ? judge.score_j3 : '';
                 document.getElementById('modalScoreJ4').value = judge.score_j4 != null ? judge.score_j4 : '';
                 document.getElementById('modalScoreJ5').value = judge.score_j5 != null ? judge.score_j5 : '';
+                document.getElementById('modalScoreJ6').value = judge.score_j6 != null ? judge.score_j6 : '';
+                document.getElementById('modalScoreJ7').value = judge.score_j7 != null ? judge.score_j7 : '';
             } else {
                 this.showNotification('データの取得に失敗しました', 'error');
             }

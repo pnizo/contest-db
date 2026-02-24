@@ -98,8 +98,16 @@ class GuestsManager {
     }
 
     bindEvents() {
-        // フィルター関連
-        document.getElementById('applyFiltersBtn').addEventListener('click', () => {
+        // フィルター関連（リストボックス変更で自動絞り込み）
+        document.getElementById('contestFilter').addEventListener('change', () => {
+            this.applyFilters();
+        });
+
+        document.getElementById('organizationTypeFilter').addEventListener('change', () => {
+            this.applyFilters();
+        });
+
+        document.getElementById('passTypeFilter').addEventListener('change', () => {
             this.applyFilters();
         });
 

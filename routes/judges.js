@@ -51,7 +51,7 @@ router.get('/export', requireAuth, async (req, res) => {
     const data = await judgeModel.findForExport(filters);
 
     // CSV文字列を生成
-    const headers = ['contest_name', 'contest_date', 'class_name', 'player_no', 'player_name', 'placing', 'score_j1', 'score_j2', 'score_j3', 'score_j4', 'score_j5', 'score_t'];
+    const headers = ['contest_name', 'contest_date', 'class_name', 'player_no', 'player_name', 'placing', 'score_j1', 'score_j2', 'score_j3', 'score_j4', 'score_j5', 'score_j6', 'score_j7', 'score_t'];
     const csvLines = [headers.join(',')];
 
     data.forEach(row => {
@@ -108,6 +108,35 @@ router.get('/', requireAuth, async (req, res) => {
 
     res.json({ success: true, ...result });
   } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 採点再計算（管理者のみ）
+router.post('/recalculate', requireAdmin, async (req, res) => {
+  try {
+    const { contestName, className, excludeMinMax } = req.body;
+
+    if (!contestName) {
+      return res.status(400).json({ success: false, error: '大会名が指定されていません' });
+    }
+
+    const result = await judgeModel.recalculateScores(
+      contestName,
+      className || '',
+      excludeMinMax !== false
+    );
+
+    res.json({
+      success: true,
+      data: {
+        updatedCount: result.updatedCount,
+        classCount: result.classCount,
+        message: `${result.classCount}クラス、${result.updatedCount}件の採点を再計算しました`
+      }
+    });
+  } catch (error) {
+    console.error('Recalculate error:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });

@@ -249,7 +249,20 @@ class ScoresManager {
         });
 
 
-        document.getElementById('applyFiltersBtn').addEventListener('click', () => {
+        // フィルター（変更で自動絞り込み）
+        document.getElementById('contestFilter').addEventListener('change', () => {
+            this.applyFilters();
+        });
+
+        document.getElementById('categoryFilter').addEventListener('change', () => {
+            this.applyFilters();
+        });
+
+        document.getElementById('startDate').addEventListener('change', () => {
+            this.applyFilters();
+        });
+
+        document.getElementById('endDate').addEventListener('change', () => {
             this.applyFilters();
         });
 

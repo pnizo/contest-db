@@ -292,7 +292,20 @@ class RegistrationsManager {
         //     this.toggleDeletedRecords();
         // });
 
-        document.getElementById('applyFiltersBtn').addEventListener('click', () => {
+        // フィルター（変更で自動絞り込み）
+        document.getElementById('contestFilter').addEventListener('change', () => {
+            this.applyFilters();
+        });
+
+        document.getElementById('classFilter').addEventListener('change', () => {
+            this.applyFilters();
+        });
+
+        document.getElementById('violationFilter').addEventListener('change', () => {
+            this.applyFilters();
+        });
+
+        document.getElementById('noteExistsFilter').addEventListener('change', () => {
             this.applyFilters();
         });
 

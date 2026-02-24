@@ -126,8 +126,20 @@ class NotesManager {
             this.openNoteModal();
         });
 
-        // フィルター関連
-        document.getElementById('applyFiltersBtn').addEventListener('click', () => {
+        // フィルター関連（変更で自動絞り込み）
+        document.getElementById('contestFilter').addEventListener('change', () => {
+            this.applyFilters();
+        });
+
+        document.getElementById('typeFilter').addEventListener('change', () => {
+            this.applyFilters();
+        });
+
+        document.getElementById('startDate').addEventListener('change', () => {
+            this.applyFilters();
+        });
+
+        document.getElementById('endDate').addEventListener('change', () => {
             this.applyFilters();
         });
 

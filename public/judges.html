@@ -34,7 +34,6 @@
                             <button type="button" id="searchBtn" class="search-btn" title="検索">検索</button>
                         </div>
                         <div class="control-buttons">
-                            <button id="addJudgeBtn" class="btn-primary admin-only" style="display:none;">新規追加</button>
                             <div class="btn-dropdown admin-only" id="importDropdown" style="display:none;">
                                 <button type="button" class="btn-dropdown-toggle" id="importDropdownToggle">インポート <span class="btn-dropdown-arrow">▼</span></button>
                                 <div class="btn-dropdown-menu" id="importDropdownMenu" style="display:none;">
@@ -43,6 +42,7 @@
                                 </div>
                             </div>
                             <button id="exportBtn">エクスポート</button>
+                            <button id="scoringBtn" class="btn-primary admin-only" style="display:none;">再計算</button>
                         </div>
                     </div>
                 </div>
@@ -58,7 +58,6 @@
                             <label class="toggle-label admin-only" style="display:none;">
                                 <input type="checkbox" id="showInvalidToggle"> 無効データを表示
                             </label>
-                            <button id="applyFiltersBtn" class="filter-btn">絞り込み</button>
                             <button id="clearFiltersBtn" class="filter-btn">クリア</button>
                         </div>
                     </div>
@@ -124,7 +123,7 @@
 
 
 
-                    <div class="form-row" style="grid-template-columns: 1fr 1fr 1fr 1fr 1fr; gap: 8px;">
+                    <div class="form-row" style="grid-template-columns: repeat(7, 1fr); gap: 8px;">
                         <div class="form-group">
                             <label for="modalScoreJ1">J1:</label>
                             <input type="number" id="modalScoreJ1" name="score_j1" placeholder="J1">
@@ -144,6 +143,14 @@
                         <div class="form-group">
                             <label for="modalScoreJ5">J5:</label>
                             <input type="number" id="modalScoreJ5" name="score_j5" placeholder="J5">
+                        </div>
+                        <div class="form-group">
+                            <label for="modalScoreJ6">J6:</label>
+                            <input type="number" id="modalScoreJ6" name="score_j6" placeholder="J6">
+                        </div>
+                        <div class="form-group">
+                            <label for="modalScoreJ7">J7:</label>
+                            <input type="number" id="modalScoreJ7" name="score_j7" placeholder="J7">
                         </div>
                     </div>
 
@@ -178,7 +185,7 @@
                 <div class="form-group">
                     <label for="importCsvFile">CSVファイルを選択: <span class="required">*</span></label>
                     <input type="file" id="importCsvFile" accept=".csv" required>
-                    <small>※必須カラム: player_no, placing / 任意: player_name, score_j1〜score_j5, score_t</small>
+                    <small>※必須カラム: player_no, placing / 任意: player_name, score_j1〜score_j7, score_t</small>
                 </div>
                 <div class="form-actions">
                     <button type="button" onclick="judgesManager.closeImportModal()" class="btn btn-secondary">キャンセル</button>
@@ -211,6 +218,40 @@
                     <button type="button" id="regImportBtn" disabled class="btn btn-primary">インポート</button>
                 </div>
                 <div id="regImportStatus" class="import-status hidden"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scoring Modal -->
+    <div id="scoringModal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>採点（再計算）</h2>
+                <button class="modal-close" onclick="judgesManager.closeScoringModal()">&times;</button>
+            </div>
+            <div class="modal-form">
+                <div class="form-group">
+                    <label for="scoringContestName">大会名: <span class="required">*</span></label>
+                    <select id="scoringContestName" required>
+                        <option value="">大会を選択してください</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="scoringClassName">クラス名:</label>
+                    <select id="scoringClassName">
+                        <option value="">全クラス</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="toggle-label">
+                        <input type="checkbox" id="scoringExcludeMinMax" checked> 最低点/最高点を除外する
+                    </label>
+                </div>
+                <div class="form-actions">
+                    <button type="button" onclick="judgesManager.closeScoringModal()" class="btn btn-secondary">キャンセル</button>
+                    <button type="button" id="recalculateBtn" class="btn btn-primary">再計算</button>
+                </div>
+                <div id="scoringStatus" class="import-status hidden"></div>
             </div>
         </div>
     </div>

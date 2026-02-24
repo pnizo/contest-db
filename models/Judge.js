@@ -23,6 +23,8 @@ class Judge {
       score_j3: row.scoreJ3,
       score_j4: row.scoreJ4,
       score_j5: row.scoreJ5,
+      score_j6: row.scoreJ6,
+      score_j7: row.scoreJ7,
       score_t: row.scoreT,
       isValid: row.isValid ? 'TRUE' : 'FALSE',
       createdAt: row.createdAt ? row.createdAt.toISOString() : '',
@@ -30,12 +32,13 @@ class Judge {
     };
   }
 
-  // score_j1〜j5のうち最高点と最低点を除いた3つの合計を算出
-  _calculateScoreT(j1, j2, j3, j4, j5) {
-    const scores = [j1, j2, j3, j4, j5].filter(s => s != null);
+  // score_j1〜j7の合計を算出
+  // excludeMinMax=true: 最高点と最低点を除外（3人以上の場合）
+  // excludeMinMax=false: 全スコアの単純合計
+  _calculateScoreT(j1, j2, j3, j4, j5, j6, j7, excludeMinMax = true) {
+    const scores = [j1, j2, j3, j4, j5, j6, j7].filter(s => s != null);
     if (scores.length === 0) return null;
-    if (scores.length <= 2) {
-      // 2人以下の場合はそのまま合計
+    if (!excludeMinMax || scores.length <= 2) {
       return scores.reduce((a, b) => a + b, 0);
     }
     // 3人以上：最高点と最低点を1つずつ除外して合計
@@ -127,7 +130,7 @@ class Judge {
     const total = parseInt(countResult[0].count);
 
     // 数値ソートが必要なカラム
-    const numericSortColumns = ['placing', 'player_no', 'score_j1', 'score_j2', 'score_j3', 'score_j4', 'score_j5', 'score_t'];
+    const numericSortColumns = ['placing', 'player_no', 'score_j1', 'score_j2', 'score_j3', 'score_j4', 'score_j5', 'score_j6', 'score_j7', 'score_t'];
 
     // ソート式を構築
     let orderByExpr;
@@ -140,6 +143,8 @@ class Judge {
         'score_j3': 'score_j3',
         'score_j4': 'score_j4',
         'score_j5': 'score_j5',
+        'score_j6': 'score_j6',
+        'score_j7': 'score_j7',
         'score_t': 'score_t',
       };
       const columnName = columnMap[sortBy] || sortBy;
@@ -196,26 +201,19 @@ class Judge {
         scoreJ3: data.score_j3 != null && data.score_j3 !== '' ? parseInt(data.score_j3) : null,
         scoreJ4: data.score_j4 != null && data.score_j4 !== '' ? parseInt(data.score_j4) : null,
         scoreJ5: data.score_j5 != null && data.score_j5 !== '' ? parseInt(data.score_j5) : null,
+        scoreJ6: data.score_j6 != null && data.score_j6 !== '' ? parseInt(data.score_j6) : null,
+        scoreJ7: data.score_j7 != null && data.score_j7 !== '' ? parseInt(data.score_j7) : null,
+        scoreT: null,
         isValid: true,
         createdAt: now,
         updatedAt: now,
       };
-
-      // score_t を自動計算
-      insertData.scoreT = this._calculateScoreT(
-        insertData.scoreJ1, insertData.scoreJ2, insertData.scoreJ3,
-        insertData.scoreJ4, insertData.scoreJ5
-      );
 
       const result = await db
         .insert(judges)
         .values(insertData)
         .returning();
 
-      // 同一大会・クラス内の placing を再計算
-      await this._recalculatePlacing(insertData.contestName, insertData.className);
-
-      // 再計算後の最新データを返す
       return { success: true, data: await this.findById(result[0].id) };
     } catch (error) {
       console.error('Judge create error:', error);
@@ -241,24 +239,8 @@ class Judge {
       if (data.score_j3 !== undefined) updateData.scoreJ3 = data.score_j3 != null && data.score_j3 !== '' ? parseInt(data.score_j3) : null;
       if (data.score_j4 !== undefined) updateData.scoreJ4 = data.score_j4 != null && data.score_j4 !== '' ? parseInt(data.score_j4) : null;
       if (data.score_j5 !== undefined) updateData.scoreJ5 = data.score_j5 != null && data.score_j5 !== '' ? parseInt(data.score_j5) : null;
-
-      // score_j1〜j5のいずれかが更新された場合、score_tを再計算
-      const scoreFields = ['score_j1', 'score_j2', 'score_j3', 'score_j4', 'score_j5'];
-      const scoresChanged = scoreFields.some(f => data[f] !== undefined);
-      if (scoresChanged) {
-        const existing = await this.findById(id);
-        const mergedScores = {
-          j1: updateData.scoreJ1 !== undefined ? updateData.scoreJ1 : (existing.score_j1 != null ? existing.score_j1 : null),
-          j2: updateData.scoreJ2 !== undefined ? updateData.scoreJ2 : (existing.score_j2 != null ? existing.score_j2 : null),
-          j3: updateData.scoreJ3 !== undefined ? updateData.scoreJ3 : (existing.score_j3 != null ? existing.score_j3 : null),
-          j4: updateData.scoreJ4 !== undefined ? updateData.scoreJ4 : (existing.score_j4 != null ? existing.score_j4 : null),
-          j5: updateData.scoreJ5 !== undefined ? updateData.scoreJ5 : (existing.score_j5 != null ? existing.score_j5 : null),
-        };
-        updateData.scoreT = this._calculateScoreT(
-          mergedScores.j1, mergedScores.j2, mergedScores.j3,
-          mergedScores.j4, mergedScores.j5
-        );
-      }
+      if (data.score_j6 !== undefined) updateData.scoreJ6 = data.score_j6 != null && data.score_j6 !== '' ? parseInt(data.score_j6) : null;
+      if (data.score_j7 !== undefined) updateData.scoreJ7 = data.score_j7 != null && data.score_j7 !== '' ? parseInt(data.score_j7) : null;
 
       if (data.isValid !== undefined) {
         updateData.isValid = data.isValid === 'TRUE' || data.isValid === true;
@@ -272,11 +254,6 @@ class Judge {
 
       if (result.length === 0) {
         return { success: false, error: '審判採点データが見つかりません' };
-      }
-
-      // スコアが変更された場合、同一大会・クラス内の placing を再計算
-      if (scoresChanged) {
-        await this._recalculatePlacing(result[0].contestName, result[0].className);
       }
 
       return { success: true, data: await this.findById(parseInt(id)) };
@@ -356,6 +333,8 @@ class Judge {
         const j3 = row.score_j3 != null && row.score_j3 !== '' ? parseInt(row.score_j3) : null;
         const j4 = row.score_j4 != null && row.score_j4 !== '' ? parseInt(row.score_j4) : null;
         const j5 = row.score_j5 != null && row.score_j5 !== '' ? parseInt(row.score_j5) : null;
+        const j6 = row.score_j6 != null && row.score_j6 !== '' ? parseInt(row.score_j6) : null;
+        const j7 = row.score_j7 != null && row.score_j7 !== '' ? parseInt(row.score_j7) : null;
         return {
           contestName: contestName,
           contestDate: contestDate || null,
@@ -368,22 +347,13 @@ class Judge {
           scoreJ3: j3,
           scoreJ4: j4,
           scoreJ5: j5,
-          scoreT: this._calculateScoreT(j1, j2, j3, j4, j5),
+          scoreJ6: j6,
+          scoreJ7: j7,
+          scoreT: null,
           isValid: true,
           createdAt: now,
           updatedAt: now,
         };
-      });
-
-      // score_t 昇順でソートして placing を付与（null は最後）
-      insertData.sort((a, b) => {
-        if (a.scoreT == null && b.scoreT == null) return 0;
-        if (a.scoreT == null) return 1;
-        if (b.scoreT == null) return -1;
-        return a.scoreT - b.scoreT;
-      });
-      insertData.forEach((row, i) => {
-        row.placing = i + 1;
       });
 
       // バルクインサート
@@ -436,6 +406,8 @@ class Judge {
         scoreJ3: null,
         scoreJ4: null,
         scoreJ5: null,
+        scoreJ6: null,
+        scoreJ7: null,
         scoreT: null,
         isValid: true,
         createdAt: now,
@@ -491,6 +463,61 @@ class Judge {
     )].sort();
 
     return { contestNames, contestDates, classNames };
+  }
+
+  async recalculateScores(contestName, className, excludeMinMax = true) {
+    const db = getDb();
+
+    // 対象の全有効レコードを一括取得
+    const conditions = [
+      eq(judges.contestName, contestName),
+      eq(judges.isValid, true)
+    ];
+    if (className) {
+      conditions.push(eq(judges.className, className));
+    }
+
+    const rows = await db
+      .select()
+      .from(judges)
+      .where(and(...conditions));
+
+    // メモリ上で score_t を計算し、クラスごとにグループ化
+    const classMap = new Map();
+    const now = new Date();
+
+    for (const row of rows) {
+      const scoreT = this._calculateScoreT(
+        row.scoreJ1, row.scoreJ2, row.scoreJ3,
+        row.scoreJ4, row.scoreJ5, row.scoreJ6, row.scoreJ7,
+        excludeMinMax
+      );
+      const entry = { id: row.id, scoreT };
+
+      if (!classMap.has(row.className)) {
+        classMap.set(row.className, []);
+      }
+      classMap.get(row.className).push(entry);
+    }
+
+    // クラスごとに placing をメモリ上で算出し、一括更新
+    for (const [, entries] of classMap) {
+      entries.sort((a, b) => {
+        if (a.scoreT == null && b.scoreT == null) return 0;
+        if (a.scoreT == null) return 1;
+        if (b.scoreT == null) return -1;
+        return a.scoreT - b.scoreT;
+      });
+
+      for (let i = 0; i < entries.length; i++) {
+        await db
+          .update(judges)
+          .set({ scoreT: entries[i].scoreT, placing: i + 1, updatedAt: now })
+          .where(eq(judges.id, entries[i].id));
+      }
+    }
+
+    return { updatedCount: rows.length, classCount: classMap.size };
   }
 
   async findForExport(filters = {}) {

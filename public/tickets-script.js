@@ -141,8 +141,16 @@ class TicketsManager {
             this.loadTickets();
         });
 
-        // フィルター適用
-        document.getElementById('applyFiltersBtn').addEventListener('click', () => {
+        // フィルター（変更で自動絞り込み）
+        document.getElementById('productFilter').addEventListener('change', () => {
+            this.applyFilters();
+        });
+
+        document.getElementById('financialStatusFilter').addEventListener('change', () => {
+            this.applyFilters();
+        });
+
+        document.getElementById('validOnlyFilter').addEventListener('change', () => {
             this.applyFilters();
         });
 
