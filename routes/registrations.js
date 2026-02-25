@@ -538,6 +538,7 @@ router.get('/export/all_fields/:contestName', requireAuth, async (req, res) => {
     // 全項目をエクスポート用に整形
     const csvData = targetRegistrations.map(reg => ({
       'id': reg.id || '',
+      'isValid': reg.isValid || '',
       'contest_date': reg.contest_date || '',
       'contest_name': reg.contest_name || '',
       'player_no': reg.player_no || '',
@@ -562,7 +563,6 @@ router.get('/export/all_fields/:contestName', requireAuth, async (req, res) => {
       'back_stage_pass': reg.back_stage_pass ?? 0,
       'is_member': reg.is_member ?? false,
       'createdAt': reg.createdAt || '',
-      'isValid': reg.isValid || '',
       'deletedAt': reg.deletedAt || '',
       'updatedAt': reg.updatedAt || '',
       'restoredAt': reg.restoredAt || ''
@@ -1114,10 +1114,22 @@ router.post('/import-csv', requireAdmin, async (req, res) => {
 
       // id空白 → 新規INSERTとして収集
       if (!id) {
-        // contest_date, contest_name が行に含まれているか確認
+        // contest_date, contest_name, player_no, fwj_card_no が行に含まれているか確認
         if (!row.contest_date || !row.contest_name) {
           skipped++;
           continue;
+        }
+        if (!row.player_no) {
+          return res.status(400).json({
+            success: false,
+            error: `新規レコード（name_ja: "${row.name_ja || ''}"）に player_no が空欄です`
+          });
+        }
+        if (!row.fwj_card_no) {
+          return res.status(400).json({
+            success: false,
+            error: `新規レコード（name_ja: "${row.name_ja || ''}"）に fwj_card_no が空欄です`
+          });
         }
         inserts.push(row);
         continue;
@@ -1137,6 +1149,30 @@ router.post('/import-csv', requireAdmin, async (req, res) => {
       }
 
       updates.push({ id, data: updateData });
+    }
+
+    // 更新対象の既存レコードとの整合性チェック（contest_name, player_no, fwj_card_no）
+    if (updates.length > 0) {
+      const allRegistrations = await registrationModel.findAll();
+      const existingMap = new Map(allRegistrations.map(r => [r.id, r]));
+
+      for (const { id, data } of updates) {
+        const existing = existingMap.get(id);
+        if (!existing) continue;
+
+        const csvRow = csvData.find(r => r.id === id);
+        if (!csvRow) continue;
+
+        const checkFields = ['contest_name', 'player_no', 'fwj_card_no'];
+        for (const field of checkFields) {
+          if (field in csvRow && String(csvRow[field] || '') !== String(existing[field] || '')) {
+            return res.status(400).json({
+              success: false,
+              error: `id=${id} の ${field} が既存レコードと一致しません（CSV: "${csvRow[field] || ''}", 既存: "${existing[field] || ''}"）`
+            });
+          }
+        }
+      }
     }
 
     // バッチUPDATE実行

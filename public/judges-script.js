@@ -28,7 +28,14 @@ async function authFetch(url, options = {}) {
         credentials: 'include'
     };
 
-    const mergedOptions = { ...defaultOptions, ...options };
+    const mergedOptions = {
+        ...defaultOptions,
+        ...options,
+        headers: {
+            ...defaultOptions.headers,
+            ...(options.headers || {})
+        }
+    };
     return fetch(url, mergedOptions);
 }
 

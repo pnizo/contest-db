@@ -28,7 +28,14 @@ async function authFetch(url, options = {}) {
         credentials: 'include'
     };
     
-    const mergedOptions = { ...defaultOptions, ...options };
+    const mergedOptions = {
+        ...defaultOptions,
+        ...options,
+        headers: {
+            ...defaultOptions.headers,
+            ...(options.headers || {})
+        }
+    };
     
     return fetch(url, mergedOptions);
 }
@@ -48,6 +55,7 @@ class RegistrationsManager {
         { key: 'biography', label: '自己紹介' },
         { key: 'back_stage_pass', label: 'BSP' },
         { key: 'is_member', label: 'カード会員' },
+        { key: 'isValid', label: '有効' },
     ];
 
     constructor() {
@@ -952,7 +960,7 @@ class RegistrationsManager {
         document.getElementById('csvImportStatus').className = 'import-status hidden';
         document.getElementById('csvImportStatus').textContent = '';
 
-        // チェックボックスを動的生成（全OFF）
+        // チェックボックスを動的生成（全ON）
         const container = document.getElementById('csvImportFields');
         container.innerHTML = '';
         RegistrationsManager.CSV_IMPORT_FIELDS.forEach(field => {
@@ -962,6 +970,7 @@ class RegistrationsManager {
             checkbox.type = 'checkbox';
             checkbox.name = 'csvImportField';
             checkbox.value = field.key;
+            checkbox.checked = true;
             checkbox.addEventListener('change', () => this.validateCsvImportForm());
             label.appendChild(checkbox);
             label.appendChild(document.createTextNode(' ' + field.label));
