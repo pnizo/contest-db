@@ -35,7 +35,7 @@ class Judge {
   // score_j1〜j7の合計を算出
   // excludeMinMax=true: 最高点と最低点を除外（3人以上の場合）
   // excludeMinMax=false: 全スコアの単純合計
-  _calculateScoreT(j1, j2, j3, j4, j5, j6, j7, excludeMinMax = true) {
+  _calculateScoreT(j1, j2, j3, j4, j5, j6, j7, excludeMinMax = false) {
     const scores = [j1, j2, j3, j4, j5, j6, j7].filter(s => s != null);
     if (scores.length === 0) return null;
     if (!excludeMinMax || scores.length <= 2) {

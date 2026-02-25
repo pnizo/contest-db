@@ -1484,8 +1484,7 @@ class RegistrationsManager {
             { key: 'player_no', label: 'ゼッケン番号' },
             { key: 'name_ja', label: '氏名' },
             { key: 'name_ja_kana', label: 'フリガナ' },
-            { key: 'first_name', label: 'First Name' },
-            { key: 'last_name', label: 'Last Name' },
+
             { key: 'email', label: 'Email' },
             { key: 'phone', label: '電話番号' },
             { key: 'fwj_card_no', label: 'FWJ card #' },
@@ -1493,7 +1492,6 @@ class RegistrationsManager {
             { key: 'age', label: '年齢' },
             { key: 'class_name', label: 'クラス' },
             { key: 'sort_index', label: 'ソート順' },
-            { key: 'score_card', label: 'スコアカード' },
             { key: 'contest_order', label: '開催順' },
             { key: 'height', label: '身長' },
             { key: 'weight', label: '体重' },

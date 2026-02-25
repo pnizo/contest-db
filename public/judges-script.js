@@ -584,8 +584,31 @@ class JudgesManager {
 
     // --- 採点モーダル ---
 
-    openScoringModal() {
-        this.populateContestSelect('scoringContestName');
+    async openScoringModal() {
+        // Judgesテーブルに存在する大会名のみ選択肢に表示
+        const contestSelect = document.getElementById('scoringContestName');
+        contestSelect.innerHTML = '<option value="">大会を選択してください</option>';
+        try {
+            const response = await authFetch(`${this.apiUrl}/filter-options`);
+            const result = await response.json();
+            if (result.success && result.data.contestNames) {
+                const contestDates = result.data.contestDates || {};
+                // 日付の降順でソート
+                const sorted = result.data.contestNames.sort((a, b) => {
+                    const dateA = contestDates[a] || '';
+                    const dateB = contestDates[b] || '';
+                    return dateB.localeCompare(dateA);
+                });
+                sorted.forEach(name => {
+                    const option = document.createElement('option');
+                    option.value = name;
+                    option.textContent = contestDates[name] ? `${name} (${contestDates[name]})` : name;
+                    contestSelect.appendChild(option);
+                });
+            }
+        } catch (error) {
+            console.error('Failed to load contest names for scoring modal:', error);
+        }
 
         // 現在のフィルター値をプリセット
         const contestFilter = document.getElementById('contestFilter').value;
@@ -601,7 +624,7 @@ class JudgesManager {
             document.getElementById('scoringClassName').innerHTML = '<option value="">全クラス</option>';
         }
 
-        document.getElementById('scoringExcludeMinMax').checked = true;
+        document.getElementById('scoringExcludeMinMax').checked = false;
         document.getElementById('scoringStatus').className = 'import-status hidden';
         document.getElementById('scoringModal').classList.remove('hidden');
     }
