@@ -398,7 +398,7 @@
                 <button class="modal-close" onclick="registrationsManager.closeContestOrderImportModal()">&times;</button>
             </div>
             <div class="modal-form">
-                <p class="modal-description">CSVファイルから開催順（contest_order）とスコアカード（score_card）を更新します。</p>
+                <p class="modal-description">CSVファイルから開催順（contest_order）を更新します。</p>
                 <div class="form-group">
                     <label for="contestOrderContestName">大会名:</label>
                     <select id="contestOrderContestName" required>
@@ -408,7 +408,7 @@
                 <div class="form-group">
                     <label for="contestOrderCsvFile">CSVファイル:</label>
                     <input type="file" id="contestOrderCsvFile" accept=".csv" required>
-                    <small>※CSVには class_name, score_card, contest_order 列が必要です</small>
+                    <small>※CSVには class_name, contest_order 列が必要です</small>
                 </div>
                 <div class="form-actions">
                     <button type="button" onclick="registrationsManager.closeContestOrderImportModal()" class="btn btn-secondary">キャンセル</button>

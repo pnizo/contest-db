@@ -1288,7 +1288,7 @@ router.post('/import-contest-order', requireAdmin, async (req, res) => {
       return normalized;
     };
 
-    // CSVからclass_name → {score_card, contest_order}のマップを作成
+    // CSVからclass_name → {contest_order}のマップを作成
     // 大会名を除去した正規化されたclass_nameをキーとして使用
     const csvMap = new Map();
     csvData.forEach(row => {
@@ -1296,7 +1296,6 @@ router.post('/import-contest-order', requireAdmin, async (req, res) => {
       if (rawClassName) {
         const normalizedClassName = normalizeClassName(rawClassName, contestName);
         csvMap.set(normalizedClassName, {
-          score_card: row.score_card || '',
           contest_order: row.contest_order || ''
         });
       }
@@ -1317,14 +1316,12 @@ router.post('/import-contest-order', requireAdmin, async (req, res) => {
       if (csvEntry) {
         // CSVにマッチ: 値を更新
         updateData = {
-          score_card: csvEntry.score_card,
           contest_order: csvEntry.contest_order
         };
         updated++;
       } else {
         // マッチしない: 空欄にリセット
         updateData = {
-          score_card: '',
           contest_order: ''
         };
         cleared++;

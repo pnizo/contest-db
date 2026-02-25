@@ -163,7 +163,7 @@ Shopifyの注文（Orders）テーブルと会員（Members）テーブルから
 
 1. 「開催順CSVを適用」ボタンをクリック
 2. 大会名を選択
-3. CSVファイルを選択（必須列: `class_name`, `score_card`, `contest_order`）
+3. CSVファイルを選択（必須列: `class_name`, `contest_order`）
 4. インポート実行
 
 ##### 4. 全項目CSVインポート（管理者のみ）

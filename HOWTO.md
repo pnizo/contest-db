@@ -76,7 +76,7 @@
 2. 「データ採番」→「開催順CSV適用」をクリック
 3. 対象の大会名をドロップダウンから選択
 4. CSVファイルを選択
-   - 必須列: `class_name`, `score_card`, `contest_order`
+   - 必須列: `class_name`, `contest_order`
 5. 「インポート実行」をクリック
 
 ### ゼッケン番号を採番する
