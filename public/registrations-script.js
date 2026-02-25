@@ -53,7 +53,7 @@ class RegistrationsManager {
     constructor() {
         console.log('REGISTRATIONS: RegistrationsManager constructor called');
         this.apiUrl = '/api/registrations';
-        this.showingDeleted = false;
+
         this.currentUser = null;
         this.isAdmin = false;
         this.currentPage = 1;
@@ -287,10 +287,9 @@ class RegistrationsManager {
             this.handleModalExport();
         });
 
-        // 削除済み表示機能を削除
-        // document.getElementById('toggleDeletedBtn').addEventListener('click', () => {
-        //     this.toggleDeletedRecords();
-        // });
+        document.getElementById('showDeletedFilter').addEventListener('change', () => {
+            this.applyFilters();
+        });
 
         // フィルター（変更で自動絞り込み）
         document.getElementById('contestFilter').addEventListener('change', () => {
@@ -1640,7 +1639,8 @@ class RegistrationsManager {
             contest_name: document.getElementById('contestFilter').value,
             class_name: document.getElementById('classFilter').value,
             violation_only: document.getElementById('violationFilter').checked ? 'true' : '',
-            note_exists: document.getElementById('noteExistsFilter').checked ? 'true' : ''
+            note_exists: document.getElementById('noteExistsFilter').checked ? 'true' : '',
+            show_deleted: document.getElementById('showDeletedFilter').checked ? 'true' : ''
         };
 
         // 空の値を削除
@@ -1660,6 +1660,7 @@ class RegistrationsManager {
         document.getElementById('classFilter').value = '';
         document.getElementById('violationFilter').checked = false;
         document.getElementById('noteExistsFilter').checked = false;
+        document.getElementById('showDeletedFilter').checked = false;
         document.getElementById('searchInput').value = '';
 
         // クリアボタンも隠す
@@ -1682,12 +1683,7 @@ class RegistrationsManager {
         this.loadRegistrations();
     }
 
-    toggleDeletedRecords() {
-        this.showingDeleted = !this.showingDeleted;
-        const btn = document.getElementById('toggleDeletedBtn');
-        btn.textContent = this.showingDeleted ? '通常表示' : '削除済みを表示';
-        this.loadRegistrations();
-    }
+
 
     // 編集機能をすべて削除
     // async editRegistration(id) {

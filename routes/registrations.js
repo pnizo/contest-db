@@ -220,6 +220,7 @@ router.get('/', requireAuth, async (req, res) => {
       class_name,
       violation_only,
       note_exists,
+      show_deleted,
       search,
       startDate,
       endDate,
@@ -232,6 +233,7 @@ router.get('/', requireAuth, async (req, res) => {
     if (contest_name) filters.contest_name = contest_name;
     if (class_name) filters.class_name = class_name;
     if (search) filters.search = search;
+    if (show_deleted === 'true') filters.show_deleted = true;
     if (startDate) filters.startDate = startDate;
     if (endDate) filters.endDate = endDate;
 

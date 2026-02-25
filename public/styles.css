@@ -1980,6 +1980,10 @@ input[type="file"]:hover {
     background-color: #ffcccc;
 }
 
+.deleted-row td {
+    text-decoration: line-through;
+}
+
 /* Data Table Styling */
 .data-table {
     width: 100%;

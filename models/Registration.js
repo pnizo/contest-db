@@ -171,7 +171,10 @@ class Registration {
   async findWithPaging(page = 1, limit = 50, filters = {}, sortBy = 'id', sortOrder = 'desc') {
     const db = getDb();
 
-    let conditions = [eq(registrations.isValid, true)];
+    let conditions = [];
+    if (!filters.show_deleted) {
+      conditions.push(eq(registrations.isValid, true));
+    }
 
     // フィルター条件
     if (filters.contest_date) {
