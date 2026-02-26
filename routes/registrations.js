@@ -995,17 +995,25 @@ router.post('/import-shopify', requireAdmin, async (req, res) => {
       const keyA = getCustomSortKey(a.class_name || '');
       const keyB = getCustomSortKey(b.class_name || '');
 
-      const aMatchesBoth = keyA.categoryIndex < CATEGORY_PRIORITY.length && keyA.classIndex < CLASS_PRIORITY.length;
-      const bMatchesBoth = keyB.categoryIndex < CATEGORY_PRIORITY.length && keyB.classIndex < CLASS_PRIORITY.length;
+      const aMatchesCategory = keyA.categoryIndex < CATEGORY_PRIORITY.length;
+      const bMatchesCategory = keyB.categoryIndex < CATEGORY_PRIORITY.length;
 
-      if (aMatchesBoth && !bMatchesBoth) return -1;
-      if (!aMatchesBoth && bMatchesBoth) return 1;
+      // カテゴリーマッチありを優先
+      if (aMatchesCategory && !bMatchesCategory) return -1;
+      if (!aMatchesCategory && bMatchesCategory) return 1;
 
-      if (aMatchesBoth && bMatchesBoth) {
+      if (aMatchesCategory && bMatchesCategory) {
+        // カテゴリー優先度で比較
         if (keyA.categoryIndex !== keyB.categoryIndex) {
           return keyA.categoryIndex - keyB.categoryIndex;
         }
-        if (keyA.classIndex !== keyB.classIndex) {
+        // 同カテゴリー内: クラスマッチありを優先
+        const aMatchesClass = keyA.classIndex < CLASS_PRIORITY.length;
+        const bMatchesClass = keyB.classIndex < CLASS_PRIORITY.length;
+        if (aMatchesClass && !bMatchesClass) return -1;
+        if (!aMatchesClass && bMatchesClass) return 1;
+        // 両方クラスマッチなら classIndex で比較
+        if (aMatchesClass && bMatchesClass && keyA.classIndex !== keyB.classIndex) {
           return keyA.classIndex - keyB.classIndex;
         }
       }
