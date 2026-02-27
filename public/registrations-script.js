@@ -46,12 +46,19 @@ class RegistrationsManager {
         { key: 'name_ja_kana', label: 'フリガナ' },
         { key: 'first_name', label: 'First Name' },
         { key: 'last_name', label: 'Last Name' },
+        { key: 'email', label: 'メール' },
+        { key: 'phone', label: '電話番号' },
         { key: 'country', label: '国' },
+        { key: 'pref', label: '都道府県' },
         { key: 'age', label: '年齢' },
         { key: 'class_name', label: 'クラス名' },
+        { key: 'sort_index', label: 'ソート順' },
+        { key: 'score_card', label: 'スコアカード' },
+        { key: 'contest_order', label: '審査順' },
         { key: 'height', label: '身長' },
         { key: 'weight', label: '体重' },
         { key: 'occupation', label: '職業' },
+        { key: 'instagram', label: 'Instagram' },
         { key: 'biography', label: '自己紹介' },
         { key: 'back_stage_pass', label: 'BSP' },
         { key: 'is_member', label: 'カード会員' },
@@ -604,6 +611,7 @@ class RegistrationsManager {
         document.getElementById('newRegEmail').value = '';
         document.getElementById('newRegPhone').value = '';
         document.getElementById('newRegCountry').value = '';
+        document.getElementById('newRegPref').value = '';
         document.getElementById('newRegAge').value = '';
         document.getElementById('newRegHeight').value = '';
         document.getElementById('newRegWeight').value = '';
@@ -676,6 +684,7 @@ class RegistrationsManager {
         document.getElementById('editRegEmail').value = reg.email || '';
         document.getElementById('editRegPhone').value = reg.phone || '';
         document.getElementById('editRegCountry').value = reg.country || '';
+        document.getElementById('editRegPref').value = reg.pref || '';
         document.getElementById('editRegAge').value = reg.age || '';
         document.getElementById('editRegHeight').value = reg.height || '';
         document.getElementById('editRegWeight').value = reg.weight || '';
@@ -707,6 +716,7 @@ class RegistrationsManager {
             email: document.getElementById('editRegEmail').value.trim(),
             phone: document.getElementById('editRegPhone').value.trim(),
             country: document.getElementById('editRegCountry').value.trim(),
+            pref: document.getElementById('editRegPref').value.trim(),
             age: document.getElementById('editRegAge').value.trim(),
             height: document.getElementById('editRegHeight').value.trim(),
             weight: document.getElementById('editRegWeight').value.trim(),
@@ -827,6 +837,7 @@ class RegistrationsManager {
             if (r.email) document.getElementById('newRegEmail').value = r.email;
             if (r.phone) document.getElementById('newRegPhone').value = r.phone;
             if (r.country) document.getElementById('newRegCountry').value = r.country;
+            if (r.pref) document.getElementById('newRegPref').value = r.pref;
             if (r.age) document.getElementById('newRegAge').value = r.age;
             if (r.height) document.getElementById('newRegHeight').value = r.height;
             if (r.weight) document.getElementById('newRegWeight').value = r.weight;
@@ -856,6 +867,7 @@ class RegistrationsManager {
             email: document.getElementById('newRegEmail').value.trim(),
             phone: document.getElementById('newRegPhone').value.trim(),
             country: document.getElementById('newRegCountry').value.trim(),
+            pref: document.getElementById('newRegPref').value.trim(),
             age: document.getElementById('newRegAge').value.trim(),
             height: document.getElementById('newRegHeight').value.trim(),
             weight: document.getElementById('newRegWeight').value.trim(),
@@ -1489,6 +1501,7 @@ class RegistrationsManager {
             { key: 'phone', label: '電話番号' },
             { key: 'fwj_card_no', label: 'FWJ card #' },
             { key: 'country', label: '国' },
+        { key: 'pref', label: '都道府県' },
             { key: 'age', label: '年齢' },
             { key: 'class_name', label: 'クラス' },
             { key: 'sort_index', label: 'ソート順' },

@@ -23,6 +23,7 @@ class Registration {
       email: row.email || '',
       phone: row.phone || '',
       country: row.country || '',
+      pref: row.pref || '',
       age: row.age || '',
       class_name: row.className || '',
       sort_index: row.sortIndex || '',
@@ -225,6 +226,7 @@ class Registration {
       'class_name': registrations.className,
       'fwj_card_no': registrations.fwjCardNo,
       'country': registrations.country,
+      'pref': registrations.pref,
       'age': sql`CAST(NULLIF(${registrations.age}, '') AS INTEGER)`,
       'sort_index': sql`CAST(NULLIF(${registrations.sortIndex}, '') AS INTEGER)`,
       'score_card': sql`CAST(NULLIF(${registrations.scoreCard}, '') AS INTEGER)`,
@@ -316,6 +318,7 @@ class Registration {
         email: data.email || null,
         phone: data.phone || null,
         country: data.country || null,
+        pref: data.pref || null,
         age: data.age || null,
         className: data.class_name || null,
         sortIndex: data.sort_index || null,
@@ -362,6 +365,7 @@ class Registration {
     if (data.email !== undefined) updateData.email = data.email || null;
     if (data.phone !== undefined) updateData.phone = data.phone || null;
     if (data.country !== undefined) updateData.country = data.country || null;
+    if (data.pref !== undefined) updateData.pref = data.pref || null;
     if (data.age !== undefined) updateData.age = data.age || null;
     if (data.class_name !== undefined) updateData.className = data.class_name || null;
     if (data.sort_index !== undefined) updateData.sortIndex = data.sort_index || null;
@@ -540,6 +544,7 @@ class Registration {
           email: normalizedRow['email'] || null,
           phone: normalizedRow['phone'] || null,
           country: normalizedRow['country'] || null,
+          pref: normalizedRow['pref'] || null,
           age: normalizedRow['age'] || null,
           className: normalizedRow['class_name'] || null,
           sortIndex: normalizedRow['sort_index'] || null,

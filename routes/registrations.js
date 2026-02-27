@@ -550,6 +550,7 @@ router.get('/export/all_fields/:contestName', requireAuth, async (req, res) => {
       'email': reg.email || '',
       'phone': reg.phone || '',
       'country': reg.country || '',
+      'pref': reg.pref || '',
       'age': reg.age || '',
       'class_name': reg.class_name || '',
       'sort_index': reg.sort_index || '',
@@ -956,6 +957,7 @@ router.post('/import-shopify', requireAdmin, async (req, res) => {
       'Men\'s Athlete Model', 'メンズアスリートモデル',
       'Men\'s Physique', 'メンズフィジーク',
       'Classic Physique', 'クラシックフィジーク',
+      'Classic Stylish Model', 'クラシックスタイリッシュモデル',
       'Bodybuilding', 'ボディビルディング'
     ];
 
@@ -963,6 +965,8 @@ router.post('/import-shopify', requireAdmin, async (req, res) => {
     const CLASS_PRIORITY = [
       'First Challenge', 'ファーストチャレンジ',
       'Beginner', 'ビギナー',
+      'Local', 'ローカル',
+      'Revenge', 'リベンジ',
       'Teen', 'ティーン',
       'Junior', 'ジュニア',
       'Masters', 'マスターズ',
@@ -1090,8 +1094,12 @@ router.post('/import-csv', requireAdmin, async (req, res) => {
     // 許可フィールドのホワイトリストチェック
     const ALLOWED_IMPORT_FIELDS = [
       'name_ja', 'name_ja_kana', 'first_name', 'last_name',
-      'country', 'age', 'class_name', 'height', 'weight',
-      'occupation', 'biography', 'back_stage_pass'
+      'email', 'phone',
+      'country', 'pref', 'age', 'class_name',
+      'sort_index', 'score_card', 'contest_order',
+      'height', 'weight',
+      'occupation', 'instagram', 'biography', 'back_stage_pass',
+      'is_member', 'isValid'
     ];
 
     const invalidFields = fields.filter(f => !ALLOWED_IMPORT_FIELDS.includes(f));
