@@ -1220,7 +1220,7 @@ class ShopifyService {
     lineItems.forEach(edge => {
       const item = edge.node;
       const productTags = item.product?.tags || [];
-      if (!productTags.includes('観戦チケット')) return;
+      if (!productTags.some(t => t.toLowerCase() === '観戦チケット'.toLowerCase())) return;
       const lineItemId = item.id ? item.id.replace('gid://shopify/LineItem/', '') : '';
       const price = item.originalUnitPriceSet?.shopMoney?.amount || '';
       const quantity = item.quantity || 0;

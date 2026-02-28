@@ -75,7 +75,7 @@ router.get('/search', async (req, res) => {
     // 商品タグでフィルタリング（検索タグが指定されている場合のみ）
     const filteredRows = searchTags.length > 0
       ? formattedRows.filter(row =>
-          row.tags && searchTags.every(t => row.tags.includes(t))
+          row.tags && searchTags.every(st => row.tags.some(rt => rt.toLowerCase() === st.toLowerCase()))
         )
       : formattedRows;
 
@@ -143,7 +143,7 @@ router.post('/export', requireAdmin, async (req, res) => {
     // 商品タグでフィルタリング（検索タグが指定されている場合のみ）
     const filteredRows = searchTags.length > 0
       ? formattedRows.filter(row =>
-          row.tags && searchTags.every(t => row.tags.includes(t))
+          row.tags && searchTags.every(st => row.tags.some(rt => rt.toLowerCase() === st.toLowerCase()))
         )
       : formattedRows;
 
