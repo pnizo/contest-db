@@ -573,6 +573,27 @@ class Ticket {
    * @param {string} productName - 商品名
    * @returns {Promise<Array>} チケット一覧
    */
+
+  async findAll() {
+    try {
+      const db = getDb();
+
+      let rows = await db
+        .select()
+        .from(tickets)
+        .orderBy(desc(tickets.id));
+
+      if (rows.length === 0) {
+        return [];
+      }
+
+      return rows.map(row => this._toSnakeCase(row));
+    } catch (error) {
+      console.error('Error in findAll:', error);
+      throw error;
+    }
+  }
+
   async findByProductName(productName) {
     try {
       const db = getDb();

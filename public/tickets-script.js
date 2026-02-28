@@ -674,7 +674,7 @@ class TicketsManager {
             const result = await response.json();
 
             if (result.success && result.data && result.data.productNames) {
-                select.innerHTML = '<option value="">商品名を選択してください</option>';
+                select.innerHTML = '<option value="__all__" selected>全チケット</option>';
                 result.data.productNames.forEach(name => {
                     const option = document.createElement('option');
                     option.value = name;
@@ -708,7 +708,10 @@ class TicketsManager {
             statusDiv.className = 'import-status';
             statusDiv.textContent = 'データを取得しています...';
 
-            const response = await authFetch(`${this.apiUrl}/export/${encodeURIComponent(productName)}`);
+            const exportUrl = productName === '__all__'
+                ? `${this.apiUrl}/export-all`
+                : `${this.apiUrl}/export/${encodeURIComponent(productName)}`;
+            const response = await authFetch(exportUrl);
             const result = await response.json();
 
             if (result.success) {

@@ -19,6 +19,26 @@ function getShopifyService() {
 // すべて認証が必要
 router.use(requireAuth);
 
+// GET /export-all - 全チケットの全項目取得
+router.get('/export-all', async (req, res) => {
+  try {
+    const tickets = await ticketModel.findAll();
+
+    // ファイル名を生成（日付付き）
+    const date = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    const filename = `tickets_all_${date}.csv`;
+
+    res.json({
+      success: true,
+      data: tickets,
+      filename
+    });
+  } catch (error) {
+    console.error('Export all tickets error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // GET /export/:productName - 指定商品名を持つチケットの全項目取得
 router.get('/export/:productName', async (req, res) => {
   try {
