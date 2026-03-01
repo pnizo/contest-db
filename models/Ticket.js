@@ -636,7 +636,9 @@ class Ticket {
       // 3. 各line_itemにつき3枚のチケットデータを生成
       const ticketDataArray = [];
       for (const item of filteredContestItems) {
-        const productName = (item.title || '').replace(/コンテストエントリー/g, '').trim() + ' 招待チケット';
+        const contestName = (item.title || '').replace(/コンテストエントリー/g, '').trim();
+        const productName = contestName + ' 招待チケット';
+        const contestTags = ['2026シーズン', contestName, '観戦チケット'];
         for (let subNo = 1; subNo <= CONTEST_ENTRY_TICKET_COUNT; subNo++) {
           const lineItemId = `${orderNo}-${item.id}-${subNo}`;
           ticketDataArray.push({
@@ -657,7 +659,7 @@ class Ticket {
             isUsable: true,
             ownerShopifyId: shopifyId,
             reservedSeat: '',
-            ...this._tagsToColumns(tags),
+            ...this._tagsToColumns(contestTags),
           });
         }
       }
@@ -698,8 +700,11 @@ class Ticket {
       // 5. バッチ UPDATE（タグのみ更新）
       if (updateList.length > 0) {
         const updateQueries = updateList.map(({ data, existing }) => {
+          const { orderNo: _o, orderDate: _d, shopifyId: _s, fullName: _f, email: _e, ...restData } = data;
           return db.update(tickets).set({
-            ...this._tagsToColumns(tags),
+            tag1: restData.tag1,
+            tag2: restData.tag2,
+            tag3: restData.tag3,
             updatedAt: new Date(),
           }).where(eq(tickets.id, existing.id));
         });
