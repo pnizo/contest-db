@@ -596,7 +596,7 @@ class Ticket {
       const seenContests = new Set();
       const uniqueContestItems = [];
       for (const item of contestItems) {
-        const productName = (item.title || '').replace(/コンテストエントリー/g, '').trim() + ' 招待チケット';
+        const productName = (item.title || '').replace(/コンテストエントリー.*$/, '').trim() + ' 招待チケット';
         if (!seenContests.has(productName)) {
           seenContests.add(productName);
           uniqueContestItems.push(item);
@@ -625,7 +625,7 @@ class Ticket {
       );
 
       const filteredContestItems = uniqueContestItems.filter(item => {
-        const productName = (item.title || '').replace(/コンテストエントリー/g, '').trim() + ' 招待チケット';
+        const productName = (item.title || '').replace(/コンテストエントリー.*$/, '').trim() + ' 招待チケット';
         if (contestsWithExistingTickets.has(productName)) {
           console.log(`[upsertContestEntryTickets] Order ${orderNo}: skipping "${productName}" - customer ${shopifyId} already has tickets from another order`);
           return false;
@@ -636,7 +636,7 @@ class Ticket {
       // 3. 各line_itemにつき3枚のチケットデータを生成
       const ticketDataArray = [];
       for (const item of filteredContestItems) {
-        const contestName = (item.title || '').replace(/コンテストエントリー/g, '').trim();
+        const contestName = (item.title || '').replace(/コンテストエントリー.*$/, '').trim();
         const productName = contestName + ' 招待チケット';
         const contestTags = ['2026シーズン', contestName, '観戦チケット'];
         for (let subNo = 1; subNo <= CONTEST_ENTRY_TICKET_COUNT; subNo++) {
