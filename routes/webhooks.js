@@ -30,12 +30,15 @@ router.post('/shopify/:topic', async (req, res) => {
 
     // 4. チケット対象の注文かチェック（ペイロードのtagsから判定）
     const tags = (order.tags || '').split(',').map(t => t.trim());
-    if (!tags.some(t => t.toLowerCase() === '観戦チケット'.toLowerCase())) {
-      console.log('[Webhook] Not a ticket order (no ticket tag), skipped');
+    const isTicketOrder = tags.some(t => t.toLowerCase() === '観戦チケット'.toLowerCase());
+    const isContestEntry = tags.some(t => t.toLowerCase() === 'コンテストエントリー'.toLowerCase());
+
+    if (!isTicketOrder && !isContestEntry) {
+      console.log('[Webhook] Not a ticket order (no relevant tag), skipped');
       return res.status(200).json({ message: 'Not a ticket order, skipped' });
     }
 
-    // 5. キャンセル済みの場合は該当注文のチケットを削除、それ以外はupsert
+    // 5. キャンセル済みの場合は該当注文のチケットを削除
     const ticket = new Ticket();
     if (order.cancelled_at) {
       console.log(`[Webhook] Order ${order.name} is cancelled, deleting tickets...`);
@@ -44,10 +47,18 @@ router.post('/shopify/:topic', async (req, res) => {
       return res.status(200).json({ success: true, result });
     }
 
-    const result = await ticket.upsertByOrder(order);
-    console.log(`[Webhook] Upsert result:`, result);
+    // 6. タグに応じてupsert（両方のタグを持つ場合は両方処理）
+    const results = {};
+    if (isTicketOrder) {
+      results.ticket = await ticket.upsertByOrder(order);
+      console.log(`[Webhook] Upsert ticket result:`, results.ticket);
+    }
+    if (isContestEntry) {
+      results.contestEntry = await ticket.upsertContestEntryTickets(order);
+      console.log(`[Webhook] Upsert contest entry result:`, results.contestEntry);
+    }
 
-    res.status(200).json({ success: true, result });
+    res.status(200).json({ success: true, results });
   } catch (error) {
     console.error('[Webhook] Error processing webhook:', error);
     res.status(200).json({ success: false, error: error.message });

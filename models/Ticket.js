@@ -1,11 +1,13 @@
 const { getDb } = require('../lib/db');
 const { tickets } = require('../lib/db/schema');
-const { eq, ilike, and, desc, asc, sql } = require('drizzle-orm');
+const { eq, ne, ilike, and, desc, asc, sql } = require('drizzle-orm');
 const ShopifyService = require('../services/shopify');
 
 /**
  * チケットモデル - Neon Postgres / Drizzle ORM版
  */
+const CONTEST_ENTRY_TICKET_COUNT = 3;
+
 class Ticket {
   /**
    * tag1-tag10カラムからタグ配列を構築（null/空文字は除外）
@@ -564,6 +566,165 @@ class Ticket {
       return { success: true, ...results };
     } catch (error) {
       console.error('Error in upsertByOrder:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  async upsertContestEntryTickets(order) {
+    try {
+      const db = getDb();
+      const orderNo = order.name;
+
+      if (!orderNo) {
+        return { success: false, error: 'order.name is required' };
+      }
+
+      if (CONTEST_ENTRY_TICKET_COUNT === 0) {
+        return { success: true, added: 0, updated: 0, skipped: 0, message: 'Contest entry tickets disabled' };
+      }
+
+      // 1. order.line_items から商品名に「コンテストエントリー」を含むものを抽出
+      const contestItems = (order.line_items || []).filter(item =>
+        (item.title || '').includes('コンテストエントリー')
+      );
+
+      if (contestItems.length === 0) {
+        return { success: true, added: 0, updated: 0, skipped: 0, message: 'No contest entry items in order' };
+      }
+
+      // 1b. 同一注文内の同一大会line_item重複排除（productName基準で最初の1つだけ残す）
+      const seenContests = new Set();
+      const uniqueContestItems = [];
+      for (const item of contestItems) {
+        const productName = (item.title || '').replace(/コンテストエントリー/g, '').trim() + ' 招待チケット';
+        if (!seenContests.has(productName)) {
+          seenContests.add(productName);
+          uniqueContestItems.push(item);
+        }
+      }
+
+      // 2. 基本情報
+      const shopifyService = new ShopifyService();
+      const orderDate = shopifyService.formatDateTimeForDb(new Date(order.created_at));
+      const shopifyId = String(order.customer.id);
+      const fullName = order.customer.last_name + ' ' + order.customer.first_name;
+      const email = order.customer.email;
+      const tags = (order.tags || '').split(',').map(t => t.trim()).filter(t => t !== '');
+
+      // 2b. 他の注文で同一顧客・同一大会のチケットが既に存在する場合はスキップ
+      const existingOtherOrderTickets = await db
+        .select({ productName: tickets.productName })
+        .from(tickets)
+        .where(and(
+          eq(tickets.shopifyId, shopifyId),
+          ne(tickets.orderNo, orderNo)
+        ));
+
+      const contestsWithExistingTickets = new Set(
+        existingOtherOrderTickets.map(t => t.productName)
+      );
+
+      const filteredContestItems = uniqueContestItems.filter(item => {
+        const productName = (item.title || '').replace(/コンテストエントリー/g, '').trim() + ' 招待チケット';
+        if (contestsWithExistingTickets.has(productName)) {
+          console.log(`[upsertContestEntryTickets] Order ${orderNo}: skipping "${productName}" - customer ${shopifyId} already has tickets from another order`);
+          return false;
+        }
+        return true;
+      });
+
+      // 3. 各line_itemにつき3枚のチケットデータを生成
+      const ticketDataArray = [];
+      for (const item of filteredContestItems) {
+        const productName = (item.title || '').replace(/コンテストエントリー/g, '').trim() + ' 招待チケット';
+        for (let subNo = 1; subNo <= CONTEST_ENTRY_TICKET_COUNT; subNo++) {
+          const lineItemId = `${orderNo}-${item.id}-${subNo}`;
+          ticketDataArray.push({
+            orderNo,
+            orderDate,
+            shopifyId,
+            fullName,
+            email,
+            totalPrice: '0',
+            financialStatus: '',
+            fulfillmentStatus: '',
+            productName,
+            variant: 'A席',
+            price: '0',
+            lineItemId,
+            productId: orderNo,
+            itemSubNo: subNo,
+            isUsable: true,
+            ownerShopifyId: shopifyId,
+            reservedSeat: '',
+            ...this._tagsToColumns(tags),
+          });
+        }
+      }
+
+      // 4. 既存チケットとの照合（lineItemId + itemSubNoベース）
+      const existingRows = await db
+        .select()
+        .from(tickets)
+        .where(eq(tickets.orderNo, orderNo));
+
+      const existingMap = new Map();
+      existingRows.forEach(ticket => {
+        const key = `${ticket.lineItemId}|${ticket.itemSubNo}`;
+        existingMap.set(key, ticket);
+      });
+
+      const results = { added: 0, updated: 0, skipped: 0 };
+      const insertList = [];
+      const updateList = [];
+
+      for (const data of ticketDataArray) {
+        const key = `${data.lineItemId}|${data.itemSubNo}`;
+        const existing = existingMap.get(key);
+
+        if (existing) {
+          if (existing.isUsable === false) {
+            results.skipped++;
+          } else {
+            updateList.push({ data, existing });
+          }
+        } else {
+          insertList.push(data);
+        }
+      }
+
+      console.log(`[upsertContestEntryTickets] Order ${orderNo}: ${ticketDataArray.length} tickets - insert: ${insertList.length}, update: ${updateList.length}, skip: ${results.skipped}`);
+
+      // 5. バッチ UPDATE（タグのみ更新）
+      if (updateList.length > 0) {
+        const updateQueries = updateList.map(({ data, existing }) => {
+          return db.update(tickets).set({
+            ...this._tagsToColumns(tags),
+            updatedAt: new Date(),
+          }).where(eq(tickets.id, existing.id));
+        });
+
+        await db.batch(updateQueries);
+        results.updated = updateList.length;
+      }
+
+      // 6. バッチ INSERT（onConflictDoNothing で重複回避）
+      if (insertList.length > 0) {
+        const insertResult = await db
+          .insert(tickets)
+          .values(insertList)
+          .onConflictDoNothing({ target: [tickets.lineItemId, tickets.itemSubNo] })
+          .returning({ id: tickets.id });
+
+        results.added = insertResult.length;
+        results.skipped += (insertList.length - insertResult.length);
+      }
+
+      console.log(`[upsertContestEntryTickets] Order ${orderNo}: done - added=${results.added}, updated=${results.updated}, skipped=${results.skipped}`);
+
+      return { success: true, ...results };
+    } catch (error) {
+      console.error('Error in upsertContestEntryTickets:', error);
       return { success: false, error: error.message };
     }
   }
