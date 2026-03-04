@@ -6,7 +6,6 @@ const NAV_CONFIG = {
             label: '大会運営',
             items: [
                 { href: '/registrations', label: '出場登録' },
-                { href: '/judges', label: '審判採点' },
                 { href: '/scores', label: '大会成績' },
                 { href: '/notes', label: '特記事項' },
                 { href: '/subjects', label: '違反認定者', adminOnly: true },

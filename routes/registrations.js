@@ -550,12 +550,10 @@ router.get('/export/all_fields/:contestName', requireAuth, async (req, res) => {
       'email': reg.email || '',
       'phone': reg.phone || '',
       'country': reg.country || '',
-      'pref': reg.pref || '',
+      'province': reg.province || '',
       'age': reg.age || '',
       'class_name': reg.class_name || '',
       'sort_index': reg.sort_index || '',
-      'score_card': reg.score_card || '',
-      'contest_order': reg.contest_order || '',
       'height': reg.height || '',
       'weight': reg.weight || '',
       'occupation': reg.occupation || '',
@@ -854,11 +852,10 @@ router.post('/import-shopify', requireAdmin, async (req, res) => {
         back_stage_pass: order.back_stage_pass ?? 0,
         is_member: !!member,
         sort_index: '',
-        score_card: '',
-        contest_order: '',
         occupation: order.occupation || '',
         instagram: '',
         biography: order.biography || '',
+        province: member?.province || '',
       };
 
       // 既存レコードにマッチ → UPDATE（player_noは変更しない）
@@ -1095,8 +1092,8 @@ router.post('/import-csv', requireAdmin, async (req, res) => {
     const ALLOWED_IMPORT_FIELDS = [
       'name_ja', 'name_ja_kana', 'first_name', 'last_name',
       'email', 'phone',
-      'country', 'pref', 'age', 'class_name',
-      'sort_index', 'score_card', 'contest_order',
+      'country', 'province', 'age', 'class_name',
+      'sort_index',
       'height', 'weight',
       'occupation', 'instagram', 'biography', 'back_stage_pass',
       'is_member', 'isValid'
@@ -1244,130 +1241,6 @@ router.post('/import-csv', requireAdmin, async (req, res) => {
 
   } catch (error) {
     console.error('CSV import error:', error);
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-// POST /import-contest-order - 開催順CSVインポート
-router.post('/import-contest-order', requireAdmin, async (req, res) => {
-  try {
-    const { contestName, csvData } = req.body;
-
-    // バリデーション
-    if (!contestName) {
-      return res.status(400).json({
-        success: false,
-        error: '大会名は必須です'
-      });
-    }
-
-    if (!csvData || !Array.isArray(csvData) || csvData.length === 0) {
-      return res.status(400).json({
-        success: false,
-        error: 'CSVデータが必要です'
-      });
-    }
-
-    console.log(`Starting contest order import for ${contestName}`);
-
-    // 既存のRegistrationsデータを取得（isValid='TRUE'のみ）
-    const existingRegistrations = await registrationModel.findAll();
-    const targetRegistrations = existingRegistrations.filter(
-      reg => reg.contest_name === contestName && reg.isValid === 'TRUE'
-    );
-
-    if (targetRegistrations.length === 0) {
-      return res.status(400).json({
-        success: false,
-        error: `大会「${contestName}」の登録データが見つかりません`
-      });
-    }
-
-    // CSVのclass_nameから大会名を除去し、文字を正規化する関数
-    const normalizeClassName = (className, contestName) => {
-      if (!className) return '';
-      let normalized = className.trim();
-
-      // 大会名が先頭にある場合は除去
-      if (normalized.startsWith(contestName)) {
-        normalized = normalized.substring(contestName.length);
-        // 区切り文字（" - ", " ", "-" など）を除去
-        normalized = normalized.replace(/^[\s\-–—]+/, '').trim();
-      }
-
-      // 文字の正規化: 全角チルダ→半角チルダ、全角ハイフン類→半角ハイフン
-      normalized = normalized
-        .replace(/～/g, '~')           // 全角チルダ → 半角チルダ
-        .replace(/[－ー―]/g, '-')      // 全角ハイフン類 → 半角ハイフン
-        .replace(/\s+/g, ' ');         // 連続スペースを単一スペースに
-
-      return normalized;
-    };
-
-    // CSVからclass_name → {contest_order}のマップを作成
-    // 大会名を除去した正規化されたclass_nameをキーとして使用
-    const csvMap = new Map();
-    csvData.forEach(row => {
-      const rawClassName = row.class_name?.trim();
-      if (rawClassName) {
-        const normalizedClassName = normalizeClassName(rawClassName, contestName);
-        csvMap.set(normalizedClassName, {
-          contest_order: row.contest_order || ''
-        });
-      }
-    });
-
-    // バッチ更新用の配列を構築
-    const updates = [];
-    let updated = 0;
-    let cleared = 0;
-
-    for (const reg of targetRegistrations) {
-      const className = reg.class_name?.trim() || '';
-      // 既存レコードのclass_nameも正規化してマッチング
-      const normalizedRegClassName = normalizeClassName(className, contestName);
-      const csvEntry = csvMap.get(normalizedRegClassName);
-
-      let updateData;
-      if (csvEntry) {
-        // CSVにマッチ: 値を更新
-        updateData = {
-          contest_order: csvEntry.contest_order
-        };
-        updated++;
-      } else {
-        // マッチしない: 空欄にリセット
-        updateData = {
-          contest_order: ''
-        };
-        cleared++;
-      }
-
-      updates.push({ id: reg.id, data: updateData });
-    }
-
-    // バッチUPDATE実行
-    if (updates.length > 0) {
-      const result = await registrationModel.batchUpdate(updates);
-      if (!result.success) {
-        return res.status(500).json({ success: false, error: result.error });
-      }
-    }
-
-    res.json({
-      success: true,
-      data: {
-        contestName,
-        totalRecords: targetRegistrations.length,
-        updated,
-        cleared,
-        csvRows: csvData.length,
-        message: `${updated}件を更新、${cleared}件をクリアしました`
-      }
-    });
-
-  } catch (error) {
-    console.error('Contest order import error:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });

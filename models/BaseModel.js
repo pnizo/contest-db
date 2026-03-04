@@ -152,8 +152,6 @@ class BaseModel {
             'player_no',         // 選手番号（登録）
             'fwj_card_no',       // FWJカード番号（成績・登録共通）
             'npc_member_no',     // NPCメンバー番号（登録）
-            'score_card',        // スコアカード番号（登録）
-            'contest_order',     // 出場順（登録）
             'backstage_pass'     // バックステージパス番号（登録）
           ];
           

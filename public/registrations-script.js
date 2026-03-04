@@ -49,12 +49,10 @@ class RegistrationsManager {
         { key: 'email', label: 'メール' },
         { key: 'phone', label: '電話番号' },
         { key: 'country', label: '国' },
-        { key: 'pref', label: '都道府県' },
+        { key: 'province', label: '都道府県' },
         { key: 'age', label: '年齢' },
         { key: 'class_name', label: 'クラス名' },
         { key: 'sort_index', label: 'ソート順' },
-        { key: 'score_card', label: 'スコアカード' },
-        { key: 'contest_order', label: '審査順' },
         { key: 'height', label: '身長' },
         { key: 'weight', label: '体重' },
         { key: 'occupation', label: '職業' },
@@ -247,11 +245,6 @@ class RegistrationsManager {
             menu.classList.toggle('hidden');
         });
 
-        document.getElementById('contestOrderImportBtn').addEventListener('click', () => {
-            document.getElementById('dataNumberingDropdownMenu').classList.add('hidden');
-            this.openContestOrderImportModal();
-        });
-
         document.getElementById('assignPlayerNoBtn').addEventListener('click', () => {
             document.getElementById('dataNumberingDropdownMenu').classList.add('hidden');
             this.openAssignPlayerNoModal();
@@ -288,10 +281,6 @@ class RegistrationsManager {
 
         document.getElementById('csvImportExecuteBtn').addEventListener('click', () => {
             this.executeCsvImport();
-        });
-
-        document.getElementById('contestOrderImportExecuteBtn').addEventListener('click', () => {
-            this.executeContestOrderImport();
         });
 
         document.getElementById('shopifyImportExecuteBtn').addEventListener('click', () => {
@@ -611,7 +600,7 @@ class RegistrationsManager {
         document.getElementById('newRegEmail').value = '';
         document.getElementById('newRegPhone').value = '';
         document.getElementById('newRegCountry').value = '';
-        document.getElementById('newRegPref').value = '';
+        document.getElementById('newRegProvince').value = '';
         document.getElementById('newRegAge').value = '';
         document.getElementById('newRegHeight').value = '';
         document.getElementById('newRegWeight').value = '';
@@ -684,7 +673,7 @@ class RegistrationsManager {
         document.getElementById('editRegEmail').value = reg.email || '';
         document.getElementById('editRegPhone').value = reg.phone || '';
         document.getElementById('editRegCountry').value = reg.country || '';
-        document.getElementById('editRegPref').value = reg.pref || '';
+        document.getElementById('editRegProvince').value = reg.province || '';
         document.getElementById('editRegAge').value = reg.age || '';
         document.getElementById('editRegHeight').value = reg.height || '';
         document.getElementById('editRegWeight').value = reg.weight || '';
@@ -716,7 +705,7 @@ class RegistrationsManager {
             email: document.getElementById('editRegEmail').value.trim(),
             phone: document.getElementById('editRegPhone').value.trim(),
             country: document.getElementById('editRegCountry').value.trim(),
-            pref: document.getElementById('editRegPref').value.trim(),
+            province: document.getElementById('editRegProvince').value.trim(),
             age: document.getElementById('editRegAge').value.trim(),
             height: document.getElementById('editRegHeight').value.trim(),
             weight: document.getElementById('editRegWeight').value.trim(),
@@ -837,7 +826,7 @@ class RegistrationsManager {
             if (r.email) document.getElementById('newRegEmail').value = r.email;
             if (r.phone) document.getElementById('newRegPhone').value = r.phone;
             if (r.country) document.getElementById('newRegCountry').value = r.country;
-            if (r.pref) document.getElementById('newRegPref').value = r.pref;
+            if (r.province) document.getElementById('newRegProvince').value = r.province;
             if (r.age) document.getElementById('newRegAge').value = r.age;
             if (r.height) document.getElementById('newRegHeight').value = r.height;
             if (r.weight) document.getElementById('newRegWeight').value = r.weight;
@@ -867,7 +856,7 @@ class RegistrationsManager {
             email: document.getElementById('newRegEmail').value.trim(),
             phone: document.getElementById('newRegPhone').value.trim(),
             country: document.getElementById('newRegCountry').value.trim(),
-            pref: document.getElementById('newRegPref').value.trim(),
+            province: document.getElementById('newRegProvince').value.trim(),
             age: document.getElementById('newRegAge').value.trim(),
             height: document.getElementById('newRegHeight').value.trim(),
             weight: document.getElementById('newRegWeight').value.trim(),
@@ -914,51 +903,6 @@ class RegistrationsManager {
             statusEl.className = 'import-status error';
             submitBtn.disabled = false;
         }
-    }
-
-    openContestOrderImportModal() {
-        document.getElementById('contestOrderImportModal').classList.remove('hidden');
-
-        // コンテスト選択肢を設定
-        const contestSelect = document.getElementById('contestOrderContestName');
-        contestSelect.innerHTML = '<option value="">大会を選択してください</option>';
-
-        // 開催日順（降順）にソートしてオプションを追加
-        const contests = Array.from(this.contestsMap.entries())
-            .sort((a, b) => new Date(b[1]) - new Date(a[1]));
-
-        contests.forEach(([name, date]) => {
-            const option = document.createElement('option');
-            option.value = name;
-            option.textContent = name;
-            contestSelect.appendChild(option);
-        });
-
-        // フォームをリセット
-        document.getElementById('contestOrderCsvFile').value = '';
-        document.getElementById('contestOrderImportExecuteBtn').disabled = true;
-        document.getElementById('contestOrderImportStatus').className = 'import-status hidden';
-        document.getElementById('contestOrderImportStatus').textContent = '';
-
-        // 今日以降で最も近い大会をデフォルト値として設定
-        if (this.defaultContest) {
-            document.getElementById('contestOrderContestName').value = this.defaultContest.contest_name;
-            this.validateContestOrderImportForm();
-        }
-
-        // フォームバリデーション
-        contestSelect.removeEventListener('change', this.contestOrderContestSelectChangeBound);
-        this.contestOrderContestSelectChangeBound = () => this.validateContestOrderImportForm();
-        contestSelect.addEventListener('change', this.contestOrderContestSelectChangeBound);
-
-        const fileInput = document.getElementById('contestOrderCsvFile');
-        fileInput.removeEventListener('change', this.contestOrderFileChangeBound);
-        this.contestOrderFileChangeBound = () => this.validateContestOrderImportForm();
-        fileInput.addEventListener('change', this.contestOrderFileChangeBound);
-    }
-
-    closeContestOrderImportModal() {
-        document.getElementById('contestOrderImportModal').classList.add('hidden');
     }
 
     // CSVインポートモーダル
@@ -1084,87 +1028,6 @@ class RegistrationsManager {
             }
         } catch (error) {
             console.error('CSV import error:', error);
-            statusEl.textContent = `エラー: ${error.message}`;
-            statusEl.className = 'import-status error';
-            importBtn.disabled = false;
-        }
-    }
-
-    validateContestOrderImportForm() {
-        const contestName = document.getElementById('contestOrderContestName').value;
-        const csvFile = document.getElementById('contestOrderCsvFile').files[0];
-        const importBtn = document.getElementById('contestOrderImportExecuteBtn');
-        importBtn.disabled = !(contestName && csvFile);
-    }
-
-    async executeContestOrderImport() {
-        const contestName = document.getElementById('contestOrderContestName').value;
-        const csvFile = document.getElementById('contestOrderCsvFile').files[0];
-        const statusEl = document.getElementById('contestOrderImportStatus');
-        const importBtn = document.getElementById('contestOrderImportExecuteBtn');
-
-        if (!contestName || !csvFile) {
-            statusEl.textContent = '大会名とCSVファイルを選択してください';
-            statusEl.className = 'import-status error';
-            return;
-        }
-
-        try {
-            importBtn.disabled = true;
-            statusEl.textContent = 'CSVファイルを読み込み中...';
-            statusEl.className = 'import-status';
-
-            // CSVファイルを読み込み
-            const csvText = await this.readFileAsText(csvFile);
-            const csvData = this.parseCSV(csvText);
-
-            if (csvData.length === 0) {
-                statusEl.textContent = 'CSVファイルにデータがありません';
-                statusEl.className = 'import-status error';
-                importBtn.disabled = false;
-                return;
-            }
-
-            // 必要な列があるか確認
-            const firstRow = csvData[0];
-            if (!('class_name' in firstRow)) {
-                statusEl.textContent = 'CSVにclass_name列が必要です';
-                statusEl.className = 'import-status error';
-                importBtn.disabled = false;
-                return;
-            }
-
-            statusEl.textContent = `${csvData.length}件のデータをインポート中...`;
-
-            // APIを呼び出し
-            const response = await authFetch('/api/registrations/import-contest-order', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    ...AuthToken.getHeaders()
-                },
-                body: JSON.stringify({ contestName, csvData })
-            });
-
-            const result = await response.json();
-
-            if (result.success) {
-                statusEl.textContent = result.data.message;
-                statusEl.className = 'import-status success';
-                this.showNotification(result.data.message, 'success');
-                
-                // データを再読み込み
-                setTimeout(() => {
-                    this.closeContestOrderImportModal();
-                    this.loadRegistrations();
-                }, 1500);
-            } else {
-                statusEl.textContent = `エラー: ${result.error}`;
-                statusEl.className = 'import-status error';
-                importBtn.disabled = false;
-            }
-        } catch (error) {
-            console.error('Contest order import error:', error);
             statusEl.textContent = `エラー: ${error.message}`;
             statusEl.className = 'import-status error';
             importBtn.disabled = false;
@@ -1501,11 +1364,10 @@ class RegistrationsManager {
             { key: 'phone', label: '電話番号' },
             { key: 'fwj_card_no', label: 'FWJ card #' },
             { key: 'country', label: '国' },
-        { key: 'pref', label: '都道府県' },
+        { key: 'province', label: '都道府県' },
             { key: 'age', label: '年齢' },
             { key: 'class_name', label: 'クラス' },
             { key: 'sort_index', label: 'ソート順' },
-            { key: 'contest_order', label: '開催順' },
             { key: 'height', label: '身長' },
             { key: 'weight', label: '体重' },
             { key: 'occupation', label: '職業' },

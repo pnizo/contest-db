@@ -8,7 +8,6 @@ require('dotenv').config();
 const userRoutes = require('./routes/users');
 const authRoutes = require('./routes/auth');
 const scoreRoutes = require('./routes/scores');
-const judgeRoutes = require('./routes/judges');
 const registrationRoutes = require('./routes/registrations');
 const subjectRoutes = require('./routes/subjects');
 const noteRoutes = require('./routes/notes');
@@ -121,7 +120,6 @@ if (process.env.NODE_ENV !== 'production') {
 // セキュリティミドルウェア（IP制限 - 認証API以外に適用）
 app.use('/api/users', requireIpRestriction);
 app.use('/api/scores', requireIpRestriction);
-app.use('/api/judges', requireIpRestriction);
 app.use('/api/registrations', requireIpRestriction);
 app.use('/api/subjects', requireIpRestriction);
 app.use('/api/notes', requireIpRestriction);
@@ -149,10 +147,6 @@ app.get('/users', (req, res) => {
 
 app.get('/scores', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'scores.html'));
-});
-
-app.get('/judges', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'judges.html'));
 });
 
 app.get('/registrations', (req, res) => {
@@ -203,7 +197,6 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/scores', scoreRoutes);
-app.use('/api/judges', judgeRoutes);
 app.use('/api/registrations', registrationRoutes);
 app.use('/api/subjects', subjectRoutes);
 app.use('/api/notes', noteRoutes);

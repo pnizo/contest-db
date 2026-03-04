@@ -44,7 +44,6 @@
                             <div class="btn-dropdown admin-only">
                                 <button id="dataNumberingDropdownBtn" class="btn-dropdown-toggle">データ採番 <span class="btn-dropdown-arrow">▼</span></button>
                                 <div id="dataNumberingDropdownMenu" class="btn-dropdown-menu hidden">
-                                    <button id="contestOrderImportBtn" class="btn-dropdown-item">開催順CSV適用</button>
                                     <button id="assignPlayerNoBtn" class="btn-dropdown-item">ゼッケン採番</button>
                                 </div>
                             </div>
@@ -184,7 +183,7 @@
                 <div class="form-row">
                     <div class="form-group">
                         <label>都道府県</label>
-                        <input type="text" id="newRegPref">
+                        <input type="text" id="newRegProvince">
                     </div>
                 </div>
                 <div class="form-row">
@@ -285,7 +284,7 @@
                 <div class="form-row">
                     <div class="form-group">
                         <label>都道府県</label>
-                        <input type="text" id="editRegPref">
+                        <input type="text" id="editRegProvince">
                     </div>
                 </div>
                 <div class="form-row">
@@ -398,35 +397,6 @@
                     <button type="button" id="shopifyImportExecuteBtn" disabled class="btn btn-primary">インポート実行</button>
                 </div>
                 <div id="shopifyImportStatus" class="import-status hidden"></div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Contest Order Import Modal -->
-    <div id="contestOrderImportModal" class="modal hidden">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2>開催順インポート</h2>
-                <button class="modal-close" onclick="registrationsManager.closeContestOrderImportModal()">&times;</button>
-            </div>
-            <div class="modal-form">
-                <p class="modal-description">CSVファイルから開催順（contest_order）を更新します。</p>
-                <div class="form-group">
-                    <label for="contestOrderContestName">大会名:</label>
-                    <select id="contestOrderContestName" required>
-                        <option value="">大会を選択してください</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label for="contestOrderCsvFile">CSVファイル:</label>
-                    <input type="file" id="contestOrderCsvFile" accept=".csv" required>
-                    <small>※CSVには class_name, contest_order 列が必要です</small>
-                </div>
-                <div class="form-actions">
-                    <button type="button" onclick="registrationsManager.closeContestOrderImportModal()" class="btn btn-secondary">キャンセル</button>
-                    <button type="button" id="contestOrderImportExecuteBtn" disabled class="btn btn-primary">インポート実行</button>
-                </div>
-                <div id="contestOrderImportStatus" class="import-status hidden"></div>
             </div>
         </div>
     </div>

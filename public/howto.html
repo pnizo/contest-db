@@ -158,7 +158,6 @@
                     <a href="#contest-prep">大会の準備をする</a>
                     <ul>
                         <li><a href="#import-registrations">Shopifyから出場登録データを取り込む</a></li>
-                        <li><a href="#set-contest-order">開催順CSVをインポートして出場順を設定する</a></li>
                         <li><a href="#assign-player-numbers">ゼッケン番号を採番する</a></li>
                         <li><a href="#export-registrations">出場登録データをCSVで出力するには</a></li>
                         <li><a href="#import-all-csv">全項目CSVデータをインポートするには</a></li>
@@ -233,7 +232,6 @@
 
             <ol>
                 <li>Shopifyからエントリーデータを同期する</li>
-                <li>開催順CSVを読み込んで開催順 / スコアカード番号をセットする</li>
                 <li>必要に応じて、全項目CSVのエクスポート→インポートで登録情報の修正と追加を行う</li>
                 <li>登録情報が完成したら、全項目CSVをエクスポートして、Registrations作成シートに読み込ませる</li>
                 <li>ゼッケン番号用CSVをエクスポートして、FWJ HPのゼッケン番号ページに読み込ませる</li>
@@ -255,19 +253,6 @@
             <div class="note-box">
                 <strong>ポイント</strong>: 既存の選手番号（player_no）は引き継がれます。新規登録分にのみ新しい番号が発行されます。
             </div>
-
-            <h3 id="set-contest-order">開催順CSVをインポートして出場順を設定する</h3>
-            <ol>
-                <li>ナビゲーションバーの「大会運営」→「出場登録」をクリック</li>
-                <li>「データ採番」→「開催順CSV適用」をクリック</li>
-                <li>対象の大会名をドロップダウンから選択</li>
-                <li>CSVファイルを選択
-                    <ul>
-                        <li>必須列: <code>class_name</code>, <code>contest_order</code></li>
-                    </ul>
-                </li>
-                <li>「インポート実行」をクリック</li>
-            </ol>
 
             <h3 id="assign-player-numbers">ゼッケン番号を採番する</h3>
             <ol>

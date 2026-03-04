@@ -24,7 +24,6 @@ async function migrateRegistrations() {
       age VARCHAR(10),
       class_name VARCHAR(255),
       sort_index VARCHAR(50),
-      score_card VARCHAR(50),
       contest_order VARCHAR(50),
       height VARCHAR(20),
       weight VARCHAR(20),
