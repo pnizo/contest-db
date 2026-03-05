@@ -1,13 +1,11 @@
 const { getDb } = require('../lib/db');
-const { tickets } = require('../lib/db/schema');
+const { tickets, contests } = require('../lib/db/schema');
 const { eq, ne, ilike, and, desc, asc, sql } = require('drizzle-orm');
 const ShopifyService = require('../services/shopify');
 
 /**
  * チケットモデル - Neon Postgres / Drizzle ORM版
  */
-const CONTEST_ENTRY_TICKET_COUNT = 3;
-
 class Ticket {
   /**
    * tag1-tag10カラムからタグ配列を構築（null/空文字は除外）
@@ -579,10 +577,6 @@ class Ticket {
         return { success: false, error: 'order.name is required' };
       }
 
-      if (CONTEST_ENTRY_TICKET_COUNT === 0) {
-        return { success: true, added: 0, updated: 0, skipped: 0, message: 'Contest entry tickets disabled' };
-      }
-
       // 1. order.line_items から商品名に「コンテストエントリー」を含むものを抽出
       const contestItems = (order.line_items || []).filter(item =>
         (item.title || '').includes('コンテストエントリー')
@@ -633,13 +627,27 @@ class Ticket {
         return true;
       });
 
-      // 3. 各line_itemにつき3枚のチケットデータを生成
+      // 3. 各line_itemにつきcontestsテーブルのcampaign枚数分のチケットデータを生成
       const ticketDataArray = [];
       for (const item of filteredContestItems) {
         const contestName = (item.title || '').replace(/コンテストエントリー.*$/, '').trim();
         const productName = contestName + ' 招待チケット';
         const contestTags = ['2026シーズン', contestName, '観戦チケット'];
-        for (let subNo = 1; subNo <= CONTEST_ENTRY_TICKET_COUNT; subNo++) {
+
+        // contestsテーブルからcampaign枚数を取得
+        const [contestRow] = await db
+          .select({ campaign: contests.campaign })
+          .from(contests)
+          .where(ilike(contests.contestName, contestName))
+          .limit(1);
+
+        const campaignCount = contestRow ? contestRow.campaign : 0;
+        if (campaignCount === 0) {
+          console.log(`[upsertContestEntryTickets] Order ${orderNo}: skipping "${contestName}" - campaign is 0 or contest not found`);
+          continue;
+        }
+
+        for (let subNo = 1; subNo <= campaignCount; subNo++) {
           const lineItemId = `${orderNo}-${item.id}-${subNo}`;
           ticketDataArray.push({
             orderNo,

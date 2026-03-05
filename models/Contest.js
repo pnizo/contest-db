@@ -121,7 +121,7 @@ class Contest {
       const rows = await db
         .select()
         .from(contests)
-        .where(eq(contests.contestName, contestName));
+        .where(ilike(contests.contestName, contestName));
 
       if (rows.length === 0) {
         return null;
