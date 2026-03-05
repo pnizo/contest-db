@@ -19,6 +19,7 @@ class Contest {
       contest_place: row.contestPlace,
       is_ready: row.isReady,
       is_test: row.isTest,
+      campaign: row.campaign,
       created_at: row.createdAt,
       updated_at: row.updatedAt,
     };

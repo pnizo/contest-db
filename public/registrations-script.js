@@ -117,7 +117,10 @@ class RegistrationsManager {
             if (result.success && result.data) {
                 result.data.forEach(contest => {
                     if (contest.contest_name && contest.contest_date) {
-                        this.contestsMap.set(contest.contest_name, contest.contest_date);
+                        this.contestsMap.set(contest.contest_name, {
+                            contest_date: contest.contest_date,
+                            is_ready: contest.is_ready,
+                        });
                     }
                 });
 
@@ -408,13 +411,13 @@ class RegistrationsManager {
 
         // 開催日順（降順）にソートしてオプションを追加
         const contests = Array.from(this.contestsMap.entries())
-            .sort((a, b) => new Date(b[1]) - new Date(a[1]));
+            .sort((a, b) => new Date(b[1].contest_date) - new Date(a[1].contest_date));
 
-        contests.forEach(([name, date]) => {
+        contests.forEach(([name, info]) => {
             const option = document.createElement('option');
             option.value = name;
             option.textContent = name;
-            option.setAttribute('data-date', date);
+            option.setAttribute('data-date', info.contest_date);
             contestSelect.appendChild(option);
         });
 
@@ -436,8 +439,8 @@ class RegistrationsManager {
         this.shopifyContestSelectChangeBound = (e) => {
             const selectedName = e.target.value;
             if (selectedName && this.contestsMap.has(selectedName)) {
-                const contestDate = this.contestsMap.get(selectedName);
-                const formattedDate = this.formatDateForInput(contestDate);
+                const contestInfo = this.contestsMap.get(selectedName);
+                const formattedDate = this.formatDateForInput(contestInfo.contest_date);
                 document.getElementById('shopifyContestDate').value = formattedDate;
             } else {
                 document.getElementById('shopifyContestDate').value = '';
@@ -461,7 +464,7 @@ class RegistrationsManager {
         contestSelect.innerHTML = '<option value="">大会を選択してください</option>';
 
         const contests = Array.from(this.contestsMap.entries())
-            .sort((a, b) => new Date(b[1]) - new Date(a[1]));
+            .sort((a, b) => new Date(b[1].contest_date) - new Date(a[1].contest_date));
 
         contests.forEach(([name]) => {
             const option = document.createElement('option');
@@ -578,13 +581,13 @@ class RegistrationsManager {
         contestSelect.innerHTML = '<option value="">大会を選択してください</option>';
 
         const contests = Array.from(this.contestsMap.entries())
-            .sort((a, b) => new Date(b[1]) - new Date(a[1]));
+            .sort((a, b) => new Date(b[1].contest_date) - new Date(a[1].contest_date));
 
-        contests.forEach(([name, date]) => {
+        contests.forEach(([name, info]) => {
             const option = document.createElement('option');
             option.value = name;
             option.textContent = name;
-            option.setAttribute('data-date', date);
+            option.setAttribute('data-date', info.contest_date);
             contestSelect.appendChild(option);
         });
 
@@ -622,8 +625,8 @@ class RegistrationsManager {
         this.newRegContestSelectChangeBound = (e) => {
             const selectedName = e.target.value;
             if (selectedName && this.contestsMap.has(selectedName)) {
-                const contestDate = this.contestsMap.get(selectedName);
-                document.getElementById('newRegContestDate').value = this.formatDateForInput(contestDate);
+                const contestInfo = this.contestsMap.get(selectedName);
+                document.getElementById('newRegContestDate').value = this.formatDateForInput(contestInfo.contest_date);
             } else {
                 document.getElementById('newRegContestDate').value = '';
             }
@@ -1047,6 +1050,16 @@ class RegistrationsManager {
         const contestName = document.getElementById('shopifyContestName').value;
         if (!contestDate || !contestName) {
             this.showNotification('大会開催日と大会名を選択してください', 'error');
+            return;
+        }
+
+        // 公開済み大会の場合はリジェクト
+        const contestInfo = this.contestsMap.get(contestName);
+        if (contestInfo && contestInfo.is_ready) {
+            const statusElement = document.getElementById('shopifyImportStatus');
+            statusElement.textContent = `「${contestName}」は公開済みのため、Shopifyからの同期はできません`;
+            statusElement.className = 'import-status error';
+            statusElement.style.display = 'block';
             return;
         }
 
