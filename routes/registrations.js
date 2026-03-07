@@ -559,6 +559,7 @@ router.get('/export/all_fields/:contestName', requireAuth, async (req, res) => {
       'occupation': reg.occupation || '',
       'instagram': reg.instagram || '',
       'biography': reg.biography || '',
+      'entry_date': reg.entry_date || '',
       'back_stage_pass': reg.back_stage_pass ?? 0,
       'is_member': reg.is_member ?? false,
       'createdAt': reg.createdAt || '',
@@ -855,6 +856,7 @@ router.post('/import-shopify', requireAdmin, async (req, res) => {
         occupation: order.occupation || '',
         instagram: '',
         biography: order.biography || '',
+        entry_date: order.order_date || '',
         province: member?.province || '',
       };
 
@@ -1095,7 +1097,7 @@ router.post('/import-csv', requireAdmin, async (req, res) => {
       'country', 'province', 'age', 'class_name',
       'sort_index',
       'height', 'weight',
-      'occupation', 'instagram', 'biography', 'back_stage_pass',
+      'occupation', 'instagram', 'biography', 'entry_date', 'back_stage_pass',
       'is_member', 'isValid'
     ];
 

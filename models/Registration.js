@@ -32,6 +32,7 @@ class Registration {
       occupation: row.occupation || '',
       instagram: row.instagram || '',
       biography: row.biography || '',
+      entry_date: row.entryDate ? row.entryDate.toISOString() : '',
       back_stage_pass: row.backStagePass ?? 0,
       is_member: row.isMember ?? false,
       isValid: row.isValid ? 'TRUE' : 'FALSE',
@@ -231,6 +232,7 @@ class Registration {
       'weight': registrations.weight,
       'occupation': registrations.occupation,
       'biography': registrations.biography,
+      'entry_date': registrations.entryDate,
       'back_stage_pass': registrations.backStagePass,
       'is_member': registrations.isMember,
     };
@@ -323,6 +325,7 @@ class Registration {
         occupation: data.occupation || null,
         instagram: data.instagram || null,
         biography: data.biography || null,
+        entryDate: data.entry_date ? new Date(data.entry_date) : null,
         backStagePass: parseInt(data.back_stage_pass, 10) || 0,
         isMember: data.is_member === true || data.is_member === 'true',
         isValid: true,
@@ -368,6 +371,7 @@ class Registration {
     if (data.occupation !== undefined) updateData.occupation = data.occupation || null;
     if (data.instagram !== undefined) updateData.instagram = data.instagram || null;
     if (data.biography !== undefined) updateData.biography = data.biography || null;
+    if (data.entry_date !== undefined) updateData.entryDate = data.entry_date ? new Date(data.entry_date) : null;
     if (data.back_stage_pass !== undefined) updateData.backStagePass = parseInt(data.back_stage_pass, 10) || 0;
     if (data.is_member !== undefined) updateData.isMember = data.is_member === true || data.is_member === 'true';
 
@@ -545,6 +549,7 @@ class Registration {
           occupation: normalizedRow['occupation'] || null,
           instagram: normalizedRow['instagram'] || null,
           biography: normalizedRow['biography'] || null,
+          entryDate: normalizedRow['entry_date'] ? new Date(normalizedRow['entry_date']) : null,
           backStagePass: parseInt(normalizedRow['back_stage_pass'], 10) || 0,
           isMember: normalizedRow['is_member'] === true || normalizedRow['is_member'] === 'true',
           isValid: true,

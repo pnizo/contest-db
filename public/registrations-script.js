@@ -58,6 +58,7 @@ class RegistrationsManager {
         { key: 'occupation', label: '職業' },
         { key: 'instagram', label: 'Instagram' },
         { key: 'biography', label: '自己紹介' },
+        { key: 'entry_date', label: 'エントリー日時' },
         { key: 'back_stage_pass', label: 'BSP' },
         { key: 'is_member', label: 'カード会員' },
         { key: 'isValid', label: '有効' },
@@ -1385,6 +1386,7 @@ class RegistrationsManager {
             { key: 'weight', label: '体重' },
             { key: 'occupation', label: '職業' },
             { key: 'biography', label: '自己紹介' },
+            { key: 'entry_date', label: 'エントリー日時' },
             { key: 'back_stage_pass', label: 'BSP' },
             { key: 'is_member', label: 'カード会員' }
         ];
@@ -1449,6 +1451,10 @@ class RegistrationsManager {
 
                 if (header.key === 'contest_date' && value) {
                     value = new Date(value).toLocaleDateString('ja-JP');
+                }
+                if (header.key === 'entry_date' && value) {
+                    const d = new Date(value);
+                    value = d.toLocaleDateString('ja-JP') + ' ' + d.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
                 }
 
                 if (header.key === 'is_member') {
