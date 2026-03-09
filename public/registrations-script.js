@@ -1253,7 +1253,34 @@ class RegistrationsManager {
     }
 
     parseCSV(csvText) {
-        const lines = csvText.split('\n').filter(line => line.trim());
+        // クォート内の改行を考慮してレコード単位に分割する
+        const lines = [];
+        let current = '';
+        let inQuotes = false;
+
+        for (let i = 0; i < csvText.length; i++) {
+            const char = csvText[i];
+
+            if (char === '"') {
+                inQuotes = !inQuotes;
+                current += char;
+            } else if ((char === '\n' || char === '\r') && !inQuotes) {
+                // \r\n の場合は \n もスキップ
+                if (char === '\r' && csvText[i + 1] === '\n') {
+                    i++;
+                }
+                if (current.trim()) {
+                    lines.push(current);
+                }
+                current = '';
+            } else {
+                current += char;
+            }
+        }
+        if (current.trim()) {
+            lines.push(current);
+        }
+
         if (lines.length < 2) return [];
 
         const headers = this.parseCSVLine(lines[0]);
