@@ -89,24 +89,16 @@ class Ticket {
         .where(sql`${tickets.productName} IS NOT NULL AND ${tickets.productName} != ''`)
         .orderBy(tickets.productName);
 
-      // 一意の支払いステータスを取得
-      const financialRows = await db
-        .selectDistinct({ financialStatus: tickets.financialStatus })
+      // 一意のバリエーションを取得
+      const variantRows = await db
+        .selectDistinct({ variant: tickets.variant })
         .from(tickets)
-        .where(sql`${tickets.financialStatus} IS NOT NULL AND ${tickets.financialStatus} != ''`)
-        .orderBy(tickets.financialStatus);
-
-      // 一意の発送ステータスを取得
-      const fulfillmentRows = await db
-        .selectDistinct({ fulfillmentStatus: tickets.fulfillmentStatus })
-        .from(tickets)
-        .where(sql`${tickets.fulfillmentStatus} IS NOT NULL AND ${tickets.fulfillmentStatus} != ''`)
-        .orderBy(tickets.fulfillmentStatus);
+        .where(sql`${tickets.variant} IS NOT NULL AND ${tickets.variant} != ''`)
+        .orderBy(tickets.variant);
 
       return {
         productNames: productNameRows.map(r => r.productName),
-        financialStatuses: financialRows.map(r => r.financialStatus),
-        fulfillmentStatuses: fulfillmentRows.map(r => r.fulfillmentStatus),
+        variants: variantRows.map(r => r.variant),
       };
     } catch (error) {
       console.error('Error getting filter options:', error);
@@ -127,8 +119,8 @@ class Ticket {
       if (filters.product_name) {
         conditions.push(ilike(tickets.productName, `%${filters.product_name}%`));
       }
-      if (filters.financial_status) {
-        conditions.push(eq(tickets.financialStatus, filters.financial_status));
+      if (filters.variant) {
+        conditions.push(eq(tickets.variant, filters.variant));
       }
       if (filters.fulfillment_status) {
         conditions.push(eq(tickets.fulfillmentStatus, filters.fulfillment_status));

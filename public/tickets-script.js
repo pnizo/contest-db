@@ -146,7 +146,7 @@ class TicketsManager {
             this.applyFilters();
         });
 
-        document.getElementById('financialStatusFilter').addEventListener('change', () => {
+        document.getElementById('variantFilter').addEventListener('change', () => {
             this.applyFilters();
         });
 
@@ -245,14 +245,14 @@ class TicketsManager {
                     productFilter.appendChild(option);
                 });
 
-                // 支払いステータスフィルター
-                const financialStatusFilter = document.getElementById('financialStatusFilter');
-                financialStatusFilter.innerHTML = '<option value="">支払いステータス</option>';
-                result.data.financialStatuses.forEach(status => {
+                // バリエーションフィルター
+                const variantFilter = document.getElementById('variantFilter');
+                variantFilter.innerHTML = '<option value="">バリエーション</option>';
+                result.data.variants.forEach(variant => {
                     const option = document.createElement('option');
-                    option.value = status;
-                    option.textContent = status;
-                    financialStatusFilter.appendChild(option);
+                    option.value = variant;
+                    option.textContent = variant;
+                    variantFilter.appendChild(option);
                 });
             }
         } catch (error) {
@@ -442,7 +442,7 @@ class TicketsManager {
 
     applyFilters() {
         this.currentFilters.product_name = document.getElementById('productFilter').value;
-        this.currentFilters.financial_status = document.getElementById('financialStatusFilter').value;
+        this.currentFilters.variant = document.getElementById('variantFilter').value;
         this.currentFilters.shopify_id_filter = document.getElementById('shopifyIdFilter').value.trim();
         this.currentFilters.valid_only = document.getElementById('validOnlyFilter').checked ? 'true' : '';
         this.currentPage = 1;
@@ -451,7 +451,7 @@ class TicketsManager {
 
     clearFilters() {
         document.getElementById('productFilter').value = '';
-        document.getElementById('financialStatusFilter').value = '';
+        document.getElementById('variantFilter').value = '';
         document.getElementById('shopifyIdFilter').value = '';
         document.getElementById('validOnlyFilter').checked = false;
         document.getElementById('searchInput').value = '';

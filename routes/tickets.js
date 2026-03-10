@@ -181,7 +181,7 @@ router.get('/', async (req, res) => {
       page = 1,
       limit = 50,
       product_name,
-      financial_status,
+      variant,
       fulfillment_status,
       shopify_id_filter,
       valid_only,
@@ -194,7 +194,7 @@ router.get('/', async (req, res) => {
 
     const filters = {};
     if (product_name) filters.product_name = product_name;
-    if (financial_status) filters.financial_status = financial_status;
+    if (variant) filters.variant = variant;
     if (fulfillment_status) filters.fulfillment_status = fulfillment_status;
     if (shopify_id_filter) filters.shopify_id_filter = shopify_id_filter;
     if (valid_only) filters.valid_only = valid_only;
