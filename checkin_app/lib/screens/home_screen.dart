@@ -1,3 +1,4 @@
+import 'dart:js_interop';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../services/auth_service.dart';
@@ -5,8 +6,39 @@ import '../services/checkin_service.dart';
 import 'login_screen.dart';
 import 'scanner_screen.dart';
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  @override
+  void initState() {
+    super.initState();
+    // URLのcodeパラメータをチェックし、あれば手動入力ダイアログを表示
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkUrlCode();
+    });
+  }
+
+  void _checkUrlCode() {
+    final uri = Uri.base;
+    final code = uri.queryParameters['code'];
+    if (code != null && code.isNotEmpty) {
+      // URLからcodeパラメータを除去（再表示防止）
+      _clearUrlCode();
+      _showManualInputDialog(context, initialCode: code);
+    }
+  }
+
+  void _clearUrlCode() {
+    final uri = Uri.base;
+    final params = Map<String, String>.from(uri.queryParameters)..remove('code');
+    final newUri = uri.replace(queryParameters: params.isEmpty ? null : params);
+    _jsReplaceState(newUri.toString());
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -76,8 +108,20 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  void _showManualInputDialog(BuildContext context) {
-    final controller = TextEditingController();
+  void _showManualInputDialog(BuildContext context, {String? initialCode}) {
+    // 初期コードをフォーマット
+    String? formatted;
+    if (initialCode != null) {
+      final clean = initialCode.toUpperCase().replaceAll(RegExp(r'[^A-Z0-9]'), '');
+      final buf = StringBuffer();
+      for (var i = 0; i < clean.length && i < 12; i++) {
+        if (i > 0 && i % 4 == 0) buf.write('-');
+        buf.write(clean[i]);
+      }
+      formatted = buf.toString();
+    }
+
+    final controller = TextEditingController(text: formatted);
     final authService = AuthService();
     final checkinService = CheckinService(authService);
 
@@ -261,4 +305,13 @@ class CheckinCodeFormatter extends TextInputFormatter {
       selection: TextSelection.collapsed(offset: formatted.length),
     );
   }
+}
+
+@JS('window.history.replaceState')
+external void _jsHistoryReplaceState(JSAny? state, String title, String url);
+
+void _jsReplaceState(String url) {
+  try {
+    _jsHistoryReplaceState(null, '', url);
+  } catch (_) {}
 }

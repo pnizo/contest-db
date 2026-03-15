@@ -93,9 +93,10 @@ app.use((req, res, next) => {
   if (req.isCheckinDomain) {
     const path = req.path;
 
-    // ルートと旧チェックイン画面を /app/ にリダイレクト
+    // ルートと旧チェックイン画面を /app/ にリダイレクト（クエリパラメータ引き継ぎ）
     if (path === '/' || path === '/checkin') {
-      return res.redirect('/app/');
+      const qs = req.originalUrl.includes('?') ? req.originalUrl.substring(req.originalUrl.indexOf('?')) : '';
+      return res.redirect('/app/' + qs);
     }
 
     // 許可されたパスのみアクセス可能
