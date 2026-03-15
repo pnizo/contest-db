@@ -142,6 +142,11 @@ class TicketsManager {
         });
 
         // フィルター（変更で自動絞り込み）
+        document.getElementById('contestFilter').addEventListener('change', () => {
+            this.loadProductNames();
+            this.applyFilters();
+        });
+
         document.getElementById('productFilter').addEventListener('change', () => {
             this.applyFilters();
         });
@@ -151,6 +156,16 @@ class TicketsManager {
         });
 
         document.getElementById('validOnlyFilter').addEventListener('change', () => {
+            if (document.getElementById('validOnlyFilter').checked && document.getElementById('invalidOnlyFilter').checked) {
+                document.getElementById('invalidOnlyFilter').checked = false;
+            }
+            this.applyFilters();
+        });
+
+        document.getElementById('invalidOnlyFilter').addEventListener('change', () => {
+            if (document.getElementById('invalidOnlyFilter').checked && document.getElementById('validOnlyFilter').checked) {
+                document.getElementById('validOnlyFilter').checked = false;
+            }
             this.applyFilters();
         });
 
@@ -235,15 +250,18 @@ class TicketsManager {
             const result = await response.json();
 
             if (result.success && result.data) {
-                // 商品名フィルター
-                const productFilter = document.getElementById('productFilter');
-                productFilter.innerHTML = '<option value="">商品名を選択</option>';
-                result.data.productNames.forEach(name => {
+                // 大会名フィルター
+                const contestFilter = document.getElementById('contestFilter');
+                contestFilter.innerHTML = '<option value="">大会名を選択</option>';
+                result.data.contestNames.forEach(name => {
                     const option = document.createElement('option');
                     option.value = name;
                     option.textContent = name;
-                    productFilter.appendChild(option);
+                    contestFilter.appendChild(option);
                 });
+
+                // 商品名フィルター（初期は全商品名）
+                this.updateProductFilter(result.data.productNames || []);
 
                 // バリエーションフィルター
                 const variantFilter = document.getElementById('variantFilter');
@@ -257,6 +275,35 @@ class TicketsManager {
             }
         } catch (error) {
             console.error('Filter options loading failed:', error);
+        }
+    }
+
+    updateProductFilter(productNames) {
+        const productFilter = document.getElementById('productFilter');
+        productFilter.innerHTML = '<option value="">商品名を選択</option>';
+        productNames.forEach(name => {
+            const option = document.createElement('option');
+            option.value = name;
+            option.textContent = name;
+            productFilter.appendChild(option);
+        });
+    }
+
+    async loadProductNames() {
+        try {
+            const contestName = document.getElementById('contestFilter').value;
+            const params = new URLSearchParams();
+            if (contestName) params.append('contest_name', contestName);
+
+            const response = await authFetch(`${this.apiUrl}/filter-options?${params.toString()}`);
+            const result = await response.json();
+
+            if (result.success && result.data) {
+                this.updateProductFilter(result.data.productNames || []);
+                document.getElementById('productFilter').value = '';
+            }
+        } catch (error) {
+            console.error('Product names loading failed:', error);
         }
     }
 
@@ -441,23 +488,26 @@ class TicketsManager {
     }
 
     applyFilters() {
+        this.currentFilters.contest_name = document.getElementById('contestFilter').value;
         this.currentFilters.product_name = document.getElementById('productFilter').value;
         this.currentFilters.variant = document.getElementById('variantFilter').value;
-        this.currentFilters.shopify_id_filter = document.getElementById('shopifyIdFilter').value.trim();
         this.currentFilters.valid_only = document.getElementById('validOnlyFilter').checked ? 'true' : '';
+        this.currentFilters.invalid_only = document.getElementById('invalidOnlyFilter').checked ? 'true' : '';
         this.currentPage = 1;
         this.loadTickets();
     }
 
     clearFilters() {
+        document.getElementById('contestFilter').value = '';
         document.getElementById('productFilter').value = '';
         document.getElementById('variantFilter').value = '';
-        document.getElementById('shopifyIdFilter').value = '';
         document.getElementById('validOnlyFilter').checked = false;
+        document.getElementById('invalidOnlyFilter').checked = false;
         document.getElementById('searchInput').value = '';
         document.getElementById('clearSearchBtn').classList.add('hidden');
         this.currentFilters = {};
         this.currentPage = 1;
+        this.loadProductNames();
         this.loadTickets();
     }
 
@@ -658,44 +708,90 @@ class TicketsManager {
     async openCsvExportModal() {
         document.getElementById('csvExportStatus').classList.add('hidden');
         document.getElementById('csvExportModal').classList.remove('hidden');
-        await this.loadExportProductNames();
+        await this.loadExportOptions();
     }
 
     closeCsvExportModal() {
         document.getElementById('csvExportModal').classList.add('hidden');
     }
 
-    async loadExportProductNames() {
-        const select = document.getElementById('exportProductNameSelect');
-        select.innerHTML = '<option value="">読み込み中...</option>';
+    async loadExportOptions() {
+        const contestSelect = document.getElementById('exportContestSelect');
+        const productSelect = document.getElementById('exportProductNameSelect');
+        contestSelect.innerHTML = '<option value="">読み込み中...</option>';
+        productSelect.innerHTML = '<option value="">読み込み中...</option>';
+
+        // フィルタの現在値を取得
+        const currentContest = this.currentFilters.contest_name || '';
+        const currentProduct = this.currentFilters.product_name || '';
 
         try {
-            const response = await authFetch(`${this.apiUrl}/filter-options`);
+            // 大会名が選択されている場合、商品名はその大会で絞り込む
+            const params = new URLSearchParams();
+            if (currentContest) params.append('contest_name', currentContest);
+
+            const response = await authFetch(`${this.apiUrl}/filter-options?${params.toString()}`);
             const result = await response.json();
 
-            if (result.success && result.data && result.data.productNames) {
-                select.innerHTML = '<option value="__all__" selected>全チケット</option>';
-                result.data.productNames.forEach(name => {
+            if (result.success && result.data) {
+                // 大会名
+                contestSelect.innerHTML = '<option value="">全大会</option>';
+                (result.data.contestNames || []).forEach(name => {
                     const option = document.createElement('option');
                     option.value = name;
                     option.textContent = name;
-                    select.appendChild(option);
+                    contestSelect.appendChild(option);
                 });
+                contestSelect.value = currentContest;
+
+                // 商品名
+                this.updateExportProductFilter(result.data.productNames || []);
+                productSelect.value = currentProduct;
             } else {
-                select.innerHTML = '<option value="">商品名がありません</option>';
+                contestSelect.innerHTML = '<option value="">データがありません</option>';
+                productSelect.innerHTML = '<option value="">データがありません</option>';
+            }
+        } catch (error) {
+            console.error('Load export options error:', error);
+            contestSelect.innerHTML = '<option value="">読み込みエラー</option>';
+            productSelect.innerHTML = '<option value="">読み込みエラー</option>';
+        }
+
+        // 大会名変更時に商品名を連動更新
+        contestSelect.onchange = () => this.loadExportProductNames();
+    }
+
+    updateExportProductFilter(productNames) {
+        const select = document.getElementById('exportProductNameSelect');
+        select.innerHTML = '<option value="">全商品</option>';
+        productNames.forEach(name => {
+            const option = document.createElement('option');
+            option.value = name;
+            option.textContent = name;
+            select.appendChild(option);
+        });
+    }
+
+    async loadExportProductNames() {
+        try {
+            const contestName = document.getElementById('exportContestSelect').value;
+            const params = new URLSearchParams();
+            if (contestName) params.append('contest_name', contestName);
+
+            const response = await authFetch(`${this.apiUrl}/filter-options?${params.toString()}`);
+            const result = await response.json();
+
+            if (result.success && result.data) {
+                this.updateExportProductFilter(result.data.productNames || []);
             }
         } catch (error) {
             console.error('Load export product names error:', error);
-            select.innerHTML = '<option value="">読み込みエラー</option>';
         }
     }
 
     async executeCsvExport() {
+        const contestName = document.getElementById('exportContestSelect').value;
         const productName = document.getElementById('exportProductNameSelect').value;
-        if (!productName) {
-            this.showNotification('商品名を選択してください', 'error');
-            return;
-        }
 
         const executeBtn = document.getElementById('executeCsvExportBtn');
         const statusDiv = document.getElementById('csvExportStatus');
@@ -708,9 +804,11 @@ class TicketsManager {
             statusDiv.className = 'import-status';
             statusDiv.textContent = 'データを取得しています...';
 
-            const exportUrl = productName === '__all__'
-                ? `${this.apiUrl}/export-all`
-                : `${this.apiUrl}/export/${encodeURIComponent(productName)}`;
+            const params = new URLSearchParams();
+            if (contestName) params.append('contest_name', contestName);
+            if (productName) params.append('product_name', productName);
+
+            const exportUrl = `${this.apiUrl}/export?${params.toString()}`;
             const response = await authFetch(exportUrl);
             const result = await response.json();
 
