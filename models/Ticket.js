@@ -86,11 +86,11 @@ class Ticket {
       const productConditions = [sql`${tickets.productName} IS NOT NULL AND ${tickets.productName} != ''`];
       if (contestName) {
         productConditions.push(sql`(
-          ${tickets.tag1} = ${contestName} OR ${tickets.tag2} = ${contestName} OR
-          ${tickets.tag3} = ${contestName} OR ${tickets.tag4} = ${contestName} OR
-          ${tickets.tag5} = ${contestName} OR ${tickets.tag6} = ${contestName} OR
-          ${tickets.tag7} = ${contestName} OR ${tickets.tag8} = ${contestName} OR
-          ${tickets.tag9} = ${contestName} OR ${tickets.tag10} = ${contestName}
+          LOWER(${tickets.tag1}) = LOWER(${contestName}) OR LOWER(${tickets.tag2}) = LOWER(${contestName}) OR
+          LOWER(${tickets.tag3}) = LOWER(${contestName}) OR LOWER(${tickets.tag4}) = LOWER(${contestName}) OR
+          LOWER(${tickets.tag5}) = LOWER(${contestName}) OR LOWER(${tickets.tag6}) = LOWER(${contestName}) OR
+          LOWER(${tickets.tag7}) = LOWER(${contestName}) OR LOWER(${tickets.tag8}) = LOWER(${contestName}) OR
+          LOWER(${tickets.tag9}) = LOWER(${contestName}) OR LOWER(${tickets.tag10}) = LOWER(${contestName})
         )`);
       }
 
@@ -810,11 +810,11 @@ class Ticket {
 
       if (contestName) {
         conditions.push(sql`(
-          ${tickets.tag1} = ${contestName} OR ${tickets.tag2} = ${contestName} OR
-          ${tickets.tag3} = ${contestName} OR ${tickets.tag4} = ${contestName} OR
-          ${tickets.tag5} = ${contestName} OR ${tickets.tag6} = ${contestName} OR
-          ${tickets.tag7} = ${contestName} OR ${tickets.tag8} = ${contestName} OR
-          ${tickets.tag9} = ${contestName} OR ${tickets.tag10} = ${contestName}
+          LOWER(${tickets.tag1}) = LOWER(${contestName}) OR LOWER(${tickets.tag2}) = LOWER(${contestName}) OR
+          LOWER(${tickets.tag3}) = LOWER(${contestName}) OR LOWER(${tickets.tag4}) = LOWER(${contestName}) OR
+          LOWER(${tickets.tag5}) = LOWER(${contestName}) OR LOWER(${tickets.tag6}) = LOWER(${contestName}) OR
+          LOWER(${tickets.tag7}) = LOWER(${contestName}) OR LOWER(${tickets.tag8}) = LOWER(${contestName}) OR
+          LOWER(${tickets.tag9}) = LOWER(${contestName}) OR LOWER(${tickets.tag10}) = LOWER(${contestName})
         )`);
       }
       if (productName) {
