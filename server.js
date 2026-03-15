@@ -74,7 +74,8 @@ const ALLOWED_CHECKIN_PATHS = [
   '/checkin-script.js',
   '/styles.css',
   '/favicon.ico',
-  '/favicon.png'
+  '/favicon.png',
+  '/app'
 ];
 
 app.use((req, res, next) => {
@@ -100,6 +101,11 @@ app.use((req, res, next) => {
     }
   }
   
+  // チェックイン専用ドメインのルートを /app/ にリダイレクト
+  if (req.isCheckinDomain && (path === '/' || path === '/checkin')) {
+    return res.redirect('/app/');
+  }
+
   next();
 });
 
