@@ -89,21 +89,23 @@ app.use((req, res, next) => {
   // チェックイン専用ドメインかどうかをリクエストに記録
   req.isCheckinDomain = (host === CHECKIN_DOMAIN || host.startsWith('ticket-checkin.'));
   
-  // チェックイン専用ドメインの場合、許可されたパスのみアクセス可能
+  // チェックイン専用ドメインの場合
   if (req.isCheckinDomain) {
     const path = req.path;
-    const isAllowed = ALLOWED_CHECKIN_PATHS.some(allowed => 
+
+    // ルートと旧チェックイン画面を /app/ にリダイレクト
+    if (path === '/' || path === '/checkin') {
+      return res.redirect('/app/');
+    }
+
+    // 許可されたパスのみアクセス可能
+    const isAllowed = ALLOWED_CHECKIN_PATHS.some(allowed =>
       path === allowed || path.startsWith(allowed + '/')
     );
-    
+
     if (!isAllowed) {
       return res.status(404).send('Not Found');
     }
-  }
-  
-  // チェックイン専用ドメインのルートを /app/ にリダイレクト
-  if (req.isCheckinDomain && (path === '/' || path === '/checkin')) {
-    return res.redirect('/app/');
   }
 
   next();
