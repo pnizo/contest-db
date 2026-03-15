@@ -4,7 +4,7 @@
     "start_url": ".",
     "display": "standalone",
     "background_color": "#1a1a2e",
-    "theme_color": "#e94560",
+    "theme_color": "#5045e9",
     "description": "FWJ チェックインアプリ - QRコードスキャナー",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,

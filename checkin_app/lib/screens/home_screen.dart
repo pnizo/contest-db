@@ -134,6 +134,7 @@ class _HomeScreenState extends State<HomeScreen> {
           textAlign: TextAlign.center,
           decoration: const InputDecoration(
             hintText: 'XXXX-XXXX-XXXX',
+            hintStyle: TextStyle(color: Colors.grey),
             border: OutlineInputBorder(),
           ),
           textCapitalization: TextCapitalization.characters,
