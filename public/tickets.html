@@ -43,16 +43,22 @@
                 </div>
                 <div class="filters">
                     <div class="filter-row">
+                        <select id="contestFilter" class="filter-select">
+                            <option value="">大会名を選択</option>
+                        </select>
                         <select id="productFilter" class="filter-select">
                             <option value="">商品名を選択</option>
                         </select>
                         <select id="variantFilter" class="filter-select">
                             <option value="">バリエーション</option>
                         </select>
-                        <input type="text" id="shopifyIdFilter" placeholder="Shopify ID" class="filter-input">
                         <div class="filter-checkbox">
                             <input type="checkbox" id="validOnlyFilter">
-                            <label for="validOnlyFilter">有効のみ表示</label>
+                            <label for="validOnlyFilter">有効</label>
+                        </div>
+                        <div class="filter-checkbox">
+                            <input type="checkbox" id="invalidOnlyFilter">
+                            <label for="invalidOnlyFilter">無効</label>
                         </div>
                         <div class="filter-actions">
                             <button id="clearFiltersBtn" class="filter-btn">クリア</button>
@@ -190,11 +196,17 @@
                 <button class="modal-close" onclick="ticketsManager.closeCsvExportModal()">&times;</button>
             </div>
             <div class="modal-form">
-                <p class="modal-description">「全チケット」を選択すると全件、商品名を選択すると該当するチケットをCSV形式でダウンロードします。</p>
+                <p class="modal-description">大会名や商品名を指定してチケットをCSV形式でダウンロードします。未選択の場合は全件が対象です。</p>
                 <div class="form-group">
-                    <label for="exportProductNameSelect">商品名を選択:</label>
+                    <label for="exportContestSelect">大会名:</label>
+                    <select id="exportContestSelect" class="form-input">
+                        <option value="">全大会</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="exportProductNameSelect">商品名:</label>
                     <select id="exportProductNameSelect" class="form-input">
-                        <option value="">読み込み中...</option>
+                        <option value="">全商品</option>
                     </select>
                 </div>
                 <div class="form-actions">
