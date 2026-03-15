@@ -41,7 +41,8 @@
                                     <button id="newRegistrationBtn" class="btn-dropdown-item">手動登録</button>
                                 </div>
                             </div>
-                            <div class="btn-dropdown admin-only">
+                            <!-- ゼッケン採番はGAS側に移行したためUI非表示 -->
+                            <div class="btn-dropdown admin-only hidden">
                                 <button id="dataNumberingDropdownBtn" class="btn-dropdown-toggle">データ採番 <span class="btn-dropdown-arrow">▼</span></button>
                                 <div id="dataNumberingDropdownMenu" class="btn-dropdown-menu hidden">
                                     <button id="assignPlayerNoBtn" class="btn-dropdown-item">ゼッケン採番</button>
@@ -349,7 +350,7 @@
                 <button class="modal-close" onclick="registrationsManager.closeAssignPlayerNoModal()">&times;</button>
             </div>
             <div class="modal-form">
-                <p class="modal-description">選択した大会の出場登録レコードにゼッケン番号（player_no）を採番します。sort_index順に番号を付与します。</p>
+                <p class="modal-description">選択した大会の出場登録レコードにゼッケン番号（player_no）を採番します。</p>
                 <div class="form-group">
                     <label for="assignPnoContestName">大会名:</label>
                     <select id="assignPnoContestName">

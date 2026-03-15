@@ -291,148 +291,96 @@ router.post('/import', requireAuth, async (req, res) => {
     console.log('Contest date:', contest_date);
     console.log('Contest place:', contest_place);
 
-    // Registrationsから該当する大会のデータを取得
+    // Registrationsから該当する大会のデータを取得（contest_nameで照合）
     const allRegistrations = await registrationModel.findAll();
     const contestRegistrations = allRegistrations.filter(
-      reg => reg.contest_date === contest_date
+      reg => reg.contest_name === contestName
     );
 
-    console.log(`Found ${contestRegistrations.length} registrations for contest date ${contest_date}`);
+    console.log(`Found ${contestRegistrations.length} registrations for contest "${contestName}"`);
 
-    // player_no + class_name をキーとするマップを作成
+    // player_no をキーとするマップを作成（同じ選手は同じfwj_card_noなのでclass_name不要）
     const registrationMap = new Map();
     contestRegistrations.forEach(reg => {
-      const key = `${reg.player_no}|${reg.class_name}`;
-      registrationMap.set(key, {
-        fwj_card_no: reg.fwj_card_no || '',
-        player_name: reg.name_ja || ''
-      });
+      if (!registrationMap.has(reg.player_no)) {
+        registrationMap.set(reg.player_no, {
+          fwj_card_no: reg.fwj_card_no || '',
+          player_name: reg.name_ja || ''
+        });
+      }
     });
 
     console.log(`Created registration map with ${registrationMap.size} entries`);
 
-    // CSVをパース（新しいフォーマット対応）
-    // CSVの1行目に記載されている大会名は無視し、選択された大会情報を使用
+    // CSVをパース（フラットテーブル形式）
+    // L1: タイトル行、L2: 空行、L3: ヘッダー行、L4以降: データ行
     const lines = csvText.split(/\r?\n/);
-    
+
     console.log(`Processing CSV with ${lines.length} lines`);
     console.log('Using selected contest:', contestName, contest_date);
 
     const scores = [];
-    const missingRegistrations = []; // 完全に処理できないレコードを記録（現在は使用しない）
-    const fallbackUsedCount = []; // フォールバックが使用されたレコードを記録
     const csvNameUsedCount = []; // CSVの名前を使用したレコードを記録
-    let currentCategory = '';
-    let inDataSection = false;
-    let lineNumber = 0;
 
-    for (let i = 0; i < lines.length; i++) {
+    // L3（index 2）をヘッダー行として解析
+    if (lines.length < 3) {
+      return res.status(400).json({ success: false, error: 'CSVのフォーマットが不正です（ヘッダー行がありません）' });
+    }
+    const headerValues = parseCSVLine(lines[2].trim());
+    const headerMap = {};
+    headerValues.forEach((h, idx) => {
+      headerMap[h.trim().toLowerCase()] = idx;
+    });
+
+    console.log('CSV headers:', headerValues);
+
+    // L4以降のデータ行を処理
+    for (let i = 3; i < lines.length; i++) {
       const line = lines[i].trim();
-      lineNumber = i + 1;
-      
-      // 最初の2行はスキップ（大会名の行と空行）
-      if (i < 2) {
-        continue;
-      }
-      
-      // 空行をスキップ
-      if (!line) {
-        inDataSection = false;
-        continue;
-      }
+      if (!line) continue;
 
-      // CSVをパース
       const values = parseCSVLine(line);
+      const lineNumber = i + 1;
 
-      // カテゴリー行を検出（最初のセルにデータがあり、他が空）
-      if (values[0] && values[0].trim() && 
-          (!values[1] || !values[1].trim()) && 
-          (!values[4] || !values[4].trim())) {
-        currentCategory = values[0].trim();
-        inDataSection = false;
-        console.log('Found category:', currentCategory);
-        continue;
-      }
+      const category_name = values[headerMap['class_name']] ? values[headerMap['class_name']].trim() : '';
+      const player_no = values[headerMap['player_no']] ? values[headerMap['player_no']].trim() : '';
+      const player_name_csv = values[headerMap['player_name']] ? values[headerMap['player_name']].trim() : '';
+      const placing = values[headerMap['placing']] ? values[headerMap['placing']].trim() : '';
 
-      // ヘッダー行を検出（#, First Name, Last Name, Country, Score, Placing）
-      if (values[0] === '#' && values[1] && values[1].toLowerCase().includes('first')) {
-        inDataSection = true;
-        console.log('Found header for category:', currentCategory);
-        continue;
-      }
+      if (!player_no) continue;
 
-      // データ行を処理
-      // CSVのA列（"#"列）がplayer_noです
-      if (inDataSection && currentCategory && values[0] && values[0].trim()) {
-        const player_no = values[0].trim();  // A列の"#"から取得
-        const first_name = values[1] ? values[1].trim() : '';  // B列
-        const last_name = values[2] ? values[2].trim() : '';   // C列
-        const country = values[3] ? values[3].trim() : '';     // D列
-        const score = values[4] ? values[4].trim() : '';       // E列
-        const placing = values[5] ? values[5].trim() : '';     // F列
+      // player_noでRegistrationsから情報を取得
+      let regData = registrationMap.get(player_no);
 
-        // player_no（A列の"#"）とcategory（class_name）でRegistrationsから情報を取得
-        const regKey = `${player_no}|${currentCategory}`;
-        let regData = registrationMap.get(regKey);
-        let usedFallback = false;
-        let usedCSVName = false;
-        let fallbackFromClass = null;
-
-        // 完全一致するエントリーがない場合、同じゼッケン番号の他のクラスからフォールバック
-        if (!regData) {
-          const fallbackRegistrations = contestRegistrations.filter(
-            reg => reg.player_no === player_no && reg.class_name !== currentCategory
-          );
-          
-          if (fallbackRegistrations.length > 0) {
-            // 同じゼッケン番号の他のクラスから情報を取得（最初の1件を使用）
-            const fallbackReg = fallbackRegistrations[0];
-            regData = {
-              fwj_card_no: fallbackReg.fwj_card_no || '',
-              player_name: fallbackReg.name_ja || ''
-            };
-            usedFallback = true;
-            fallbackFromClass = fallbackReg.class_name;
-            fallbackUsedCount.push({
-              player_no: player_no,
-              class_name: currentCategory,
-              fallback_class: fallbackFromClass,
-              line: lineNumber
-            });
-            console.warn(`Fallback used: player_no=${player_no}, class_name=${currentCategory} -> Using data from class=${fallbackReg.class_name} (fwj_card_no=${regData.fwj_card_no}, player_name=${regData.player_name})`);
-          } else {
-            // フォールバックもできない場合、CSVの名前情報を使用
-            const csvName = `${first_name} ${last_name}`.trim();
-            regData = {
-              fwj_card_no: '', // 空欄
-              player_name: csvName // CSVの名前を使用
-            };
-            usedCSVName = true;
-            csvNameUsedCount.push({
-              player_no: player_no,
-              class_name: currentCategory,
-              csv_name: csvName,
-              line: lineNumber
-            });
-            console.warn(`CSV name used: player_no=${player_no}, class_name=${currentCategory} -> No registration found, using CSV name="${csvName}", fwj_card_no=empty`);
-          }
-        } else {
-          console.log(`Matched: player_no=${player_no}, class_name=${currentCategory} -> fwj_card_no=${regData.fwj_card_no}, player_name=${regData.player_name}`);
-        }
-
-        const scoreData = {
-          contest_date: contest_date,
-          contest_name: contestName,
-          contest_place: contest_place,
-          category_name: currentCategory,
-          player_no: player_no,
-          placing: placing || '',
-          fwj_card_no: regData ? regData.fwj_card_no : '',
-          player_name: regData ? regData.player_name : ''
+      if (!regData) {
+        // Registrationsに見つからない場合、CSVのplayer_nameを使用しfwj_card_noは空欄
+        regData = {
+          fwj_card_no: '',
+          player_name: player_name_csv
         };
-
-        scores.push(scoreData);
+        csvNameUsedCount.push({
+          player_no: player_no,
+          class_name: category_name,
+          csv_name: player_name_csv,
+          line: lineNumber
+        });
+        console.warn(`CSV name used: player_no=${player_no}, class_name=${category_name} -> No registration found, using CSV name="${player_name_csv}", fwj_card_no=empty`);
+      } else {
+        console.log(`Matched: player_no=${player_no}, class_name=${category_name} -> fwj_card_no=${regData.fwj_card_no}, player_name=${regData.player_name}`);
       }
+
+      const scoreData = {
+        contest_date: contest_date,
+        contest_name: contestName,
+        contest_place: contest_place,
+        category_name: category_name,
+        player_no: player_no,
+        placing: placing || '',
+        fwj_card_no: regData.fwj_card_no,
+        player_name: regData.player_name
+      };
+
+      scores.push(scoreData);
     }
 
     console.log(`Parsed ${scores.length} scores from CSV`);
@@ -454,57 +402,31 @@ router.post('/import', requireAuth, async (req, res) => {
     if (result.success) {
       let message = `${result.data.imported}件の成績を正常にインポートしました`;
       
-      // フォールバックまたはCSV名が使用された場合は警告メッセージを追加
-      const hasWarnings = fallbackUsedCount.length > 0 || csvNameUsedCount.length > 0;
-      
-      if (hasWarnings) {
-        message += '\n\n【⚠ 警告】Registrationsに完全一致するエントリーがない成績がありました：';
-      }
-      
-      // フォールバックが使用された場合
-      if (fallbackUsedCount.length > 0) {
-        message += `\n\n🔄 フォールバック使用: ${fallbackUsedCount.length}件`;
-        message += `\n（同じゼッケン番号の他のクラスから情報を取得）`;
-        
-        // 詳細情報（最大5件まで表示）
-        const fallbackDetails = fallbackUsedCount.slice(0, 5).map(item => 
-          `  - ゼッケン番号${item.player_no}の「${item.class_name}」→「${item.fallback_class}」から取得`
-        ).join('\n');
-        
-        message += `\n${fallbackDetails}`;
-        
-        if (fallbackUsedCount.length > 5) {
-          message += `\n  ...他${fallbackUsedCount.length - 5}件`;
-        }
-      }
-      
-      // CSV名が使用された場合
+      // CSV名が使用された場合は警告メッセージを追加
       if (csvNameUsedCount.length > 0) {
+        message += '\n\n【⚠ 警告】Registrationsにゼッケン番号が存在しない成績がありました：';
         message += `\n\n📝 CSV名使用: ${csvNameUsedCount.length}件`;
-        message += `\n（Registrationsにゼッケン番号が存在しないため、CSVの名前を使用、FWJ番号は空欄）`;
-        
+        message += `\n（CSVの名前を使用、FWJ番号は空欄）`;
+
         // 詳細情報（最大5件まで表示）
-        const csvDetails = csvNameUsedCount.slice(0, 5).map(item => 
+        const csvDetails = csvNameUsedCount.slice(0, 5).map(item =>
           `  - ゼッケン番号${item.player_no}「${item.class_name}」→ CSV名「${item.csv_name}」を使用`
         ).join('\n');
-        
+
         message += `\n${csvDetails}`;
-        
+
         if (csvNameUsedCount.length > 5) {
           message += `\n  ...他${csvNameUsedCount.length - 5}件`;
         }
-      }
-      
-      if (hasWarnings) {
+
         message += `\n\n💡 推奨事項: データの正確性を確保するため、該当選手のRegistrationsエントリーを追加することをお勧めします。`;
       }
-      
+
       res.json({
         success: true,
         data: {
           total: result.data.total,
           imported: result.data.imported,
-          fallbackUsed: fallbackUsedCount.length,
           csvNameUsed: csvNameUsedCount.length,
           message: message
         }

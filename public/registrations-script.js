@@ -52,7 +52,7 @@ class RegistrationsManager {
         { key: 'province', label: '都道府県' },
         { key: 'age', label: '年齢' },
         { key: 'class_name', label: 'クラス名' },
-        { key: 'sort_index', label: 'ソート順' },
+
         { key: 'height', label: '身長' },
         { key: 'weight', label: '体重' },
         { key: 'occupation', label: '職業' },
@@ -1408,7 +1408,7 @@ class RegistrationsManager {
         { key: 'province', label: '都道府県' },
             { key: 'age', label: '年齢' },
             { key: 'class_name', label: 'クラス' },
-            { key: 'sort_index', label: 'ソート順' },
+
             { key: 'height', label: '身長' },
             { key: 'weight', label: '体重' },
             { key: 'occupation', label: '職業' },

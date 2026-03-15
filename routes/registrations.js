@@ -339,19 +339,6 @@ router.post('/', requireAuth, async (req, res) => {
   try {
     const data = { ...req.body };
 
-    // sort_index が未指定の場合、同一大会の既存最大値+1をセット
-    if (!data.sort_index && data.contest_name) {
-      const existing = await registrationModel.findByContestName(data.contest_name);
-      let maxSortIndex = 0;
-      existing.forEach(reg => {
-        const si = parseInt(reg.sort_index, 10);
-        if (!isNaN(si) && si > maxSortIndex) {
-          maxSortIndex = si;
-        }
-      });
-      data.sort_index = String(maxSortIndex + 1);
-    }
-
     const result = await registrationModel.createRegistration(data);
     if (result.success) {
       res.status(201).json(result);
@@ -553,7 +540,7 @@ router.get('/export/all_fields/:contestName', requireAuth, async (req, res) => {
       'province': reg.province || '',
       'age': reg.age || '',
       'class_name': reg.class_name || '',
-      'sort_index': reg.sort_index || '',
+
       'height': reg.height || '',
       'weight': reg.weight || '',
       'occupation': reg.occupation || '',
@@ -645,13 +632,6 @@ router.post('/assign-player-numbers', requireAuth, async (req, res) => {
         data: { assigned: 0, skipped: 0, total: 0, contestName, message: '対象レコードがありません' }
       });
     }
-
-    // sort_index 順にソート（数値比較）
-    registrations.sort((a, b) => {
-      const ai = parseInt(a.sort_index, 10) || 99999;
-      const bi = parseInt(b.sort_index, 10) || 99999;
-      return ai - bi;
-    });
 
     const updates = [];
     // fwj_card_no → 割り当て済み player_no のマップ（同一人物に同じ番号を付与）
@@ -852,7 +832,7 @@ router.post('/import-shopify', requireAdmin, async (req, res) => {
         class_name: className,
         back_stage_pass: order.back_stage_pass ?? 0,
         is_member: !!member,
-        sort_index: '',
+
         occupation: order.occupation || '',
         instagram: '',
         biography: order.biography || '',
@@ -939,100 +919,6 @@ router.post('/import-shopify', requireAdmin, async (req, res) => {
       deletedCount = deleteResult.deleted;
     }
 
-    // 7. sort_index 再計算: 全有効レコードを取得してソート
-    const allActiveRegs = await registrationModel.findByContestName(contestName);
-
-    // カテゴリー辞書（優先度順）
-    const CATEGORY_PRIORITY = [
-      'Family Physique', 'ファミリーフィジーク',
-      'Kid\s Physique', 'キッズフィジーク',
-      'Favorite Athlete', 'フェイバリットアスリート',
-      'Women\'s Athlete Model', 'ウィメンズアスリートモデル',
-      'Bikini Model', 'ビキニモデル',
-      'Bikini', 'ビキニ',
-      'Wellness', 'ウェルネス',
-      'Figure', 'フィギュア',
-      'Men\'s Fitness Model', 'メンズフィットネスモデル',
-      'Men\'s Athlete Model', 'メンズアスリートモデル',
-      'Men\'s Physique', 'メンズフィジーク',
-      'Classic Physique', 'クラシックフィジーク',
-      'Classic Stylish Model', 'クラシックスタイリッシュモデル',
-      'Bodybuilding', 'ボディビルディング'
-    ];
-
-    // クラス辞書（優先度順）
-    const CLASS_PRIORITY = [
-      'First Challenge', 'ファーストチャレンジ',
-      'Beginner', 'ビギナー',
-      'Local', 'ローカル',
-      'Revenge', 'リベンジ',
-      'Teen', 'ティーン',
-      'Junior', 'ジュニア',
-      'Masters', 'マスターズ',
-      'Lean', 'リーン',
-      'Plus', 'プラス',
-      'Open', 'オープン',
-      'Lightweight', 'ライトウェイト',
-      'Heavyweight', 'ヘビーウェイト'
-    ];
-
-    function getCustomSortKey(className) {
-      let categoryIndex = CATEGORY_PRIORITY.length;
-      for (let i = 0; i < CATEGORY_PRIORITY.length; i++) {
-        if (className.includes(CATEGORY_PRIORITY[i])) {
-          categoryIndex = i;
-          break;
-        }
-      }
-      let classIndex = CLASS_PRIORITY.length;
-      for (let i = 0; i < CLASS_PRIORITY.length; i++) {
-        if (className.includes(CLASS_PRIORITY[i])) {
-          classIndex = i;
-          break;
-        }
-      }
-      return { categoryIndex, classIndex, className };
-    }
-
-    allActiveRegs.sort((a, b) => {
-      const keyA = getCustomSortKey(a.class_name || '');
-      const keyB = getCustomSortKey(b.class_name || '');
-
-      const aMatchesCategory = keyA.categoryIndex < CATEGORY_PRIORITY.length;
-      const bMatchesCategory = keyB.categoryIndex < CATEGORY_PRIORITY.length;
-
-      // カテゴリーマッチありを優先
-      if (aMatchesCategory && !bMatchesCategory) return -1;
-      if (!aMatchesCategory && bMatchesCategory) return 1;
-
-      if (aMatchesCategory && bMatchesCategory) {
-        // カテゴリー優先度で比較
-        if (keyA.categoryIndex !== keyB.categoryIndex) {
-          return keyA.categoryIndex - keyB.categoryIndex;
-        }
-        // 同カテゴリー内: クラスマッチありを優先
-        const aMatchesClass = keyA.classIndex < CLASS_PRIORITY.length;
-        const bMatchesClass = keyB.classIndex < CLASS_PRIORITY.length;
-        if (aMatchesClass && !bMatchesClass) return -1;
-        if (!aMatchesClass && bMatchesClass) return 1;
-        // 両方クラスマッチなら classIndex で比較
-        if (aMatchesClass && bMatchesClass && keyA.classIndex !== keyB.classIndex) {
-          return keyA.classIndex - keyB.classIndex;
-        }
-      }
-
-      return keyA.className.localeCompare(keyB.className, 'ja');
-    });
-
-    // sort_index を振り直し
-    const sortIndexUpdates = allActiveRegs.map((reg, index) => ({
-      id: reg.id,
-      data: { sort_index: String(index + 1) }
-    }));
-    if (sortIndexUpdates.length > 0) {
-      await registrationModel.batchUpdate(sortIndexUpdates);
-    }
-
     // 結果レスポンス
     const total = insertedCount + updatedCount + deletedCount + preservedCount;
     const message = `${insertedCount}件を新規追加、${updatedCount}件を更新、${deletedCount}件を削除しました`
@@ -1095,7 +981,7 @@ router.post('/import-csv', requireAdmin, async (req, res) => {
       'name_ja', 'name_ja_kana', 'first_name', 'last_name',
       'email', 'phone',
       'country', 'province', 'age', 'class_name',
-      'sort_index',
+
       'height', 'weight',
       'occupation', 'instagram', 'biography', 'entry_date', 'back_stage_pass',
       'is_member', 'isValid'

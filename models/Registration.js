@@ -26,7 +26,7 @@ class Registration {
       province: row.province || '',
       age: row.age || '',
       class_name: row.className || '',
-      sort_index: row.sortIndex || '',
+
       height: row.height || '',
       weight: row.weight || '',
       occupation: row.occupation || '',
@@ -227,7 +227,7 @@ class Registration {
       'country': registrations.country,
       'province': registrations.province,
       'age': sql`CAST(NULLIF(${registrations.age}, '') AS INTEGER)`,
-      'sort_index': sql`CAST(NULLIF(${registrations.sortIndex}, '') AS INTEGER)`,
+
       'height': registrations.height,
       'weight': registrations.weight,
       'occupation': registrations.occupation,
@@ -319,7 +319,7 @@ class Registration {
         province: data.province || null,
         age: data.age || null,
         className: data.class_name || null,
-        sortIndex: data.sort_index || null,
+
         height: data.height || null,
         weight: data.weight || null,
         occupation: data.occupation || null,
@@ -365,7 +365,7 @@ class Registration {
     if (data.province !== undefined) updateData.province = data.province || null;
     if (data.age !== undefined) updateData.age = data.age || null;
     if (data.class_name !== undefined) updateData.className = data.class_name || null;
-    if (data.sort_index !== undefined) updateData.sortIndex = data.sort_index || null;
+
     if (data.height !== undefined) updateData.height = data.height || null;
     if (data.weight !== undefined) updateData.weight = data.weight || null;
     if (data.occupation !== undefined) updateData.occupation = data.occupation || null;
@@ -543,7 +543,7 @@ class Registration {
           province: normalizedRow['province'] || null,
           age: normalizedRow['age'] || null,
           className: normalizedRow['class_name'] || null,
-          sortIndex: normalizedRow['sort_index'] || null,
+
           height: normalizedRow['height'] || null,
           weight: normalizedRow['weight'] || null,
           occupation: normalizedRow['occupation'] || null,

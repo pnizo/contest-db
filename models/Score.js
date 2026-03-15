@@ -424,14 +424,12 @@ class Score {
     }
 
     const requiredHeaders = [
-      'fwj_card_no',
-      'contest_date',
       'contest_name',
-      'contest_place',
-      'category_name',
-      'placing',
+      'contest_date',
+      'class_name',
       'player_no',
-      'player_name'
+      'player_name',
+      'placing'
     ];
 
     const firstRow = csvData[0];
@@ -444,20 +442,10 @@ class Score {
       !headers.find(header => header.trim().toLowerCase() === required.trim().toLowerCase())
     );
 
-    // NPCJ番号からFWJ番号への移行対応
-    if (missingRequired.includes('fwj_card_no')) {
-      const hasFwjNo = headers.some(header => header.trim() === 'npcj_no');
-      if (hasFwjNo) {
-        const index = missingRequired.indexOf('fwj_card_no');
-        missingRequired.splice(index, 1);
-        console.log('Using npcj_no as substitute for fwj_card_no');
-      }
-    }
-
     if (missingRequired.length > 0) {
       return {
         isValid: false,
-        error: `必須ヘッダーが不足しています: ${missingRequired.join(', ')}\n\n期待される全ヘッダー:\n${requiredHeaders.join(', ')} (npcj_noをfwj_card_noの代替として使用可能)\n\n見つかったヘッダー:\n${headers.join(', ')}`
+        error: `必須ヘッダーが不足しています: ${missingRequired.join(', ')}\n\n期待される全ヘッダー:\n${requiredHeaders.join(', ')}\n\n見つかったヘッダー:\n${headers.join(', ')}`
       };
     }
 

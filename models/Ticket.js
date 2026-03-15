@@ -78,15 +78,27 @@ class Ticket {
    * フィルターオプションを取得
    * @returns {Promise<object>} フィルターオプション（商品名、支払いステータス、発送ステータス）
    */
-  async getFilterOptions() {
+  async getFilterOptions(contestName) {
     try {
       const db = getDb();
+
+      // 商品名の絞り込み条件（大会名指定時はタグでフィルタ）
+      const productConditions = [sql`${tickets.productName} IS NOT NULL AND ${tickets.productName} != ''`];
+      if (contestName) {
+        productConditions.push(sql`(
+          LOWER(${tickets.tag1}) = LOWER(${contestName}) OR LOWER(${tickets.tag2}) = LOWER(${contestName}) OR
+          LOWER(${tickets.tag3}) = LOWER(${contestName}) OR LOWER(${tickets.tag4}) = LOWER(${contestName}) OR
+          LOWER(${tickets.tag5}) = LOWER(${contestName}) OR LOWER(${tickets.tag6}) = LOWER(${contestName}) OR
+          LOWER(${tickets.tag7}) = LOWER(${contestName}) OR LOWER(${tickets.tag8}) = LOWER(${contestName}) OR
+          LOWER(${tickets.tag9}) = LOWER(${contestName}) OR LOWER(${tickets.tag10}) = LOWER(${contestName})
+        )`);
+      }
 
       // 一意の商品名を取得
       const productNameRows = await db
         .selectDistinct({ productName: tickets.productName })
         .from(tickets)
-        .where(sql`${tickets.productName} IS NOT NULL AND ${tickets.productName} != ''`)
+        .where(and(...productConditions))
         .orderBy(tickets.productName);
 
       // 一意のバリエーションを取得
@@ -116,8 +128,20 @@ class Ticket {
       // フィルタ条件を構築
       const conditions = [];
 
+      if (filters.contest_name) {
+        const contestName = filters.contest_name;
+        conditions.push(
+          sql`(
+            ${tickets.tag1} = ${contestName} OR ${tickets.tag2} = ${contestName} OR
+            ${tickets.tag3} = ${contestName} OR ${tickets.tag4} = ${contestName} OR
+            ${tickets.tag5} = ${contestName} OR ${tickets.tag6} = ${contestName} OR
+            ${tickets.tag7} = ${contestName} OR ${tickets.tag8} = ${contestName} OR
+            ${tickets.tag9} = ${contestName} OR ${tickets.tag10} = ${contestName}
+          )`
+        );
+      }
       if (filters.product_name) {
-        conditions.push(ilike(tickets.productName, `%${filters.product_name}%`));
+        conditions.push(eq(tickets.productName, filters.product_name));
       }
       if (filters.variant) {
         conditions.push(eq(tickets.variant, filters.variant));
@@ -128,11 +152,8 @@ class Ticket {
       if (filters.valid_only === 'true') {
         conditions.push(eq(tickets.isUsable, true));
       }
-      if (filters.shopify_id_filter) {
-        const filterValue = filters.shopify_id_filter.toString();
-        conditions.push(
-          sql`(${tickets.shopifyId} = ${filterValue} OR ${tickets.ownerShopifyId} = ${filterValue})`
-        );
+      if (filters.invalid_only === 'true') {
+        conditions.push(eq(tickets.isUsable, false));
       }
       if (filters.search) {
         const searchTerm = `%${filters.search}%`;
@@ -778,6 +799,37 @@ class Ticket {
       return rows.map(row => this._toSnakeCase(row));
     } catch (error) {
       console.error('Error in findByProductName:', error);
+      throw error;
+    }
+  }
+
+  async findForExport(contestName, productName) {
+    try {
+      const db = getDb();
+      const conditions = [];
+
+      if (contestName) {
+        conditions.push(sql`(
+          LOWER(${tickets.tag1}) = LOWER(${contestName}) OR LOWER(${tickets.tag2}) = LOWER(${contestName}) OR
+          LOWER(${tickets.tag3}) = LOWER(${contestName}) OR LOWER(${tickets.tag4}) = LOWER(${contestName}) OR
+          LOWER(${tickets.tag5}) = LOWER(${contestName}) OR LOWER(${tickets.tag6}) = LOWER(${contestName}) OR
+          LOWER(${tickets.tag7}) = LOWER(${contestName}) OR LOWER(${tickets.tag8}) = LOWER(${contestName}) OR
+          LOWER(${tickets.tag9}) = LOWER(${contestName}) OR LOWER(${tickets.tag10}) = LOWER(${contestName})
+        )`);
+      }
+      if (productName) {
+        conditions.push(eq(tickets.productName, productName));
+      }
+
+      let query = db.select().from(tickets);
+      if (conditions.length > 0) {
+        query = query.where(and(...conditions));
+      }
+      const rows = await query.orderBy(desc(tickets.id));
+
+      return rows.map(row => this._toSnakeCase(row));
+    } catch (error) {
+      console.error('Error in findForExport:', error);
       throw error;
     }
   }

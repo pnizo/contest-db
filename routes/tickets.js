@@ -1,5 +1,6 @@
 const express = require('express');
 const Ticket = require('../models/Ticket');
+const Contest = require('../models/Contest');
 const ShopifyService = require('../services/shopify');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
 const router = express.Router();
@@ -19,36 +20,20 @@ function getShopifyService() {
 // すべて認証が必要
 router.use(requireAuth);
 
-// GET /export-all - 全チケットの全項目取得
-router.get('/export-all', async (req, res) => {
+// GET /export - チケットエクスポート（大会名・商品名で絞り込み可能）
+router.get('/export', async (req, res) => {
   try {
-    const tickets = await ticketModel.findAll();
+    const { contest_name, product_name } = req.query;
+    const tickets = await ticketModel.findForExport(contest_name, product_name);
 
     // ファイル名を生成（日付付き）
     const date = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-    const filename = `tickets_all_${date}.csv`;
-
-    res.json({
-      success: true,
-      data: tickets,
-      filename
-    });
-  } catch (error) {
-    console.error('Export all tickets error:', error);
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-// GET /export/:productName - 指定商品名を持つチケットの全項目取得
-router.get('/export/:productName', async (req, res) => {
-  try {
-    const productName = decodeURIComponent(req.params.productName);
-    const tickets = await ticketModel.findByProductName(productName);
-
-    // ファイル名を生成（日付付き）
-    const date = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-    const safeName = productName.replace(/[^\w\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]/g, '_');
-    const filename = `tickets_${safeName}_${date}.csv`;
+    let namePart = 'all';
+    if (contest_name || product_name) {
+      const parts = [contest_name, product_name].filter(Boolean);
+      namePart = parts.map(s => s.replace(/[^\w\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]/g, '_')).join('_');
+    }
+    const filename = `tickets_${namePart}_${date}.csv`;
 
     res.json({
       success: true,
@@ -163,10 +148,26 @@ router.post('/import-csv', requireAdmin, async (req, res) => {
 // GET /filter-options - フィルターオプション取得
 router.get('/filter-options', async (req, res) => {
   try {
-    const options = await ticketModel.getFilterOptions();
+    const { contest_name } = req.query;
+    const options = await ticketModel.getFilterOptions(contest_name);
+
+    // Contestsテーブルから大会名を取得（1か月以上前の大会は除外、contest_date降順）
+    const contestModel = new Contest();
+    const allContests = await contestModel.findAll();
+    const oneMonthAgo = new Date();
+    oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+    const contestNames = allContests
+      .filter(c => c.contest_name && c.contest_date && new Date(c.contest_date) >= oneMonthAgo)
+      .sort((a, b) => new Date(b.contest_date) - new Date(a.contest_date))
+      .map(c => c.contest_name);
+
     res.json({
       success: true,
-      data: options
+      data: {
+        contestNames,
+        productNames: options.productNames,
+        variants: options.variants
+      }
     });
   } catch (error) {
     console.error('Filter options error:', error);
@@ -180,11 +181,12 @@ router.get('/', async (req, res) => {
     const {
       page = 1,
       limit = 50,
+      contest_name,
       product_name,
       variant,
       fulfillment_status,
-      shopify_id_filter,
       valid_only,
+      invalid_only,
       search,
       startDate,
       endDate,
@@ -193,11 +195,12 @@ router.get('/', async (req, res) => {
     } = req.query;
 
     const filters = {};
+    if (contest_name) filters.contest_name = contest_name;
     if (product_name) filters.product_name = product_name;
     if (variant) filters.variant = variant;
     if (fulfillment_status) filters.fulfillment_status = fulfillment_status;
-    if (shopify_id_filter) filters.shopify_id_filter = shopify_id_filter;
     if (valid_only) filters.valid_only = valid_only;
+    if (invalid_only) filters.invalid_only = invalid_only;
     if (search) filters.search = search;
     if (startDate) filters.startDate = startDate;
     if (endDate) filters.endDate = endDate;
