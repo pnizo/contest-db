@@ -18,7 +18,7 @@ class CheckinApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF5045E9),
+          seedColor: const Color(0xFFE94560),
           brightness: Brightness.light,
         ),
         useMaterial3: true,
